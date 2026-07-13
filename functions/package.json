@@ -1,0 +1,18 @@
+{
+  "name": "kadi-api",
+  "version": "0.1.0",
+  "description": "KADI API — Catalyst Advanced I/O Functions (Node) with a local mock backend",
+  "private": true,
+  "type": "commonjs",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node local-server.js",
+    "dev": "node local-server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "express": "^4.19.2"
+  }
+}

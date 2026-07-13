@@ -1,0 +1,129 @@
+// app.js — the KADI API surface (Express). Runs locally and, wrapped, as a Catalyst
+// Advanced I/O Function. Every route: RBAC-scoped, returns the standard envelope, and
+// insight endpoints carry an `explanation`/`fairness` payload. Reads only precomputed
+// data — no heavy compute here (that lives in AppSail/Jobs).
+const express = require('express');
+const cors = require('cors');
+const { handle, forbidden } = require('./lib/envelope');
+const rbac = require('./services/rbac');
+const q = require('./services/queries');
+const assistant = require('./services/assistant');
+const audit = require('./services/audit');
+
+function buildApp() {
+  const app = express();
+  app.use(cors());
+  app.use(express.json({ limit: '1mb' }));
+  app.use((req, _res, next) => {
+    req.user = rbac.userFromRequest(req);
+    req.clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local';
+    next();
+  });
+
+  const r = express.Router();
+
+  r.get('/health', handle(async () => ({ status: 'ok', service: 'kadi-api', time: new Date().toISOString() })));
+
+  r.get('/me', handle(async (req) => ({
+    user: { appUserId: req.user.appUserId, name: req.user.name, role: req.user.role,
+      unitId: req.user.unitId, districtId: req.user.districtId },
+    capabilities: rbac.capabilities(req.user),
+    fairness: q.FAIRNESS_STATEMENT,
+    roles: Object.keys(rbac.DEMO_USERS),
+  })));
+
+  r.get('/lookups', handle(async () => q.lookups()));
+  r.get('/stats', handle(async (req) => q.stats(req.user)));
+  r.get('/alerts', handle(async (req) => q.alerts(req.user)));
+  r.get('/eval', handle(async () => q.evalReport()));
+  r.get('/clusters', handle(async () => q.clusters().slice(0, 100)));
+
+  // cases
+  r.get('/cases', handle(async (req) => q.listCases(req.user, req.query)));
+  r.get('/cases/:id', handle(async (req) => {
+    audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
+    return q.getCase(req.user, req.params.id);
+  }));
+
+  // graph (the hero)
+  r.get('/graph/case/:id', handle(async (req) => {
+    audit.record({ user: req.user, action: 'view_graph', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
+    return q.graphForCase(req.user, req.params.id, { maxNeighbors: Number(req.query.maxNeighbors) || 60 });
+  }));
+  r.get('/graph/cluster/:id', handle(async (req) => q.getCluster(req.user, req.params.id)));
+  r.get('/graph/search', handle(async (req) => ({ clusters: q.clusters().filter((c) => {
+    if (req.query.crossDistrict === 'true' && !c.crossDistrict) return false;
+    if (req.query.minSize && c.size < Number(req.query.minSize)) return false;
+    return true;
+  }).slice(0, 60) })));
+
+  // offenders
+  r.get('/offenders', handle(async (req) => q.listOffenders(req.user, req.query)));
+  r.get('/offenders/:id', handle(async (req) => {
+    audit.record({ user: req.user, action: 'view_offender', targetType: 'offender', targetId: req.params.id, ip: req.clientIp });
+    return q.getOffender(req.user, req.params.id);
+  }));
+
+  // investigation health
+  r.get('/health/cases', handle(async (req) => q.listHealth(req.user, req.query)));
+  r.get('/health/summary', handle(async (req) => q.healthSummary(req.user)));
+
+  // geo
+  r.get('/geo/points', handle(async (req) => q.geoPoints(req.user, req.query)));
+  r.get('/geo/hotspots', handle(async (req) => q.hotspots(req.user, req.query)));
+
+  // analytics (role-gated)
+  r.get('/analytics/vulnerability', handle(async (req) => q.vulnerability(req.user)));
+
+  // assistant
+  r.post('/assistant/query', handle(async (req) => {
+    const text = (req.body && req.body.text) || '';
+    const lang = (req.body && req.body.lang) || 'en';
+    audit.record({ user: req.user, action: 'assistant_query', targetType: 'nl', queryText: text, ip: req.clientIp });
+    return assistant.query(req.user, text, lang);
+  }));
+  r.post('/assistant/voice', handle(async (req) => {
+    // Local fallback: client does Web Speech STT/TTS; here we answer the transcribed text.
+    const text = (req.body && req.body.text) || '';
+    const lang = (req.body && req.body.lang) || 'en';
+    audit.record({ user: req.user, action: 'assistant_voice', targetType: 'nl', queryText: text, ip: req.clientIp });
+    const ans = assistant.query(req.user, text, lang);
+    return { ...ans, ttsText: ans.answer };
+  }));
+  r.post('/assistant/export', handle(async (req) => {
+    const { title, messages } = req.body || {};
+    const html = renderBriefingHtml(title || 'KADI Briefing', messages || [], req.user);
+    // Catalyst path: SmartBrowz -> PDF -> Stratus signed URL. Local: return HTML.
+    return { format: 'html', filename: `KADI_briefing_${Date.now()}.html`, html };
+  }));
+
+  // audit (role-gated)
+  r.get('/audit', handle(async (req) => {
+    rbac.requireRole(req.user, ['ACP', 'Admin']);
+    return { items: audit.list({ limit: Number(req.query.limit) || 100, action: req.query.action }) };
+  }));
+
+  app.use('/', r);
+  app.use((req, res) => res.status(404).json({ ok: false, error: { code: 'not_found', message: `No route ${req.method} ${req.path}` } }));
+  return app;
+}
+
+function renderBriefingHtml(title, messages, user) {
+  const rows = messages.map((m) => `<div class="msg ${m.role}"><b>${m.role === 'user' ? 'Q' : 'KADI'}:</b> ${escapeHtml(m.content || '')}
+    ${(m.citations || []).map((c) => `<span class="cite">${c.label}</span>`).join(' ')}</div>`).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+  <style>body{font-family:Inter,Arial,sans-serif;color:#1C2A3A;margin:40px;}
+  h1{color:#0B3D75}.msg{margin:10px 0;padding:10px;border-left:3px solid #1A6FC4;background:#F5F7FA}
+  .cite{background:#EAF3FB;color:#1A6FC4;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:6px}
+  .foot{margin-top:30px;color:#5B6B7E;font-size:12px}</style></head>
+  <body><h1>${escapeHtml(title)}</h1>
+  <p>Generated by KADI · Karnataka State Police · ${new Date().toLocaleString()} · Role: ${user.role}</p>
+  ${rows}
+  <div class="foot">Insights use evidence &amp; behaviour only — never caste, religion or occupation. Demo dataset (synthetic).</div>
+  </body></html>`;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+module.exports = { buildApp };
