@@ -1,75 +1,84 @@
 # PROGRESS — KADI (KadiLabs)
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-14_
 
 Source of truth for build status. Three sections: **Done**, **Next**, **⚠️ Needs Adarsh**.
+
+The whole stack runs **locally end-to-end** against a mock backend (reads generated CSVs +
+precomputed read-model) behind a store interface, so the Catalyst adapters drop in unchanged.
 
 ---
 
 ## ✅ Done
 
 ### Phase 0 — Foundations
-- [x] Read all 6 docs + CLAUDE.md; confirmed plan.
-- [x] `git init`, git identity set (Adarsh Dwivedi / adarshdwivedi256@gmail.com).
-- [x] Repo folder layout created (`data/`, `functions/`, `appsail/`, `client/`).
-- [x] `.gitignore`, `PROGRESS.md`, `catalyst.json`, `.env.example`.
+- Repo scaffold, git identity, `.gitignore`, `catalyst.json`, `.env.example` (mock|catalyst switch).
+
+### Phase 1 — Data + vertical slice
+- **Synthetic generator** (`data/generator`): 31 real districts, crime taxonomy, IPC/BNS/IT/NDPS
+  sections, Kannada name pool, MO templates. Deterministic (SEED=2026); 40k FIRs + parties/acts/
+  arrests/chargesheets across 29 tables in ~1.3s; CrimeNo per schema.
+- **7 planted ground-truth patterns** (cross-district gang, serial burglary, cyber ring, repeat
+  offender, slipping cases, false-case cluster, emerging hotspot) + 40 ordinary repeat offenders.
+- **`validate.py`**: FK integrity, CrimeNo format, pattern presence, fairness chi-square — all pass.
+- **Cases list + detail** end-to-end (RBAC-scoped) through the API.
+
+### Phase 2 — Hero: linkage graph + offenders
+- **AppSail pipeline**: entity resolution (rarity-aware, 12s), MO similarity (TF-IDF), graph build
+  (typed LinkEdges + evidence), community detection (Louvain), risk, health, anomaly, spatial.
+- **Ground-truth eval: 100%** cluster recovery, 100% single-person ER, repeat-offender High risk,
+  emerging hotspot detected (target ≥90%).
+- **Graph explorer** (Cytoscape fcose): animated ego-network, typed edges, cluster colours,
+  **"Why linked"** evidence panel, legend, deep-links — verified live.
+- **Offender watchlist + profile**: risk gauge, glass-box factor breakdown, ER variants/confidence,
+  "protected attributes: none".
+
+### Phase 3 — Intelligence + trust
+- **Health cockpit** (worklist + flags + peer medians + recommended actions), **Map** (MapLibre
+  hotspots + emerging trends), **Audit** log, **Admin** (fairness/eval/pipeline status).
+- **RBAC** enforced server-side (SI/Inspector unit · ACP district · Analyst/Admin state) +
+  capability gates; audit on every sensitive read.
+
+### Phase 4 — Assistant + voice + export
+- Grounded **NL assistant** (EN + Kannada) over safe query tools, always cites FIRs; **Web Speech**
+  voice in/out; **PDF export** (HTML briefing; SmartBrowz adapter for Catalyst).
+
+### Cross-cutting
+- Node API (Express) usable locally + as Catalyst Advanced I/O Function; standard `{ok,data|error}`
+  envelope; `/health`, `/me`, `/eval`.
+- AppSail Flask service + Jobs (`recompute_graph` Cron, `recompute_metrics` Signal).
+- **Tests:** 11 Python (fairness, ER, eval, health) + 7 Node (envelope, RBAC, graph evidence) — all
+  pass. README written.
 
 ---
 
-## 🔜 Next (in order)
-
-### Phase 0 (finish)
-- [ ] Client scaffold: Vite + React 18 + TS + Tailwind, design tokens, app shell (topbar/sidebar/fairness banner).
-- [ ] Functions API scaffold: router + error envelope + service interfaces (Catalyst adapter + local mock).
-- [ ] AppSail hello + pipeline module stubs.
-
-### Phase 1 — Data + vertical slice
-- [ ] Synthetic data generator (`data/generator`) per `06_SYNTHETIC_DATA_SPEC.md` → CSVs + `_ground_truth.json` + `_manifest.json`.
-- [ ] `GET /cases`, `GET /cases/:id` (RBAC-scoped) against local mock data layer.
-- [ ] Client: Case list + Case detail reading through the API.
-- [ ] Deploy skeleton to Catalyst (needs Adarsh — see below).
-
-### Phase 2 — Hero: graph + offenders
-- [ ] AppSail pipeline: entity_resolution → graph_build → community → mo_similarity.
-- [ ] Ground-truth eval test (≥90% planted gangs recovered).
-- [ ] `/graph/*`, `/offenders/*` endpoints; Cytoscape explorer + "Why linked" panel; offender profile.
-
-### Phase 3 — Intelligence + trust
-- [ ] health_metrics, anomaly, spatial, risk_score; `/health/*`, `/geo/*`, `/analytics/*`, `/audit`.
-- [ ] Health cockpit, Map, Audit screens; fairness panel; RBAC hardening.
-
-### Phase 4 — Assistant + voice + export
-- [ ] `/assistant/query`, `/assistant/voice`, `/assistant/export`; assistant UI.
-
-### Phase 5 — Harden + pitch
-- [ ] Seed demo path; a11y; deploy + smoke test; deck + video.
+## 🔜 Next
+- **Deploy to Catalyst** (needs the console/credential items below), then whitelist domain + CORS.
+- Wire **QuickML GLM-4.7 + RAG** behind the assistant's existing tool interface (adapter stub ready).
+- Wire **Zia** STT/TTS/translation (Web Speech is the local fallback today).
+- **SmartBrowz** PDF render (local returns HTML briefing today).
+- Catalyst **Data Store** adapter for the store interface (mock is feature-complete).
+- Phase 5 polish: perf pass, a11y sweep, seed a locked flawless demo path.
+- **Deck (official PPT) + demo video** — owner + content (I can draft the deck outline/script).
 
 ---
 
 ## ⚠️ Needs Adarsh (console / credentials — I can't do these)
 
-> I've mocked every one of these behind an interface so the app runs locally meanwhile.
+> Every one of these is mocked behind an interface, so the app runs fully locally meanwhile.
 
-1. **Install Catalyst CLI** on your machine so we can deploy:
-   ```
-   npm i -g zcatalyst-cli
-   catalyst login
-   ```
-   (The CLI is not installed in this environment; I've written `catalyst.json` ready for it.)
-
-2. **Catalyst project** — you gave me: project **KadiLabs**, Project ID **55468000000013048**. ✅
-   Still need: **org/environment ID**, and confirm the project's data-center domain (e.g. `.catalyst.zoho.in` vs `.zoho.com`).
-
-3. **Enable services** in the Catalyst console (Cloud Scale): Authentication, Data Store, NoSQL, Cache, Stratus, QuickML, Zia, Cron, API Gateway, Signals, AppSail, Pipelines.
-
-4. **Data import**: create a Stratus bucket for CSV upload; confirm `catalyst data-store import` is available on your plan.
-
-5. **QuickML** (Phase 4): LLM (GLM-4.7) deployment ID + endpoint URL; Connection with scope `quickml.deployment.read`; RAG knowledge-base document IDs.
-
-6. **Zia** (Phase 4): enable Zia Services; confirm **Kannada STT/TTS** availability (else we use the translation fallback).
-
-7. **Auth / CORS**: whitelist the Slate front-end domain and enable CORS once deployed.
-
-8. **Credits**: confirm free-credit claim covers Data Store + AppSail + QuickML usage.
-
-9. **Submission**: exact deadline + team details for README/deck.
+1. **Install Catalyst CLI + login** on your machine to deploy: `npm i -g zcatalyst-cli && catalyst login`.
+   (Not installable in this environment.)
+2. **Project** = KadiLabs, ID **55468000000013048** ✅. Still need **org/environment ID** and the
+   data-centre domain (`.catalyst.zoho.in` vs `.com`).
+3. **Enable services** (Cloud Scale): Authentication, Data Store, NoSQL, Cache, Stratus, QuickML,
+   Zia, Cron, API Gateway, Signals, AppSail, Pipelines.
+4. **Data import**: create a Stratus bucket; run `catalyst data-store import` (config per table,
+   FK order in `data/output/_manifest.json`).
+5. **QuickML**: GLM-4.7 deployment ID + endpoint URL; Connection scope `quickml.deployment.read`;
+   RAG knowledge-base document IDs (IPC/BNS/SOP docs).
+6. **Zia**: enable Zia Services; confirm **Kannada STT/TTS** availability (else translation fallback).
+7. **Auth / CORS**: whitelist the Slate front-end domain + enable CORS once deployed.
+8. **Credits**: confirm free-credit claim covers Data Store + AppSail + QuickML.
+9. **Submission**: exact deadline + team details for README/deck; confirm AppSail Python stack
+   version (3.9 vs 3.11) for `appsail/app-config.json`.
