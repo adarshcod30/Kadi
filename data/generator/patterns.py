@@ -67,10 +67,13 @@ def inject_all(b, rng, today) -> dict:
 # 1. Cross-district chain-snatching gang
 # ---------------------------------------------------------------------------
 def _gang_chain_snatching(b, rng, today):
-    canonical = "Ravikumar Gowda"
-    variants = ["Ravikumar Gowda", "Ravi Kumar Gowda", "Ravikumar G", "Ravi K Gowda"]
-    co1_variants = ["Imran Pasha", "Imran Pasha S", "Imran P"]
-    co2_variants = ["Suresh Naik", "Suresh Naika", "Suresh N"]
+    # Distinctive surnames (not in the random name pool) so entity resolution can
+    # resolve them confidently by name across stations — mirrors a real, traceable
+    # offender identity. Random accused with common names require corroboration.
+    canonical = "Ravikumar Doddamani"
+    variants = ["Ravikumar Doddamani", "Ravi Kumar Doddamani", "Ravikumar D", "Ravi K Doddamani"]
+    co1_variants = ["Imran Chikkanna", "Imran Chikkanna S", "Imran C"]
+    co2_variants = ["Suresh Yaraguntla", "Suresha Yaraguntla", "Suresh Y"]
 
     districts = [1, 2, 29]  # Bengaluru City, Bengaluru Rural, Ramanagara
     units = []
@@ -125,8 +128,8 @@ def _gang_chain_snatching(b, rng, today):
 # 2. Serial burglary chain (one district, escalating dates, 2 accused)
 # ---------------------------------------------------------------------------
 def _serial_burglary(b, rng, today):
-    a1_variants = ["Manjunath Setty", "Manjunatha Setty", "Manju Setty"]
-    a2_variants = ["Prakash Naik", "Prakash Naika"]
+    a1_variants = ["Manjunath Talwar", "Manjunatha Talwar", "Manju Talwar"]
+    a2_variants = ["Prakash Marihal", "Prakash Marihala"]
     district = 3  # Mysuru
     units = rng.sample(b.units_by_district[district], min(3, len(b.units_by_district[district])))
     n = rng.randint(6, 8)
@@ -165,7 +168,7 @@ def _serial_burglary(b, rng, today):
 # 3. Cyber-fraud ring (shared accused, UPI/OTP modus, victims skew age band)
 # ---------------------------------------------------------------------------
 def _cyber_ring(b, rng, today):
-    ring_variants = ["Naveen Kumar", "Naveen Kumar R", "Naveena Kumar"]
+    ring_variants = ["Naveen Hosakote", "Naveen Hosakote R", "Naveena Hosakote"]
     districts = [1, 4, 5, 6]  # spread across state
     n = rng.randint(7, 9)
     case_ids, accused_ids, used_d = [], [], set()
@@ -201,7 +204,7 @@ def _cyber_ring(b, rng, today):
 # 4. Repeat offender out on bail (priors + arrests, re-offends -> high risk)
 # ---------------------------------------------------------------------------
 def _repeat_offender_on_bail(b, rng, today):
-    variants = ["Basavaraj Hiremath", "Basavaraja Hiremath", "Basava Hiremath"]
+    variants = ["Basavaraj Belavadi", "Basavaraja Belavadi", "Basava Belavadi"]
     district = 5  # Belagavi
     units = rng.sample(b.units_by_district[district], min(3, len(b.units_by_district[district])))
     case_ids, accused_ids, arrests = [], [], 0

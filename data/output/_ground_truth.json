@@ -3,16 +3,16 @@
   "gangs": [
     {
       "name": "Cross-district chain-snatching gang",
-      "canonicalOffender": "Ravikumar Gowda",
+      "canonicalOffender": "Ravikumar Doddamani",
       "variants": [
-        "Ravikumar Gowda",
-        "Ravi Kumar Gowda",
-        "Ravikumar G",
-        "Ravi K Gowda"
+        "Ravikumar Doddamani",
+        "Ravi Kumar Doddamani",
+        "Ravikumar D",
+        "Ravi K Doddamani"
       ],
       "coAccused": [
-        "Imran Pasha",
-        "Suresh Naik"
+        "Imran Chikkanna",
+        "Suresh Yaraguntla"
       ],
       "caseMasterIds": [
         40001,
@@ -66,18 +66,18 @@
     {
       "name": "Serial burglary chain",
       "canonicalOffenders": [
-        "Manjunath Setty",
-        "Prakash Naik"
+        "Manjunath Talwar",
+        "Prakash Marihal"
       ],
       "variants": {
         "a1": [
-          "Manjunath Setty",
-          "Manjunatha Setty",
-          "Manju Setty"
+          "Manjunath Talwar",
+          "Manjunatha Talwar",
+          "Manju Talwar"
         ],
         "a2": [
-          "Prakash Naik",
-          "Prakash Naika"
+          "Prakash Marihal",
+          "Prakash Marihala"
         ]
       },
       "caseMasterIds": [
@@ -115,11 +115,11 @@
   ],
   "cyberRing": {
     "name": "Cyber-fraud ring (UPI/OTP)",
-    "canonicalOffender": "Naveen Kumar",
+    "canonicalOffender": "Naveen Hosakote",
     "variants": [
-      "Naveen Kumar",
-      "Naveen Kumar R",
-      "Naveena Kumar"
+      "Naveen Hosakote",
+      "Naveen Hosakote R",
+      "Naveena Hosakote"
     ],
     "caseMasterIds": [
       40017,
@@ -155,11 +155,11 @@
   "riskyOffenderIds": [
     {
       "name": "Repeat offender out on bail",
-      "canonicalOffender": "Basavaraj Hiremath",
+      "canonicalOffender": "Basavaraj Belavadi",
       "variants": [
-        "Basavaraj Hiremath",
-        "Basavaraja Hiremath",
-        "Basava Hiremath"
+        "Basavaraj Belavadi",
+        "Basavaraja Belavadi",
+        "Basava Belavadi"
       ],
       "caseMasterIds": [
         40025,
