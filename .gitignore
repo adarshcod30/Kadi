@@ -30,9 +30,11 @@ catalyst-config.json
 .catalyst/
 .catalystrc
 
-# Generated data (large) — keep spec + ground truth small ones tracked selectively
+# Generated data (large, regenerable via generate.py / run_pipeline.py).
+# Keep only the small spec artifacts: _ground_truth.json, _manifest.json.
 data/output/*.csv
 data/output/rag/*.pdf
+data/output/derived/
 
 # Logs
 *.log
