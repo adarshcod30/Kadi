@@ -224,9 +224,9 @@
     "district": 1,
     "crimeHeadId": 2,
     "crimeSubHeadId": 205,
-    "centroidLat": 12.9352,
-    "centroidLng": 77.6245,
-    "windowDays": 60,
+    "centroidLat": 12.956,
+    "centroidLng": 77.748,
+    "windowDays": 55,
     "caseMasterIds": [
       40053,
       40054,
@@ -272,8 +272,536 @@
       40094,
       40095,
       40096,
-      40097
+      40097,
+      40098,
+      40099,
+      40100,
+      40101,
+      40102,
+      40103,
+      40104,
+      40105,
+      40106,
+      40107,
+      40108,
+      40109,
+      40110,
+      40111,
+      40112,
+      40113,
+      40114,
+      40115,
+      40116,
+      40117,
+      40118,
+      40119,
+      40120,
+      40121,
+      40122
     ],
     "cellIds": []
-  }
+  },
+  "ordinaryRepeatOffenders": [
+    {
+      "canonicalOffender": "Shankar Kadaganchi",
+      "surname": "Kadaganchi",
+      "caseMasterIds": [
+        40123,
+        40124,
+        40125
+      ],
+      "accusedMasterIds": [
+        35919,
+        35920,
+        35921
+      ],
+      "district": 3
+    },
+    {
+      "canonicalOffender": "Umesh Mahalingpur",
+      "surname": "Mahalingpur",
+      "caseMasterIds": [
+        40126,
+        40127,
+        40128
+      ],
+      "accusedMasterIds": [
+        35922,
+        35923,
+        35924
+      ],
+      "district": 5
+    },
+    {
+      "canonicalOffender": "Syed Savadatti",
+      "surname": "Savadatti",
+      "caseMasterIds": [
+        40129,
+        40130,
+        40131,
+        40132
+      ],
+      "accusedMasterIds": [
+        35925,
+        35926,
+        35927,
+        35928
+      ],
+      "district": 24
+    },
+    {
+      "canonicalOffender": "Nagaraj Nidagundi",
+      "surname": "Nidagundi",
+      "caseMasterIds": [
+        40133,
+        40134
+      ],
+      "accusedMasterIds": [
+        35929,
+        35930
+      ],
+      "district": 9
+    },
+    {
+      "canonicalOffender": "Girish Ranebennur",
+      "surname": "Ranebennur",
+      "caseMasterIds": [
+        40135,
+        40136,
+        40137
+      ],
+      "accusedMasterIds": [
+        35931,
+        35932,
+        35933
+      ],
+      "district": 12
+    },
+    {
+      "canonicalOffender": "Rohit Halagatti",
+      "surname": "Halagatti",
+      "caseMasterIds": [
+        40138,
+        40139,
+        40140,
+        40141
+      ],
+      "accusedMasterIds": [
+        35934,
+        35935,
+        35936,
+        35937
+      ],
+      "district": 15
+    },
+    {
+      "canonicalOffender": "Abdul Bommanahalli",
+      "surname": "Bommanahalli",
+      "caseMasterIds": [
+        40142,
+        40143,
+        40144
+      ],
+      "accusedMasterIds": [
+        35938,
+        35939,
+        35940
+      ],
+      "district": 16
+    },
+    {
+      "canonicalOffender": "Syed Yelburga",
+      "surname": "Yelburga",
+      "caseMasterIds": [
+        40145,
+        40146
+      ],
+      "accusedMasterIds": [
+        35941,
+        35942
+      ],
+      "district": 4
+    },
+    {
+      "canonicalOffender": "Kiran Mundargi",
+      "surname": "Mundargi",
+      "caseMasterIds": [
+        40147,
+        40148,
+        40149,
+        40150
+      ],
+      "accusedMasterIds": [
+        35943,
+        35944,
+        35945,
+        35946
+      ],
+      "district": 15
+    },
+    {
+      "canonicalOffender": "Ashok Aland",
+      "surname": "Aland",
+      "caseMasterIds": [
+        40151,
+        40152
+      ],
+      "accusedMasterIds": [
+        35947,
+        35948
+      ],
+      "district": 29
+    },
+    {
+      "canonicalOffender": "Yogesh Chincholi",
+      "surname": "Chincholi",
+      "caseMasterIds": [
+        40153,
+        40154,
+        40155,
+        40156
+      ],
+      "accusedMasterIds": [
+        35949,
+        35950,
+        35951,
+        35952
+      ],
+      "district": 11
+    },
+    {
+      "canonicalOffender": "Manjunath Sedam",
+      "surname": "Sedam",
+      "caseMasterIds": [
+        40157,
+        40158,
+        40159,
+        40160
+      ],
+      "accusedMasterIds": [
+        35953,
+        35954,
+        35955,
+        35956
+      ],
+      "district": 27
+    },
+    {
+      "canonicalOffender": "Kiran Afzalpur",
+      "surname": "Afzalpur",
+      "caseMasterIds": [
+        40161,
+        40162,
+        40163,
+        40164
+      ],
+      "accusedMasterIds": [
+        35957,
+        35958,
+        35959,
+        35960
+      ],
+      "district": 26
+    },
+    {
+      "canonicalOffender": "Santosh Basavakalyan",
+      "surname": "Basavakalyan",
+      "caseMasterIds": [
+        40165,
+        40166,
+        40167,
+        40168
+      ],
+      "accusedMasterIds": [
+        35961,
+        35962,
+        35963,
+        35964
+      ],
+      "district": 12
+    },
+    {
+      "canonicalOffender": "Sandeep Humnabad",
+      "surname": "Humnabad",
+      "caseMasterIds": [
+        40169,
+        40170,
+        40171,
+        40172
+      ],
+      "accusedMasterIds": [
+        35965,
+        35966,
+        35967,
+        35968
+      ],
+      "district": 4
+    },
+    {
+      "canonicalOffender": "Nagaraj Shorapur",
+      "surname": "Shorapur",
+      "caseMasterIds": [
+        40173,
+        40174,
+        40175,
+        40176
+      ],
+      "accusedMasterIds": [
+        35969,
+        35970,
+        35971,
+        35972
+      ],
+      "district": 10
+    },
+    {
+      "canonicalOffender": "Chandru Lingsugur",
+      "surname": "Lingsugur",
+      "caseMasterIds": [
+        40177,
+        40178,
+        40179,
+        40180
+      ],
+      "accusedMasterIds": [
+        35973,
+        35974,
+        35975,
+        35976
+      ],
+      "district": 2
+    },
+    {
+      "canonicalOffender": "Shankar Manvi",
+      "surname": "Manvi",
+      "caseMasterIds": [
+        40181,
+        40182,
+        40183,
+        40184
+      ],
+      "accusedMasterIds": [
+        35977,
+        35978,
+        35979,
+        35980
+      ],
+      "district": 26
+    },
+    {
+      "canonicalOffender": "Yogesh Sindhanur",
+      "surname": "Sindhanur",
+      "caseMasterIds": [
+        40185,
+        40186,
+        40187
+      ],
+      "accusedMasterIds": [
+        35981,
+        35982,
+        35983
+      ],
+      "district": 19
+    },
+    {
+      "canonicalOffender": "Sunil Gangavathi",
+      "surname": "Gangavathi",
+      "caseMasterIds": [
+        40188,
+        40189
+      ],
+      "accusedMasterIds": [
+        35984,
+        35985
+      ],
+      "district": 28
+    },
+    {
+      "canonicalOffender": "Santosh Kustagi",
+      "surname": "Kustagi",
+      "caseMasterIds": [
+        40190,
+        40191
+      ],
+      "accusedMasterIds": [
+        35986,
+        35987
+      ],
+      "district": 29
+    },
+    {
+      "canonicalOffender": "Venkatesh Shiggaon",
+      "surname": "Shiggaon",
+      "caseMasterIds": [
+        40192,
+        40193,
+        40194,
+        40195
+      ],
+      "accusedMasterIds": [
+        35988,
+        35989,
+        35990,
+        35991
+      ],
+      "district": 30
+    },
+    {
+      "canonicalOffender": "Karthik Byadgi",
+      "surname": "Byadgi",
+      "caseMasterIds": [
+        40196,
+        40197,
+        40198,
+        40199
+      ],
+      "accusedMasterIds": [
+        35992,
+        35993,
+        35994,
+        35995
+      ],
+      "district": 21
+    },
+    {
+      "canonicalOffender": "Sunil Hangal",
+      "surname": "Hangal",
+      "caseMasterIds": [
+        40200,
+        40201
+      ],
+      "accusedMasterIds": [
+        35996,
+        35997
+      ],
+      "district": 8
+    },
+    {
+      "canonicalOffender": "Deepak Kalghatgi",
+      "surname": "Kalghatgi",
+      "caseMasterIds": [
+        40202,
+        40203
+      ],
+      "accusedMasterIds": [
+        35998,
+        35999
+      ],
+      "district": 31
+    },
+    {
+      "canonicalOffender": "Vinay Kundgol",
+      "surname": "Kundgol",
+      "caseMasterIds": [
+        40204,
+        40205
+      ],
+      "accusedMasterIds": [
+        36000,
+        36001
+      ],
+      "district": 15
+    },
+    {
+      "canonicalOffender": "Deepak Navalgund",
+      "surname": "Navalgund",
+      "caseMasterIds": [
+        40206,
+        40207
+      ],
+      "accusedMasterIds": [
+        36002,
+        36003
+      ],
+      "district": 17
+    },
+    {
+      "canonicalOffender": "Raghavendra Ron",
+      "surname": "Ron",
+      "caseMasterIds": [
+        40208,
+        40209,
+        40210
+      ],
+      "accusedMasterIds": [
+        36004,
+        36005,
+        36006
+      ],
+      "district": 26
+    },
+    {
+      "canonicalOffender": "Santosh Nargund",
+      "surname": "Nargund",
+      "caseMasterIds": [
+        40211,
+        40212,
+        40213
+      ],
+      "accusedMasterIds": [
+        36007,
+        36008,
+        36009
+      ],
+      "district": 23
+    },
+    {
+      "canonicalOffender": "Vishnu Mudhol",
+      "surname": "Mudhol",
+      "caseMasterIds": [
+        40214,
+        40215,
+        40216
+      ],
+      "accusedMasterIds": [
+        36010,
+        36011,
+        36012
+      ],
+      "district": 1
+    },
+    {
+      "canonicalOffender": "Mohan Jamkhandi",
+      "surname": "Jamkhandi",
+      "caseMasterIds": [
+        40217,
+        40218,
+        40219
+      ],
+      "accusedMasterIds": [
+        36013,
+        36014,
+        36015
+      ],
+      "district": 30
+    },
+    {
+      "canonicalOffender": "Venkatesh Hunagund",
+      "surname": "Hunagund",
+      "caseMasterIds": [
+        40220,
+        40221
+      ],
+      "accusedMasterIds": [
+        36016,
+        36017
+      ],
+      "district": 3
+    },
+    {
+      "canonicalOffender": "Lokesh Badami",
+      "surname": "Badami",
+      "caseMasterIds": [
+        40222,
+        40223,
+        40224
+      ],
+      "accusedMasterIds": [
+        36018,
+        36019,
+        36020
+      ],
+      "district": 13
+    }
+  ]
 }

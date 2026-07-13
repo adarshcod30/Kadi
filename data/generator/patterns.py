@@ -23,6 +23,18 @@ from datetime import datetime, timedelta
 import karnataka as K
 
 
+# Distinctive surnames reserved for planted offenders (NOT in the random name pool),
+# so entity resolution resolves them confidently by name.
+PLANTED_SURNAMES = [
+    "Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi",
+    "Kadaganchi", "Mahalingpur", "Savadatti", "Nidagundi", "Ranebennur", "Halagatti",
+    "Bommanahalli", "Yelburga", "Mundargi", "Aland", "Chincholi", "Sedam", "Afzalpur",
+    "Basavakalyan", "Humnabad", "Shorapur", "Lingsugur", "Manvi", "Sindhanur", "Gangavathi",
+    "Kustagi", "Shiggaon", "Byadgi", "Hangal", "Kalghatgi", "Kundgol", "Navalgund",
+    "Ron", "Nargund", "Mudhol", "Jamkhandi", "Hunagund", "Badami",
+]
+
+
 def _pick_unit(b, district_id, rng):
     return rng.choice(b.units_by_district[district_id])
 
@@ -60,7 +72,48 @@ def inject_all(b, rng, today) -> dict:
     gt["slippingCaseIds"] = _slipping_cases(b, rng, today)
     gt["falseCaseCluster"] = _false_case_cluster(b, rng, today)
     gt["emergingHotspot"] = _emerging_hotspot(b, rng, today)
+    gt["ordinaryRepeatOffenders"] = _ordinary_repeat_offenders(b, rng, today)
     return gt
+
+
+def _ordinary_repeat_offenders(b, rng, today):
+    """~40 everyday repeat offenders (distinctive surnames, 2-4 cases each) so the
+    offender watchlist and network views are realistically populated."""
+    used = {"Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi"}
+    pool = [s for s in PLANTED_SURNAMES if s not in used]
+    records = []
+    for surname in pool:
+        first = rng.choice(K.FIRST_NAMES_M)
+        n = rng.randint(2, 4)
+        district = rng.choice(list(K.DISTRICT_WEIGHTS.keys()))
+        case_ids, accused_ids = [], []
+        dt = datetime(2024, rng.randint(1, 12), rng.randint(1, 28), rng.randint(6, 23), 0)
+        for i in range(n):
+            u = _pick_unit(b, district, rng)
+            dt = dt + timedelta(days=rng.randint(40, 220))
+            if dt.date() > today:
+                dt = datetime.combine(today - timedelta(days=rng.randint(5, 60)), datetime.min.time())
+            shid = rng.choice([201, 202, 203, 205, 206, 401, 501])
+            arrested = rng.random() < 0.5
+            case = b.make_case(district_id=district, unit_id=u["UnitID"], subhead_id=shid,
+                               incident_dt=dt, status_id=2 if arrested else 1,
+                               io_emp_id=_io_for(b, u["UnitID"], rng))
+            cid = case["CaseMasterID"]
+            b.add_complainant(cid); b.add_victim(cid)
+            # name variant: occasional initial or spelling change
+            nm = f"{first} {surname}"
+            if i and rng.random() < 0.5:
+                nm = f"{first} {surname} {rng.choice(K.INITIALS)}"
+            aid = b.add_accused(cid, name=nm, gender_id=1, person_index=1)
+            accused_ids.append(aid)
+            if arrested:
+                b.add_arrest(cid, aid, district, u["UnitID"], _io_for(b, u["UnitID"], rng),
+                             (dt + timedelta(days=12)).date())
+            case_ids.append(cid)
+        records.append({"canonicalOffender": f"{first} {surname}", "surname": surname,
+                        "caseMasterIds": case_ids, "accusedMasterIds": accused_ids,
+                        "district": district})
+    return records
 
 
 # ---------------------------------------------------------------------------
@@ -295,16 +348,17 @@ def _false_case_cluster(b, rng, today):
 # ---------------------------------------------------------------------------
 def _emerging_hotspot(b, rng, today):
     district = 1
-    clat, clng = K.BENGALURU_HOTSPOTS[1]  # Koramangala-ish
+    # a distinct spot NOT on the base Bengaluru hotspot centroids, so the historical
+    # baseline is low and the recent spike reads as genuinely emerging.
+    clat, clng = 12.9560, 77.7480   # Whitefield-ish, east Bengaluru
     unit = _pick_unit(b, district, rng)
     io = _io_for(b, unit["UnitID"], rng)
     ids = []
-    for i in range(45):
-        # concentrate in last ~60 days
-        incident = datetime.combine(today - timedelta(days=rng.randint(1, 60)),
+    for i in range(70):
+        incident = datetime.combine(today - timedelta(days=rng.randint(1, 55)),
                                     datetime.min.time()) + timedelta(hours=rng.randint(18, 23))
-        lat = round(clat + rng.uniform(-0.006, 0.006), 6)
-        lng = round(clng + rng.uniform(-0.006, 0.006), 6)
+        lat = round(clat + rng.uniform(-0.004, 0.004), 6)
+        lng = round(clng + rng.uniform(-0.004, 0.004), 6)
         case = b.make_case(district_id=district, unit_id=unit["UnitID"], subhead_id=205,  # MV theft
                            incident_dt=incident, status_id=rng.choice([1, 4]),
                            lat=lat, lng=lng, io_emp_id=io)
@@ -312,4 +366,4 @@ def _emerging_hotspot(b, rng, today):
         ids.append(case["CaseMasterID"])
     return {"name": "Emerging MV-theft hotspot", "district": district, "crimeHeadId": 2,
             "crimeSubHeadId": 205, "centroidLat": clat, "centroidLng": clng,
-            "windowDays": 60, "caseMasterIds": ids, "cellIds": []}
+            "windowDays": 55, "caseMasterIds": ids, "cellIds": []}
