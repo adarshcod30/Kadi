@@ -1,0 +1,11 @@
+{
+  "name": "kadi-appsail",
+  "stack": "python3.9",
+  "command": "python app.py",
+  "runtime": "python",
+  "memory": 1024,
+  "env_variables": {
+    "DATA_DIR": "./data/output"
+  },
+  "_note": "Catalyst AppSail managed Python runtime. Confirm exact stack version (3.9 vs 3.11) with Adarsh; if 3.11 unavailable, libs already pin >= compatible versions. The pipeline is invoked via /run-pipeline or the Jobs in jobs/."
+}

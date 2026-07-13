@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-14T02:15:20",
+  "generated": "2026-07-14T02:46:52",
   "seed": 2026,
   "import_order": [
     "State",
@@ -54,11 +54,11 @@
     "CasteMaster": 5,
     "OccupationMaster": 10,
     "Court": 31,
-    "CaseMaster": 40224,
-    "ComplainantDetails": 40224,
-    "Victim": 50389,
-    "Accused": 36020,
-    "ActSectionAssociation": 58707,
+    "CaseMaster": 40220,
+    "ComplainantDetails": 40220,
+    "Victim": 50385,
+    "Accused": 36008,
+    "ActSectionAssociation": 58704,
     "ArrestSurrender": 11624,
     "inv_arrestsurrenderaccused": 11624,
     "ChargesheetDetails": 22393

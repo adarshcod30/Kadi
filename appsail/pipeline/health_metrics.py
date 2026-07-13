@@ -85,8 +85,8 @@ def compute(tables, edges, ctx, cluster_of, today):
         # undetected risk
         undetected_score = 0.0
         if status in ("1", "4") and acc_count.get(row.CaseMasterID, 0) == 0:
-            undetected_score = min(1.0, 0.3 + age_days / 900.0)
-            if undetected_score >= 0.7:
+            undetected_score = min(1.0, 0.4 + age_days / 720.0)
+            if undetected_score >= 0.6:
                 flags.append({"flag": "undetected_risk",
                               "reason": "No accused identified and case ageing — risk of remaining undetected"})
         # false-case pattern

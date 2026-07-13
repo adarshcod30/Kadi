@@ -314,8 +314,7 @@ def _slipping_cases(b, rng, today):
                            incident_dt=incident, status_id=status, io_emp_id=io)
         cid = case["CaseMasterID"]
         b.add_complainant(cid); b.add_victim(cid)
-        if rng.random() < 0.5:
-            b.add_accused(cid, person_index=1)
+        # slipping cases have no accused progress — that is why they are slipping
         ids.append(cid)
     return ids
 
