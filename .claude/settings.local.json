@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(echo \"npm: $\\(npm -v 2>/dev/null || echo MISSING\\)\")",
+      "Bash(pip3 --version)",
+      "Bash(echo \"pip3: $\\(pip3 --version 2>/dev/null || echo MISSING\\)\")",
+      "Bash(git --version)"
+    ]
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "note": "Synthetic planted ground truth for KADI evaluation. Not imported to Data Store.",
+  "gangs": [
+    {
+      "name": "Cross-district chain-snatching gang",
+      "canonicalOffender": "Ravikumar Gowda",
+      "variants": [
+        "Ravikumar Gowda",
+        "Ravi Kumar Gowda",
+        "Ravikumar G",
+        "Ravi K Gowda"
+      ],
+      "coAccused": [
+        "Imran Pasha",
+        "Suresh Naik"
+      ],
+      "caseMasterIds": [
+        40001,
+        40002,
+        40003,
+        40004,
+        40005,
+        40006,
+        40007,
+        40008,
+        40009,
+        40010
+      ],
+      "accusedMasterIds": [
+        35857,
+        35858,
+        35859,
+        35860,
+        35861,
+        35862,
+        35863,
+        35864,
+        35865,
+        35866,
+        35867,
+        35868,
+        35869,
+        35870,
+        35871,
+        35872,
+        35873,
+        35874,
+        35875,
+        35876
+      ],
+      "districts": [
+        1,
+        2,
+        29
+      ],
+      "stations": [
+        100,
+        127,
+        128,
+        292
+      ],
+      "expectedCluster": true
+    }
+  ],
+  "serialChains": [
+    {
+      "name": "Serial burglary chain",
+      "canonicalOffenders": [
+        "Manjunath Setty",
+        "Prakash Naik"
+      ],
+      "variants": {
+        "a1": [
+          "Manjunath Setty",
+          "Manjunatha Setty",
+          "Manju Setty"
+        ],
+        "a2": [
+          "Prakash Naik",
+          "Prakash Naika"
+        ]
+      },
+      "caseMasterIds": [
+        40011,
+        40012,
+        40013,
+        40014,
+        40015,
+        40016
+      ],
+      "accusedMasterIds": [
+        35877,
+        35878,
+        35879,
+        35880,
+        35881,
+        35882,
+        35883,
+        35884,
+        35885,
+        35886,
+        35887,
+        35888
+      ],
+      "districts": [
+        3
+      ],
+      "stations": [
+        140,
+        141,
+        146
+      ],
+      "expectedCluster": true
+    }
+  ],
+  "cyberRing": {
+    "name": "Cyber-fraud ring (UPI/OTP)",
+    "canonicalOffender": "Naveen Kumar",
+    "variants": [
+      "Naveen Kumar",
+      "Naveen Kumar R",
+      "Naveena Kumar"
+    ],
+    "caseMasterIds": [
+      40017,
+      40018,
+      40019,
+      40020,
+      40021,
+      40022,
+      40023,
+      40024
+    ],
+    "accusedMasterIds": [
+      35889,
+      35890,
+      35891,
+      35892,
+      35893,
+      35894,
+      35895,
+      35896
+    ],
+    "districts": [
+      1,
+      4,
+      6
+    ],
+    "victimAgeBand": [
+      55,
+      72
+    ],
+    "expectedCluster": true
+  },
+  "riskyOffenderIds": [
+    {
+      "name": "Repeat offender out on bail",
+      "canonicalOffender": "Basavaraj Hiremath",
+      "variants": [
+        "Basavaraj Hiremath",
+        "Basavaraja Hiremath",
+        "Basava Hiremath"
+      ],
+      "caseMasterIds": [
+        40025,
+        40026,
+        40027,
+        40028,
+        40029,
+        40030
+      ],
+      "accusedMasterIds": [
+        35897,
+        35898,
+        35899,
+        35900,
+        35901,
+        35902
+      ],
+      "districts": [
+        5
+      ],
+      "priorArrests": 3,
+      "expectedHighRisk": true
+    }
+  ],
+  "slippingCaseIds": [
+    40031,
+    40032,
+    40033,
+    40034,
+    40035,
+    40036,
+    40037,
+    40038,
+    40039,
+    40040,
+    40041,
+    40042
+  ],
+  "falseCaseCluster": {
+    "name": "False-case cluster",
+    "stationUnitId": 207,
+    "district": 8,
+    "caseMasterIds": [
+      40043,
+      40044,
+      40045,
+      40046,
+      40047,
+      40048,
+      40049,
+      40050,
+      40051
+    ],
+    "cstype": "B"
+  },
+  "emergingHotspot": {
+    "name": "Emerging MV-theft hotspot",
+    "district": 1,
+    "crimeHeadId": 2,
+    "crimeSubHeadId": 205,
+    "centroidLat": 12.9352,
+    "centroidLng": 77.6245,
+    "windowDays": 60,
+    "caseMasterIds": [
+      40052,
+      40053,
+      40054,
+      40055,
+      40056,
+      40057,
+      40058,
+      40059,
+      40060,
+      40061,
+      40062,
+      40063,
+      40064,
+      40065,
+      40066,
+      40067,
+      40068,
+      40069,
+      40070,
+      40071,
+      40072,
+      40073,
+      40074,
+      40075,
+      40076,
+      40077,
+      40078,
+      40079,
+      40080,
+      40081,
+      40082,
+      40083,
+      40084,
+      40085,
+      40086,
+      40087,
+      40088,
+      40089,
+      40090,
+      40091,
+      40092,
+      40093,
+      40094,
+      40095,
+      40096
+    ],
+    "cellIds": []
+  }
+}

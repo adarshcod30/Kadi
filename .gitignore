@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Build outputs
+dist/
+build/
+.vite/
+client/dist/
+*.tsbuildinfo
+
+# Environment & secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+*.pem
+catalyst-config.json
+.catalyst/
+.catalystrc
+
+# Generated data (large) — keep spec + ground truth small ones tracked selectively
+data/output/*.csv
+data/output/rag/*.pdf
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
