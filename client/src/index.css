@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --kadi-navy: #0B3D75;
+  --kadi-blue: #1A6FC4;
+  --kadi-teal: #2FA8A0;
+  --kadi-saffron: #E8871E;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-surface-2 text-ink font-sans antialiased;
+  margin: 0;
+}
+.font-num { font-variant-numeric: tabular-nums; }
+.kn { font-family: 'Noto Sans Kannada', Inter, sans-serif; }
+
+/* Focus visibility for accessibility */
+:focus-visible { outline: 2px solid var(--kadi-blue); outline-offset: 2px; border-radius: 4px; }
+
+/* Reusable component classes */
+@layer components {
+  .card { @apply bg-surface border border-line rounded-card shadow-card; }
+  .btn { @apply inline-flex items-center gap-2 px-3 py-2 rounded-ctl text-sm font-medium transition-colors; }
+  .btn-primary { @apply btn bg-kadi-navy text-white hover:bg-kadi-navy700; }
+  .btn-ghost { @apply btn text-ink-muted hover:bg-surface-3; }
+  .btn-outline { @apply btn border border-line text-ink hover:bg-surface-3; }
+  .chip { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium; }
+  .input { @apply px-3 py-2 rounded-ctl border border-line bg-surface text-sm focus:border-kadi-blue outline-none; }
+  .label { @apply text-xs font-medium text-ink-muted uppercase tracking-wide; }
+  .link { @apply text-kadi-blue hover:underline cursor-pointer; }
+}
+
+/* Skeleton shimmer */
+.skeleton { @apply bg-surface-3 rounded animate-pulse; }
+
+/* Graph canvas container */
+.graph-canvas { background: linear-gradient(180deg,#FBFCFE 0%, #F5F7FA 100%); }
+
+/* MapLibre attribution tone-down */
+.maplibregl-ctrl-attrib { font-size: 10px; opacity: .6; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
