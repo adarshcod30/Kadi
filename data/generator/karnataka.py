@@ -329,49 +329,104 @@ INITIALS = list("RSKMGHNPVBLTDA")
 
 # ---------------------------------------------------------------------------
 # MO (modus operandi) templates per sub-head — used for BriefFacts & MO similarity.
-# {victim}/{loc}/{item}/{time} filled at generation. Planted patterns reuse a
-# distinctive template so MO-similarity linking is demonstrable.
+# Many varied templates + rich fill vocabulary so UNRELATED cases have low mutual
+# text similarity (TF-IDF cosine), while the planted rings reuse a single distinctive
+# template (see patterns.py) and therefore surface as high-similarity MO clusters.
 # ---------------------------------------------------------------------------
 MO_TEMPLATES = {
     201: [
-        "Unknown persons committed theft of {item} from {loc} during {time}.",
-        "Complainant reports {item} stolen from residence at {loc} in the {time}.",
+        "Unknown persons committed theft of {item} from {loc} during {time} by {method}.",
+        "Complainant reports {item} stolen from {place} at {loc} in the {time}.",
+        "Theft of {item} noticed at {loc}; suspect {method} while the {place} was unattended.",
+        "The complainant left {item} at {place} near {loc}; on return during {time} it was missing.",
+        "Pickpocketing of {item} reported in a crowded {place} at {loc} during {time}.",
+        "{item} kept in the {place} at {loc} was stolen; entry gained by {method}.",
     ],
     202: [
-        "Accused broke open the door lock of house at {loc} at {time} and decamped with {item}.",
-        "House-breaking reported at {loc}; almirah broken, {item} missing, occurred {time}.",
+        "Accused broke open the {barrier} of the house at {loc} at {time} and decamped with {item}.",
+        "House-breaking at {loc}; {barrier} tampered, {item} missing, occurred {time}.",
+        "Culprits entered a locked residence at {loc} by {method} and took {item} from the {place}.",
+        "Burglary reported at {loc}: {barrier} damaged, {item} and valuables removed during {time}.",
     ],
     203: [
-        "Two persons on motorcycle threatened complainant with weapon at {loc} and robbed {item}.",
-        "Accused waylaid the complainant near {loc} in the {time} and robbed {item} at knife-point.",
+        "{count} persons threatened the complainant with {weapon} at {loc} and robbed {item}.",
+        "Accused waylaid the complainant near {loc} in the {time} and robbed {item} at {weapon}-point.",
+        "Highway robbery near {loc}: {count} men stopped the vehicle and took {item} using {weapon}.",
     ],
     206: [
-        "Two accused on a motorcycle snatched the gold chain of the complainant near {loc} and sped away.",
-        "Pillion rider snatched {item} from the complainant walking near {loc} in the {time} and fled on bike.",
+        "A pillion rider snatched {item} from the complainant near {loc} and escaped on a {vehicle}.",
+        "Chain-snatching at {loc} during {time}; {count} youths on a {vehicle} fled with {item}.",
+        "Snatching of {item} from a pedestrian near {loc}; accused escaped through {method}.",
     ],
     205: [
-        "Complainant's two-wheeler parked at {loc} was found missing on returning {time}.",
-        "Motor vehicle bearing registration parked near {loc} stolen during {time}.",
+        "The complainant's {vehicle} parked at {loc} was found missing on returning {time}.",
+        "Motor-vehicle theft near {loc}: {vehicle} stolen during {time} by {method}.",
+        "{vehicle} parked outside a {place} at {loc} was stolen in the {time}.",
     ],
     401: [
-        "Complainant received a call impersonating bank staff and shared OTP; {item} debited via UPI.",
-        "Accused sent a phishing link; complainant lost {item} in an unauthorised UPI transaction {time}.",
+        "Complainant received a call from a fake {authority} and shared an OTP; {amount} debited via UPI.",
+        "Accused sent a phishing link posing as {authority}; complainant lost {amount} in {time}.",
+        "Online fraud: victim induced to install a {app} app on pretext of {pretext}, losing {amount}.",
+        "Fraudster promised {pretext} and collected {amount} through multiple UPI transfers {time}.",
     ],
     402: [
-        "Accused befriended complainant online, obtained private media and extorted money threatening release.",
+        "Accused befriended the complainant on {app}, obtained private media and extorted {amount}.",
+        "Sextortion: video call recorded and used to demand {amount} over {app} {time}.",
+    ],
+    403: [
+        "Accused created a fake profile impersonating the complainant on {app} to defraud contacts.",
+        "Identity theft: complainant's documents misused to obtain a {pretext} {time}.",
+    ],
+    404: [
+        "Victim responded to a {pretext} advertisement and paid {amount} as processing fee via UPI.",
+        "Investment fraud: accused promised high returns and collected {amount} {time}.",
     ],
     101: [
         "Complainant found the deceased with injuries at {loc}; suspected homicide reported {time}.",
+        "A body bearing {weapon} injuries was recovered at {loc} in the {time}.",
+    ],
+    102: [
+        "Accused assaulted the complainant with {weapon} at {loc} with intent to kill {time}.",
     ],
     103: [
-        "Quarrel over money at {loc} led accused to assault the complainant causing injuries {time}.",
+        "A quarrel over {pretext} at {loc} led the accused to assault the complainant {time}.",
+        "The complainant sustained injuries when {count} persons attacked with {weapon} at {loc}.",
+    ],
+    104: [
+        "Verbal altercation at {loc} escalated; accused pushed and injured the complainant {time}.",
+    ],
+    301: [
+        "Complainant alleges harassment for dowry by in-laws at {loc} over the past months.",
+    ],
+    501: [
+        "Accused cheated the complainant of {amount} on a false promise of {pretext}.",
     ],
 }
-GENERIC_MO = "Offence reported at {loc} during {time}; investigation taken up."
+GENERIC_MO = "Offence of {subhead} reported at {loc} during {time}; investigation taken up under law."
 
 STOLEN_ITEMS = [
-    "gold ornaments", "a mobile phone", "cash and jewellery", "a two-wheeler",
-    "a laptop", "a gold chain", "silver articles", "cash", "electronic items",
-    "documents and cash", "a wristwatch and cash",
+    "gold ornaments", "a mobile phone", "cash and jewellery", "a laptop", "a gold chain",
+    "silver articles", "two gold bangles", "cash of Rs. 40,000", "electronic items",
+    "documents and cash", "a wristwatch and cash", "a mangalsutra", "gold earrings",
+    "a handbag with valuables", "power tools", "copper wire", "a bicycle",
 ]
-TIME_PHRASES = ["late night", "early morning hours", "afternoon", "evening", "night"]
+TIME_PHRASES = ["late night", "early morning hours", "afternoon", "evening", "small hours",
+                "post-midnight", "day-time absence", "office hours"]
+METHODS = ["cutting the grill", "using a duplicate key", "distracting the victim",
+           "climbing the compound wall", "breaking the window latch", "picking the lock",
+           "posing as a delivery agent", "tailgating into the parking"]
+PLACES = ["a jewellery shop", "a residential flat", "a parked scooter", "a shop counter",
+          "a temple premises", "a bus stand", "a hostel room", "an ATM kiosk",
+          "a market stall", "a school compound", "a rented house", "a godown"]
+BARRIERS = ["door lock", "rear window grill", "back door", "shutter lock", "almirah"]
+WEAPONS = ["a knife", "a machete", "an iron rod", "a wooden club", "a country pistol"]
+VEHICLES = ["black motorcycle", "scooter", "sedan car", "auto-rickshaw", "bike without number plate"]
+COUNTS = ["two", "three", "four", "a group of"]
+AUTHORITIES = ["bank official", "KYC department", "electricity board", "police officer",
+               "courier company", "mobile operator"]
+APPS = ["a messaging", "a screen-sharing", "a social media", "a trading", "a dating"]
+PRETEXTS = ["a work-from-home job", "a lottery prize", "electricity bill update",
+            "a loan approval", "a customs clearance", "a matrimonial alliance",
+            "a part-time task", "a KYC re-verification"]
+AMOUNTS = ["Rs. 15,000", "Rs. 50,000", "Rs. 1,20,000", "Rs. 8,500", "Rs. 2,40,000",
+           "Rs. 75,000", "Rs. 3,10,000"]

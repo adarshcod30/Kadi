@@ -229,10 +229,22 @@ class Builder:
     def _brief(self, subhead_id):
         templates = K.MO_TEMPLATES.get(subhead_id)
         tpl = self.rng.choice(templates) if templates else K.GENERIC_MO
+        sh = self.subhead_index.get(subhead_id)
         return tpl.format(
             item=self.rng.choice(K.STOLEN_ITEMS),
             loc=self._locality_phrase(),
             time=self.rng.choice(K.TIME_PHRASES),
+            method=self.rng.choice(K.METHODS),
+            place=self.rng.choice(K.PLACES),
+            barrier=self.rng.choice(K.BARRIERS),
+            weapon=self.rng.choice(K.WEAPONS),
+            vehicle=self.rng.choice(K.VEHICLES),
+            count=self.rng.choice(K.COUNTS),
+            authority=self.rng.choice(K.AUTHORITIES),
+            app=self.rng.choice(K.APPS),
+            pretext=self.rng.choice(K.PRETEXTS),
+            amount=self.rng.choice(K.AMOUNTS),
+            subhead=(sh[2] if sh else "offence").lower(),
         )
 
     def _locality_phrase(self):
