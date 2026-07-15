@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
-import { Share2, ArrowRight, CheckCircle2, FileText, ShieldCheck, Clock, Layers } from 'lucide-react';
+import { Share2, ArrowRight, CheckCircle2, Activity, Layers } from 'lucide-react';
 import { useStats, useAlerts, useMe, useEval, useDistricts, useNational } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
+import { SiloToGraph } from '../components/illustrations';
 import { useT } from '../lib/i18n';
 
 export default function Dashboard() {
@@ -28,16 +29,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-end justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-xl font-semibold text-kadi-navy">Command Dashboard</h1>
-          <p className="text-sm text-ink-muted">{me?.capabilities.label} · scope: {me?.capabilities.scope} · <span className="text-ink-muted">Demo dataset (synthetic)</span></p>
+      {/* Illustrated welcome hero */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kadi-navy via-kadi-navy700 to-[#0a2547] text-white p-6 md:p-7">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none hidden sm:block"><SiloToGraph className="w-[420px]" /></div>
+        <div className="relative max-w-xl">
+          <div className="text-xs text-white/60 uppercase tracking-wider">{me?.capabilities.label} · {me?.capabilities.scope} scope</div>
+          <h1 className="text-2xl md:text-3xl font-bold mt-1">Command Dashboard</h1>
+          <p className="text-white/80 text-sm mt-1.5">Thousands of siloed FIRs, connected into one living graph — with slipping investigations, offender networks and emerging hotspots surfaced up front. <button onClick={() => nav('/about')} className="underline underline-offset-2 hover:text-white">What is KADI?</button></p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button onClick={() => nav('/graph')} className="btn bg-white text-kadi-navy hover:bg-white/90 text-sm font-semibold"><Share2 size={16} /> Explore the graph</button>
+            <button onClick={() => nav('/map')} className="btn bg-white/10 text-white hover:bg-white/20 text-sm"><Layers size={16} /> Map</button>
+            <button onClick={() => nav('/health')} className="btn bg-white/10 text-white hover:bg-white/20 text-sm"><Activity size={16} /> Health cockpit</button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => nav('/graph')} className="btn-primary text-sm"><Share2 size={16} /> Explore the graph</button>
-          <button onClick={() => nav('/map')} className="btn-outline text-sm"><Layers size={16} /> Map</button>
-        </div>
-      </div>
+      </motion.div>
 
       {/* KPIs — animated entrance */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3">

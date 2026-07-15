@@ -5,7 +5,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Share2, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
-  Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X,
+  Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
 } from 'lucide-react';
 import { useMe, useAlerts } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
@@ -13,6 +13,7 @@ import { setRole, getRole, Role } from '../lib/api';
 import { SeverityDot } from './ui';
 
 const NAV = [
+  { to: '/about', icon: Info, key: 'about' },
   { to: '/', icon: Home, key: 'home', end: true },
   { to: '/graph', icon: Share2, key: 'graph' },
   { to: '/cases', icon: FileText, key: 'cases' },
@@ -47,10 +48,13 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="h-full flex flex-col">
       {/* Top bar */}
       <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20">
-        <div className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="w-7 h-7 rounded bg-white/15 grid place-items-center text-kadi-saffron font-bold kn">ಕ</span>
-          <span>{t('appName')}</span>
-          <span className="hidden md:inline text-white/70 text-sm font-normal ml-2">{t('ksp')}</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/seal-karnataka.svg" alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
+          <div className="flex items-center gap-1.5 font-semibold tracking-tight">
+            <span className="w-6 h-6 rounded bg-white/15 grid place-items-center text-kadi-saffron font-bold kn text-sm">ಕ</span>
+            <span>{t('appName')}</span>
+          </div>
+          <span className="hidden md:inline text-white/70 text-sm font-normal ml-1 border-l border-white/20 pl-3">{t('ksp')}</span>
         </div>
         <form onSubmit={doSearch} className="ml-auto relative hidden sm:block">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />

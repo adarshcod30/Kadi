@@ -7,6 +7,7 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   appName: { en: 'KADI', kn: 'ಕಡಿ' },
   tagline: { en: 'Connecting the links', kn: 'ಕೊಂಡಿಗಳನ್ನು ಜೋಡಿಸುವುದು' },
   ksp: { en: 'Karnataka State Police — Crime Intelligence', kn: 'ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ — ಅಪರಾಧ ಗುಪ್ತಚರ' },
+  about: { en: 'About', kn: 'ಬಗ್ಗೆ' },
   home: { en: 'Home', kn: 'ಮುಖಪುಟ' },
   graph: { en: 'Graph', kn: 'ಗ್ರಾಫ್' },
   cases: { en: 'Cases', kn: 'ಪ್ರಕರಣಗಳು' },

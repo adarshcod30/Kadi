@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { LangContext, Lang } from './lib/i18n';
+import About from './pages/About';
 import Dashboard from './pages/Dashboard';
 import Cases from './pages/Cases';
 import CaseDetail from './pages/CaseDetail';
@@ -22,6 +23,7 @@ export default function App() {
     <LangContext.Provider value={{ lang, setLang: setLangP }}>
       <Shell>
         <Routes>
+          <Route path="/about" element={<About />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/cases" element={<Cases />} />
           <Route path="/cases/:id" element={<CaseDetail />} />

@@ -1,14 +1,21 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCases, useLookups } from '../api/hooks';
+import { useCases, useLookups, useMe } from '../api/hooks';
 import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip } from '../components/ui';
 
 export default function Cases() {
   const [params, setParams] = useSearchParams();
   const nav = useNavigate();
   const { data: lookups } = useLookups();
+  const { data: me } = useMe();
   const q = Object.fromEntries(params.entries());
   const page = Number(q.page || '1');
   const { data, isLoading } = useCases({ ...q, pageSize: 25 });
+
+  // scope-aware district options: non-state roles only see their own district
+  const scope = me?.capabilities.scope;
+  const districtOptions = scope && scope !== 'state' && me?.user.districtId
+    ? (lookups?.districts || []).filter((d) => d.id === String(me.user.districtId))
+    : lookups?.districts || [];
 
   const set = (k: string, v: string) => {
     const p = new URLSearchParams(params);
@@ -35,8 +42,8 @@ export default function Cases() {
           {lookups?.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
         </select>
         <select value={q.district || ''} onChange={(e) => set('district', e.target.value)} className="input">
-          <option value="">All districts</option>
-          {lookups?.districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          <option value="">{scope && scope !== 'state' ? 'My district' : 'All districts'}</option>
+          {districtOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
         <select value={q.status || ''} onChange={(e) => set('status', e.target.value)} className="input">
           <option value="">Any status</option>
