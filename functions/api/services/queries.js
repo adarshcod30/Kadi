@@ -254,15 +254,21 @@ function healthSummary(user) {
 // ---------------- geo ----------------
 function geoPoints(user, q = {}) {
   const db = load();
-  let rows = scoped(user, db.caseList).filter((c) => c.latitude && c.longitude);
+  // Spatial view is state-wide crime-pattern intelligence (aggregate dots), not per-case
+  // detail — shown to all analytical roles; individual case detail stays RBAC-scoped.
+  let rows = db.caseList.filter((c) => c.latitude && c.longitude);
   if (q.head) rows = rows.filter((c) => c.crimeHeadId === String(q.head));
   if (q.district) rows = rows.filter((c) => c.districtId === String(q.district));
   if (q.dateFrom) rows = rows.filter((c) => c.crimeRegisteredDate >= q.dateFrom);
-  const limit = Math.min(8000, parseInt(q.limit || '4000', 10));
-  const items = rows.slice(0, limit).map((c) => ({
-    caseId: c.caseMasterId, crimeNo: c.crimeNo, lat: c.latitude, lng: c.longitude,
-    head: c.crimeHead, subHead: c.crimeSubHead, gravity: c.gravity, district: c.districtName,
-  }));
+  const limit = Math.min(9000, parseInt(q.limit || '6000', 10));
+  // even sampling across the whole scoped set so every district shows (not just the first N)
+  const step = rows.length > limit ? rows.length / limit : 1;
+  const items = [];
+  for (let i = 0; i < rows.length && items.length < limit; i += step) {
+    const c = rows[Math.floor(i)];
+    items.push({ caseId: c.caseMasterId, crimeNo: c.crimeNo, lat: c.latitude, lng: c.longitude,
+      head: c.crimeHead, subHead: c.crimeSubHead, gravity: c.gravity, district: c.districtName });
+  }
   return { items, total: rows.length, districtCounts: db.hotspots.districtCounts || {} };
 }
 

@@ -73,7 +73,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
       elements.push({
         data: {
           id: e.id, source: e.source, target: e.target, etype: e.edgeType,
-          color: EDGE_COLOR[e.edgeType] || '#94A3B8', width: 1.5 + (e.strength || 0.3) * 5,
+          color: EDGE_COLOR[e.edgeType] || '#94A3B8', width: 0.8 + (e.strength || 0.3) * 2.2,
           strength: e.strength, raw: e,
         },
       });
@@ -110,13 +110,14 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
           selector: 'edge',
           style: {
             width: 'data(width)', 'line-color': 'data(color)', 'curve-style': 'bezier',
-            opacity: 0.75, 'target-arrow-shape': 'none',
-            'transition-property': 'opacity', 'transition-duration': 180,
-          },
+            opacity: 0.55, 'target-arrow-shape': 'none', 'line-cap': 'round',
+            'transition-property': 'opacity, width', 'transition-duration': 180,
+          } as any,
         },
-        { selector: 'edge[etype="appears_in"]', style: { 'line-style': 'dashed', opacity: 0.55 } },
+        { selector: 'edge[etype="appears_in"]', style: { 'line-style': 'dashed', 'line-dash-pattern': [4, 3], opacity: 0.4, width: 1 } as any },
         { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#E8871E' } },
-        { selector: 'edge:selected', style: { 'line-color': '#E8871E', opacity: 1, width: 6 } },
+        { selector: 'edge:selected', style: { 'line-color': '#E8871E', opacity: 1, width: 3 } },
+        { selector: 'edge.hl', style: { opacity: 0.95 } },
         { selector: '.dim', style: { opacity: 0.08 } },
         { selector: '.hidden', style: { display: 'none' } },
       ],

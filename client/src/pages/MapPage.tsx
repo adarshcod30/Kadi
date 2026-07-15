@@ -21,8 +21,17 @@ const HEAD_COLOR: Record<string, string> = {
 const STYLE: any = {
   version: 8,
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#F5F8FC' } }],
+  sources: {
+    sat: { type: 'raster', tileSize: 256, attribution: '© Esri, Maxar',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] },
+    osm: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'] },
+  },
+  layers: [
+    { id: 'bg', type: 'background', paint: { 'background-color': '#0A1929' } },
+    { id: 'basemap-sat', type: 'raster', source: 'sat', paint: { 'raster-opacity': 1 } },
+    { id: 'basemap-osm', type: 'raster', source: 'osm', layout: { visibility: 'none' }, paint: { 'raster-opacity': 1, 'raster-saturation': -0.4 } },
+  ],
 };
 
 export default function MapPage() {
@@ -32,6 +41,7 @@ export default function MapPage() {
   const markers = useRef<maplibregl.Marker[]>([]);
   const [ready, setReady] = useState(false);
   const [layer, setLayer] = useState<'density' | 'points'>('density');
+  const [basemap, setBasemap] = useState<'sat' | 'streets'>('sat');
   const [head, setHead] = useState('');
   const [selDistrict, setSelDistrict] = useState<any>(null);
 
@@ -55,12 +65,12 @@ export default function MapPage() {
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     m.on('load', () => {
       m.addSource('india', { type: 'geojson', data: indiaOutline as any });
-      m.addLayer({ id: 'india-fill', type: 'fill', source: 'india', paint: { 'fill-color': '#E7EDF5', 'fill-opacity': 0.5 } });
-      m.addLayer({ id: 'india-line', type: 'line', source: 'india', paint: { 'line-color': '#B9C6D8', 'line-width': 1 } });
+      m.addLayer({ id: 'india-line', type: 'line', source: 'india', paint: { 'line-color': '#7FB2FF', 'line-width': 1, 'line-opacity': 0.5 } });
       m.addSource('ka', { type: 'geojson', data: kaDistricts as any });
-      m.addLayer({ id: 'ka-fill', type: 'fill', source: 'ka', paint: { 'fill-color': '#D9E4F0', 'fill-opacity': 0.85 } });
-      m.addLayer({ id: 'ka-line', type: 'line', source: 'ka', paint: { 'line-color': '#FFFFFF', 'line-width': 1 } });
-      m.addLayer({ id: 'ka-hover', type: 'line', source: 'ka', paint: { 'line-color': '#0B3D75', 'line-width': 2.5 }, filter: ['==', 'districtId', ''] });
+      m.addLayer({ id: 'ka-fill', type: 'fill', source: 'ka', paint: { 'fill-color': '#4A90D9', 'fill-opacity': 0.55 } });
+      m.addLayer({ id: 'ka-line', type: 'line', source: 'ka', paint: { 'line-color': '#FFFFFF', 'line-width': 1, 'line-opacity': 0.7 } });
+      m.addLayer({ id: 'ka-outline', type: 'line', source: 'ka', paint: { 'line-color': '#FFD54F', 'line-width': 0 } });
+      m.addLayer({ id: 'ka-hover', type: 'line', source: 'ka', paint: { 'line-color': '#E8871E', 'line-width': 3 }, filter: ['==', 'districtId', ''] });
       m.on('mousemove', 'ka-fill', (e: any) => {
         if (e.features[0]) { m.getCanvas().style.cursor = 'pointer'; m.setFilter('ka-hover', ['==', 'districtId', e.features[0].properties.districtId]); }
       });
@@ -85,9 +95,17 @@ export default function MapPage() {
     const fc = { ...(kaDistricts as any), features: (kaDistricts as any).features.map((f: any) => ({
       ...f, properties: { ...f.properties, count: countById[f.properties.districtId] || 0 } })) };
     (m.getSource('ka') as any)?.setData(fc);
-    m.setPaintProperty('ka-fill', 'fill-color', layer === 'density' ? expr : '#E7EDF5');
-    m.setPaintProperty('ka-fill', 'fill-opacity', layer === 'density' ? 0.85 : 0.4);
+    m.setPaintProperty('ka-fill', 'fill-color', layer === 'density' ? expr : '#4A90D9');
+    m.setPaintProperty('ka-fill', 'fill-opacity', layer === 'density' ? 0.62 : 0.08);
   }, [ready, districts, layer, countById]);
+
+  // basemap toggle (satellite <-> streets)
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    m.setLayoutProperty('basemap-sat', 'visibility', basemap === 'sat' ? 'visible' : 'none');
+    m.setLayoutProperty('basemap-osm', 'visibility', basemap === 'streets' ? 'visible' : 'none');
+  }, [ready, basemap]);
 
   // points layer
   useEffect(() => {
@@ -100,7 +118,7 @@ export default function MapPage() {
     if (m.getSource('pts')) (m.getSource('pts') as any).setData(fc);
     else {
       m.addSource('pts', { type: 'geojson', data: fc as any });
-      m.addLayer({ id: 'pts', type: 'circle', source: 'pts', paint: { 'circle-radius': 2.6, 'circle-color': ['get', 'color'], 'circle-opacity': 0.72, 'circle-stroke-width': 0.3, 'circle-stroke-color': '#fff' } });
+      m.addLayer({ id: 'pts', type: 'circle', source: 'pts', paint: { 'circle-radius': 3, 'circle-color': ['get', 'color'], 'circle-opacity': 0.85, 'circle-stroke-width': 0.6, 'circle-stroke-color': '#fff' } });
       m.on('click', 'pts', (e: any) => { const f = e.features[0]; if (f) nav(`/graph?case=${f.properties.caseId}`); });
     }
   }, [ready, points, layer, lookups]);
@@ -129,10 +147,14 @@ export default function MapPage() {
           <h1 className="text-xl font-semibold text-kadi-navy flex items-center gap-2"><Layers size={18} /> Spatiotemporal Intelligence</h1>
           <p className="text-sm text-ink-muted max-w-2xl">District-level crime density across Karnataka, live incident points, and DBSCAN hotspots. <span className="text-danger font-medium">Pulsing red rings</span> flag emerging trends where recent activity far exceeds the historical baseline. Click a district to drill down.</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <div className="flex rounded-ctl border border-line overflow-hidden text-sm">
             <button onClick={() => setLayer('density')} className={`px-3 py-1.5 flex items-center gap-1 ${layer === 'density' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}><Flame size={14} /> Density</button>
             <button onClick={() => setLayer('points')} className={`px-3 py-1.5 flex items-center gap-1 ${layer === 'points' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}><MapPin size={14} /> Incidents</button>
+          </div>
+          <div className="flex rounded-ctl border border-line overflow-hidden text-sm">
+            <button onClick={() => setBasemap('sat')} className={`px-3 py-1.5 ${basemap === 'sat' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Satellite</button>
+            <button onClick={() => setBasemap('streets')} className={`px-3 py-1.5 ${basemap === 'streets' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Streets</button>
           </div>
           {layer === 'points' && (
             <select value={head} onChange={(e) => setHead(e.target.value)} className="input">

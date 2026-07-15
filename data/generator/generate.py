@@ -135,10 +135,22 @@ class Builder:
     # --- geo ---
     def sample_latlng(self, district_id: int):
         d = next(x for x in K.DISTRICTS if x["DistrictID"] == district_id)
-        if district_id == 1 and self.rng.random() < 0.75:
-            clat, clng = self.rng.choice(K.BENGALURU_HOTSPOTS)
-            return round(clat + self.rng.uniform(-0.012, 0.012), 6), round(clng + self.rng.uniform(-0.012, 0.012), 6)
+        if district_id == 1:
+            # Bengaluru: fill the whole metro with realistic soft clustering around wards
+            # (not a few tight dots) so the map reads like a real city, not a blob.
+            roll = self.rng.random()
+            if roll < 0.45:
+                clat, clng = self.rng.choice(K.BENGALURU_HOTSPOTS)
+                return (round(clat + self.rng.uniform(-0.03, 0.03), 6),
+                        round(clng + self.rng.uniform(-0.03, 0.03), 6))
+            return (round(self.rng.uniform(12.85, 13.14), 6),
+                    round(self.rng.uniform(77.45, 77.78), 6))
         lat0, lat1, lng0, lng1 = d["box"]
+        # cluster ~35% around a few sub-centres per district so towns are visible
+        if self.rng.random() < 0.35:
+            clat = self.rng.uniform(lat0 + 0.05 * (lat1 - lat0), lat1 - 0.05 * (lat1 - lat0))
+            clng = self.rng.uniform(lng0 + 0.05 * (lng1 - lng0), lng1 - 0.05 * (lng1 - lng0))
+            return (round(clat + self.rng.uniform(-0.02, 0.02), 6), round(clng + self.rng.uniform(-0.02, 0.02), 6))
         return round(self.rng.uniform(lat0, lat1), 6), round(self.rng.uniform(lng0, lng1), 6)
 
     # --- protected attributes, sampled independently of everything else ---

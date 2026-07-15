@@ -24,14 +24,33 @@ import karnataka as K
 
 
 # Distinctive surnames reserved for planted offenders (NOT in the random name pool),
-# so entity resolution resolves them confidently by name.
+# so entity resolution resolves them confidently by name. Karnataka taluk/place-derived
+# surnames — a large pool so we can populate a realistic repeat-offender watchlist.
 PLANTED_SURNAMES = [
     "Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi",
     "Kadaganchi", "Mahalingpur", "Savadatti", "Nidagundi", "Ranebennur", "Halagatti",
     "Bommanahalli", "Yelburga", "Mundargi", "Aland", "Chincholi", "Sedam", "Afzalpur",
     "Basavakalyan", "Humnabad", "Shorapur", "Lingsugur", "Manvi", "Sindhanur", "Gangavathi",
     "Kustagi", "Shiggaon", "Byadgi", "Hangal", "Kalghatgi", "Kundgol", "Navalgund",
-    "Ron", "Nargund", "Mudhol", "Jamkhandi", "Hunagund", "Badami",
+    "Ron", "Nargund", "Mudhol", "Jamkhandi", "Hunagund", "Badami", "Terdal", "Bilgi",
+    "Rabkavi", "Guledgudda", "Ilkal", "Kamalapur", "Chittapur", "Wadi", "Kalgi", "Jevargi",
+    "Yadrami", "Kembhavi", "Hunasagi", "Gogi", "Mudgal", "Maski", "Devadurga", "Kavital",
+    "Turuvekere", "Kunigal", "Gubbi", "Sira", "Pavagada", "Madhugiri", "Koratagere",
+    "Chelur", "Bagepalli", "Gudibande", "Gauribidanur", "Sidlaghatta", "Malur", "Mulbagal",
+    "Srinivaspur", "Bangarpet", "Chintamani", "Nelamangala", "Doddaballapur", "Hoskote",
+    "Devanahalli", "Magadi", "Channapatna", "Kanakapura", "Harohalli", "Malavalli",
+    "Nagamangala", "Pandavapura", "Krishnarajpet", "Maddur", "Srirangapatna", "Hunsur",
+    "Piriyapatna", "Krishnarajnagar", "Nanjangud", "Tirumakudalu", "Gundlupet", "Yelandur",
+    "Kollegal", "Hanur", "Sagar", "Sorab", "Shikaripur", "Hosanagar", "Tirthahalli",
+    "Bhadravati", "Channagiri", "Honnali", "Harihar", "Jagalur", "Molakalmuru", "Hiriyur",
+    "Hosadurga", "Holalkere", "Challakere", "Sringeri", "Koppa", "Narasimharajapura",
+    "Mudigere", "Kadur", "Tarikere", "Ajjampura", "Belur", "Arsikere", "Channarayapatna",
+    "Holenarasipura", "Arkalgud", "Sakleshpur", "Alur", "Somwarpet", "Virajpet", "Ponnampet",
+    "Bantwal", "Puttur", "Sullia", "Belthangady", "Moodbidri", "Kadaba", "Karkala", "Kundapura",
+    "Byndoor", "Hebri", "Bhatkal", "Honnavar", "Kumta", "Ankola", "Sirsi", "Siddapur",
+    "Yellapur", "Mundgod", "Haliyal", "Joida", "Dandeli", "Khanapur", "Ramdurg", "Saundatti",
+    "Bailhongal", "Kittur", "Gokak", "Mudalgi", "Raibag", "Athani", "Kagwad", "Chikodi",
+    "Nippani", "Hukkeri", "Sankeshwar",
 ]
 
 
@@ -76,43 +95,56 @@ def inject_all(b, rng, today) -> dict:
     return gt
 
 
-def _ordinary_repeat_offenders(b, rng, today):
-    """~40 everyday repeat offenders (distinctive surnames, 2-4 cases each) so the
-    offender watchlist and network views are realistically populated."""
-    used = {"Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi"}
-    pool = [s for s in PLANTED_SURNAMES if s not in used]
+def _ordinary_repeat_offenders(b, rng, today, target=240):
+    """~240 everyday repeat offenders (distinctive surnames, 2-5 cases each) so the
+    offender watchlist and network views are realistically populated. Distributed across
+    districts weighted like the base data (cities have more), and occasionally sharing a
+    co-accused so small networks form."""
+    reserved = {"Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi"}
+    pool = [s for s in PLANTED_SURNAMES if s not in reserved]
+    district_ids = list(K.DISTRICT_WEIGHTS.keys())
+    district_w = list(K.DISTRICT_WEIGHTS.values())
     records = []
-    for surname in pool:
-        first = rng.choice(K.FIRST_NAMES_M)
-        n = rng.randint(2, 4)
-        district = rng.choice(list(K.DISTRICT_WEIGHTS.keys()))
+    seen = set()
+    for i in range(target):
+        surname = pool[i % len(pool)]
+        first = K.FIRST_NAMES_M[(i * 7) % len(K.FIRST_NAMES_M)]
+        if (first, surname) in seen:
+            first = rng.choice(K.FIRST_NAMES_M)
+        seen.add((first, surname))
+        n = rng.choices([2, 3, 4, 5], weights=[0.4, 0.3, 0.2, 0.1])[0]
+        district = rng.choices(district_ids, weights=district_w)[0]
         case_ids, accused_ids = [], []
-        dt = datetime(2024, rng.randint(1, 12), rng.randint(1, 28), rng.randint(6, 23), 0)
-        for i in range(n):
+        dt = datetime(2023, rng.randint(1, 12), rng.randint(1, 28), rng.randint(6, 23), 0)
+        # a co-offender who recurs with this person (forms a small network) ~35% of the time
+        co_name = None
+        if rng.random() < 0.35:
+            co_name = f"{rng.choice(K.FIRST_NAMES_M)} {pool[(i * 3 + 11) % len(pool)]}"
+        for j in range(n):
             u = _pick_unit(b, district, rng)
-            dt = dt + timedelta(days=rng.randint(40, 220))
+            dt = dt + timedelta(days=rng.randint(60, 260))
             if dt.date() > today:
-                dt = datetime.combine(today - timedelta(days=rng.randint(5, 60)), datetime.min.time())
-            shid = rng.choice([201, 202, 203, 205, 206, 401, 501])
-            arrested = rng.random() < 0.5
+                dt = datetime.combine(today - timedelta(days=rng.randint(5, 90)), datetime.min.time())
+            shid = rng.choice([201, 202, 203, 205, 206, 401, 404, 501, 103])
+            arrested = rng.random() < 0.55
             case = b.make_case(district_id=district, unit_id=u["UnitID"], subhead_id=shid,
                                incident_dt=dt, status_id=2 if arrested else 1,
                                io_emp_id=_io_for(b, u["UnitID"], rng))
             cid = case["CaseMasterID"]
             b.add_complainant(cid); b.add_victim(cid)
-            # name variant: occasional initial or spelling change
             nm = f"{first} {surname}"
-            if i and rng.random() < 0.5:
+            if j and rng.random() < 0.45:
                 nm = f"{first} {surname} {rng.choice(K.INITIALS)}"
             aid = b.add_accused(cid, name=nm, gender_id=1, person_index=1)
             accused_ids.append(aid)
+            if co_name and rng.random() < 0.7:
+                b.add_accused(cid, name=co_name, gender_id=1, person_index=2)
             if arrested:
                 b.add_arrest(cid, aid, district, u["UnitID"], _io_for(b, u["UnitID"], rng),
-                             (dt + timedelta(days=12)).date())
+                             (dt + timedelta(days=rng.randint(8, 40))).date())
             case_ids.append(cid)
         records.append({"canonicalOffender": f"{first} {surname}", "surname": surname,
-                        "caseMasterIds": case_ids, "accusedMasterIds": accused_ids,
-                        "district": district})
+                        "caseMasterIds": case_ids, "accusedMasterIds": accused_ids, "district": district})
     return records
 
 
