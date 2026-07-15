@@ -38,6 +38,10 @@ export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });
 export const useHotspots = (emerging?: boolean) =>
   useQuery({ queryKey: ['hotspots', emerging], queryFn: () => api.get<{ hotspots: Hotspot[]; districtCounts: Record<string, number> }>(`/geo/hotspots${qs({ emerging })}`) });
+export const useDistricts = () =>
+  useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
+export const useNational = () =>
+  useQuery({ queryKey: ['national'], queryFn: () => api.get<any>('/geo/national'), staleTime: Infinity });
 export const useVulnerability = (enabled: boolean) =>
   useQuery({ queryKey: ['vulnerability'], queryFn: () => api.get<any>('/analytics/vulnerability'), enabled });
 export const useAudit = (enabled: boolean) =>

@@ -119,6 +119,8 @@ function load() {
   const alerts = readJson('alerts', []);
   const stats = readJson('stats', {});
   const evalReport = readJson('eval_report', {});
+  const districtStats = readJson('district_stats', { districts: [], maxCount: 0 });
+  const national = readJson('national', { states: [] });
 
   DB = {
     dataDir: DATA_DIR,
@@ -129,7 +131,7 @@ function load() {
     cases, caseList: [...cases.values()],
     offenders, offendersById, adjacency, offenderOfCase,
     clusters, clustersById,
-    hotspots, caseAnomalies, alerts, stats, evalReport,
+    hotspots, caseAnomalies, alerts, stats, evalReport, districtStats, national,
     healthList, healthByCase,
   };
   console.log(`[store.mock] loaded ${cases.size} cases, ${offenders.length} offenders in ${DB.loadedMs}ms`);

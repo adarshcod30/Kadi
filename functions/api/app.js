@@ -71,6 +71,8 @@ function buildApp() {
   // geo
   r.get('/geo/points', handle(async (req) => q.geoPoints(req.user, req.query)));
   r.get('/geo/hotspots', handle(async (req) => q.hotspots(req.user, req.query)));
+  r.get('/geo/districts', handle(async () => q.districtStats()));
+  r.get('/geo/national', handle(async () => q.national()));
 
   // analytics (role-gated)
   r.get('/analytics/vulnerability', handle(async (req) => q.vulnerability(req.user)));

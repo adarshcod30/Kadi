@@ -29,6 +29,7 @@ import health_metrics
 import anomaly
 import spatial
 import evaluate
+import national
 
 TODAY = date(2026, 7, 13)
 
@@ -169,6 +170,10 @@ def run(data_dir: str):
     # dashboard stats
     stats = _build_stats(tables, health, clusters, offenders, geo, anomalies, TODAY)
 
+    # per-district aggregates (choropleth + drill-down) and national context
+    district_stats = _build_district_stats(tables, health, offenders, geo, unit_district)
+    national_ctx = national.national_context()
+
     # ---------------- write artifacts ----------------
     step("writing derived artifacts")
     common.write_json(data_dir, "offenders", offenders)
@@ -183,6 +188,8 @@ def run(data_dir: str):
     common.write_json(data_dir, "hotspots", geo)
     common.write_json(data_dir, "alerts", alerts)
     common.write_json(data_dir, "stats", stats)
+    common.write_json(data_dir, "district_stats", district_stats)
+    common.write_json(data_dir, "national", national_ctx)
 
     step("ground-truth evaluation")
     gt_path = os.path.join(data_dir, "_ground_truth.json")
@@ -246,6 +253,51 @@ def _build_alerts(clusters, health, anomalies, geo, offenders, unit_district, to
     sev_rank = {"high": 0, "medium": 1, "low": 2}
     alerts.sort(key=lambda a: sev_rank.get(a["severity"], 3))
     return alerts
+
+
+def _build_district_stats(tables, health, offenders, geo, unit_district):
+    cases = tables["CaseMaster"]
+    district_names = tables["District"].set_index("DistrictID")["DistrictName"].to_dict()
+    head_names = tables["CrimeHead"].set_index("CrimeHeadID")["CrimeGroupName"].to_dict()
+    unit_names = tables["Unit"].set_index("UnitID")["UnitName"].to_dict()
+
+    health_by_district = Counter(str(h["districtId"]) for h in health if h.get("severity") == "high")
+    d = {}
+    for row in cases.itertuples(index=False):
+        did = unit_district.get(row.PoliceStationID, "")
+        if not did:
+            continue
+        e = d.setdefault(did, {"districtId": str(did), "district": district_names.get(str(did), did),
+                               "total": 0, "open": 0, "heads": Counter(), "stations": Counter(),
+                               "latSum": 0.0, "lngSum": 0.0, "geoN": 0})
+        e["total"] += 1
+        if str(row.CaseStatusID) == "1":
+            e["open"] += 1
+        e["heads"][head_names.get(row.CrimeMajorHeadID, row.CrimeMajorHeadID)] += 1
+        e["stations"][row.PoliceStationID] += 1
+        try:
+            e["latSum"] += float(row.latitude); e["lngSum"] += float(row.longitude); e["geoN"] += 1
+        except (TypeError, ValueError):
+            pass
+
+    emerging_by_district = Counter()
+    unit_to_district = {u: unit_district.get(u, "") for u in unit_names}
+    out = []
+    for did, e in d.items():
+        n = max(e["geoN"], 1)
+        out.append({
+            "districtId": e["districtId"], "district": e["district"],
+            "total": e["total"], "open": e["open"],
+            "flaggedHigh": health_by_district.get(str(did), 0),
+            "topHeads": [{"name": k, "count": v} for k, v in e["heads"].most_common(5)],
+            "topStations": [{"unitId": u, "name": unit_names.get(u, u), "count": c}
+                            for u, c in e["stations"].most_common(5)],
+            "centroidLat": round(e["latSum"] / n, 4), "centroidLng": round(e["lngSum"] / n, 4),
+        })
+    out.sort(key=lambda x: x["total"], reverse=True)
+    counts = [x["total"] for x in out]
+    return {"districts": out, "maxCount": max(counts) if counts else 0,
+            "minCount": min(counts) if counts else 0, "totalDistricts": len(out)}
 
 
 def _build_stats(tables, health, clusters, offenders, geo, anomalies, today):

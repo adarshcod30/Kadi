@@ -298,6 +298,8 @@ module.exports = {
   FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, hotspots, vulnerability,
   stats: (user) => load().stats,
+  districtStats: () => load().districtStats,
+  national: () => load().national,
   alerts: (user) => load().alerts,
   evalReport: () => load().evalReport,
   anomalies: () => load().caseAnomalies,
