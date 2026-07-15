@@ -35,7 +35,7 @@ export function RiskBadge({ score, band }: { score?: number; band?: string }) {
 }
 
 export function KpiCard({ label, value, delta, hint, accent, onClick }: {
-  label: string; value: ReactNode; delta?: number; hint?: string; accent?: string; onClick?: () => void;
+  label: ReactNode; value: ReactNode; delta?: number; hint?: string; accent?: string; onClick?: () => void;
 }) {
   return (
     <button onClick={onClick} className={`card p-4 text-left transition-shadow hover:shadow-hover ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>

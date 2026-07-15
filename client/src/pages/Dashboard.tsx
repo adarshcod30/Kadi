@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
-import { Share2, Activity, Users, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval } from '../api/hooks';
-import { KpiCard, Section, SeverityDot, Skeleton, Mono } from '../components/ui';
+import { Share2, ArrowRight, CheckCircle2, FileText, ShieldCheck, Clock, Layers } from 'lucide-react';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational } from '../api/hooks';
+import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
+import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
+import { HEAD_COLOR } from '../features/graph/GraphCanvas';
 import { useT } from '../lib/i18n';
 
 export default function Dashboard() {
@@ -12,98 +15,143 @@ export default function Dashboard() {
   const { data: alerts } = useAlerts();
   const { data: me } = useMe();
   const { data: ev } = useEval();
+  const { data: districts } = useDistricts();
+  const { data: national } = useNational();
+
+  const statusData = stats && [
+    { name: 'Charge-sheeted', value: stats.statusBreakdown.chargeSheeted, color: '#1E874B' },
+    { name: 'Under investigation', value: stats.statusBreakdown.open, color: '#1A6FC4' },
+    { name: 'Undetected', value: stats.statusBreakdown.undetected, color: '#C9820A' },
+    { name: 'Closed', value: stats.statusBreakdown.closed, color: '#8A94A3' },
+  ];
+  const headData = stats?.topCrimeHeads.slice(0, 6).map((h) => ({ name: h.name, value: h.count, color: HEAD_COLOR[h.name] || '#5B6B7E' }));
 
   return (
     <div className="space-y-5">
-      <div className="flex items-end justify-between">
+      <div className="flex items-end justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl font-semibold text-kadi-navy">Command Dashboard</h1>
           <p className="text-sm text-ink-muted">{me?.capabilities.label} · scope: {me?.capabilities.scope} · <span className="text-ink-muted">Demo dataset (synthetic)</span></p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => nav('/graph')} className="btn-primary text-sm"><Share2 size={16} /> Explore the graph</button>
-          <button onClick={() => nav('/cases')} className="btn-outline text-sm">Open a case</button>
+          <button onClick={() => nav('/map')} className="btn-outline text-sm"><Layers size={16} /> Map</button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label={t('openCases')} value={stats?.openCases?.toLocaleString() ?? '—'} hint="under investigation" onClick={() => nav('/cases?status=1')} />
-        <KpiCard label={t('flagged')} value={stats?.seriousFlaggedCases?.toLocaleString() ?? '—'} hint="high-severity health flags" accent="#C9820A" onClick={() => nav('/health')} />
-        <KpiCard label={t('networks')} value={stats?.activeNetworks ?? '—'} hint={`${stats?.crossDistrictNetworks ?? 0} cross-district`} accent="#1A6FC4" onClick={() => nav('/graph')} />
-        <KpiCard label="Resolved offenders" value={stats?.resolvedOffenders ?? '—'} hint={`${stats?.highRiskOffenders ?? 0} high risk`} onClick={() => nav('/offenders')} />
-      </div>
+      {/* KPIs — animated entrance */}
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {[
+          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation in your scope.', to: '/cases?status=1' },
+          { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases flagged as slipping (ageing / pendency / undetected-risk).', accent: '#C9820A', to: '/health' },
+          { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offender networks (clusters sharing an offender), not just similar MO.', accent: '#1A6FC4', to: '/graph' },
+          { label: 'Resolved offenders', value: stats?.resolvedOffenders, hint: 'Distinct repeat offenders after name-variant entity resolution.', to: '/offenders' },
+          { label: 'Emerging hotspots', value: stats?.emergingHotspots, hint: 'Areas where recent activity far exceeds the historical baseline.', accent: '#C0392B', to: '/map' },
+        ].map((k) => (
+          <motion.div key={k.label} variants={rise}>
+            <KpiCard label={<span className="flex items-center gap-1">{k.label}<Hint text={k.hint} /></span>}
+              value={k.value?.toLocaleString() ?? '—'} accent={k.accent} onClick={() => nav(k.to)} />
+          </motion.div>
+        ))}
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left: trend + heatmap + districts */}
         <div className="lg:col-span-2 space-y-5">
-          <Section title="FIRs registered per month">
-            <div className="h-56 p-3">
+          <VizCard title="FIRs registered per month" hint="Monthly FIR volume over the dataset window — watch for sustained rises that signal shifting crime patterns.">
+            <div className="h-52 p-3">
               {stats ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.trend}>
-                    <defs>
-                      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#1A6FC4" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#1A6FC4" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} width={30} />
+                <ResponsiveContainer width="100%" height="100%" key={stats.trend.length}>
+                  <AreaChart data={stats.trend} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                    <defs><linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1A6FC4" stopOpacity={0.35} /><stop offset="100%" stopColor="#1A6FC4" stopOpacity={0.02} /></linearGradient></defs>
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} minTickGap={20} />
+                    <YAxis tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} width={32} />
                     <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
-                    <Area type="monotone" dataKey="count" stroke="#1A6FC4" strokeWidth={2} fill="url(#g)" />
+                    <Area type="monotone" dataKey="count" stroke="#1A6FC4" strokeWidth={2} fill="url(#trendGrad)" isAnimationActive={false} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : <Skeleton rows={4} />}
             </div>
-          </Section>
+          </VizCard>
 
-          <Section title="Top crime heads">
-            <div className="h-52 p-3">
-              {stats ? (
+          <VizCard title="When crime happens — hour × weekday" hint="Spatiotemporal signal: darker cells are hours with more incidents. Night-time and weekend spikes guide patrol deployment.">
+            {stats ? <HeatMap data={stats.heat} /> : <Skeleton rows={4} />}
+          </VizCard>
+
+          <VizCard title="Top districts by case volume" hint="Case counts per district — click through to the district drill-down on the map." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
+            <div className="h-56 p-3">
+              {districts ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.topCrimeHeads} layout="vertical" margin={{ left: 10 }}>
+                  <BarChart data={districts.districts.slice(0, 8)} layout="vertical" margin={{ left: 10 }}>
                     <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: '#1C2A3A' }} tickLine={false} axisLine={false} />
+                    <YAxis type="category" dataKey="district" width={110} tick={{ fontSize: 11, fill: '#1C2A3A' }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                      {stats.topCrimeHeads.map((_, i) => <Cell key={i} fill={['#0B3D75', '#1A6FC4', '#2FA8A0', '#E8871E', '#5C6BC0', '#26A69A', '#8A94A3', '#7E57C2'][i % 8]} />)}
+                    <Bar dataKey="total" radius={[0, 4, 4, 0]} animationDuration={800}>
+                      {districts.districts.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={i === 0 ? '#0B3D75' : '#1A6FC4'} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : <Skeleton rows={4} />}
             </div>
-          </Section>
+          </VizCard>
         </div>
 
+        {/* Right: eval, donuts, alerts */}
         <div className="space-y-5">
-          {/* Eval highlight — the proof slide */}
           {ev?.passed && (
-            <div className="card p-4 border-l-4 border-success">
+            <motion.div variants={rise} className="card p-4 border-l-4 border-success">
               <div className="flex items-center gap-2 text-success font-semibold text-sm"><CheckCircle2 size={16} /> Detection validated</div>
               <p className="text-xs text-ink-muted mt-1">On planted ground-truth, the pipeline recovers</p>
-              <div className="text-2xl font-semibold font-num text-kadi-navy mt-1">{ev.overallRecoveryPct}%</div>
-              <p className="text-xs text-ink-muted">of gangs / serial chains, with {ev.identityRecoveryPct}% offender ER accuracy.</p>
-            </div>
+              <div className="text-3xl font-semibold font-num text-kadi-navy mt-1">{ev.overallRecoveryPct}%</div>
+              <p className="text-xs text-ink-muted">of gangs / serial chains, at {ev.identityRecoveryPct}% offender-ER accuracy.</p>
+            </motion.div>
           )}
 
-          <Section title="Alerts" action={<button onClick={() => nav('/health')} className="text-xs link">View all</button>}>
-            <div className="divide-y divide-line max-h-[420px] overflow-auto">
-              {(alerts || []).slice(0, 10).map((a) => (
-                <button key={a.alertId} onClick={() => a.caseMasterId ? nav(`/graph?case=${a.caseMasterId}`) : a.offenderIdentityId ? nav(`/offenders/${a.offenderIdentityId}`) : a.clusterId ? nav(`/graph?cluster=${a.clusterId}`) : nav('/health')}
+          <VizCard title="Case status mix" hint="Disposition of all FIRs. A high undetected share highlights where investigations stall.">
+            {stats && statusData ? (<>
+              <Donut data={statusData} centerLabel="cases" centerValue={stats.totalCases.toLocaleString()} />
+              <Legend items={statusData.map((s) => ({ name: s.name, color: s.color, value: s.value.toLocaleString() }))} />
+            </>) : <Skeleton rows={4} />}
+          </VizCard>
+
+          <VizCard title="Crime mix" hint="Share of FIRs by major crime head — property and cyber crime dominate real volume.">
+            {stats && headData ? (<>
+              <Donut data={headData} centerLabel="heads" centerValue={String(stats.topCrimeHeads.length)} />
+              <Legend items={headData.map((h) => ({ name: h.name, color: h.color }))} />
+            </>) : <Skeleton rows={4} />}
+          </VizCard>
+
+          <VizCard title="Alerts" hint="Live signals: new cross-district networks, slipping cases, emerging hotspots, station anomalies." action={<button onClick={() => nav('/health')} className="text-xs link">All</button>}>
+            <div className="divide-y divide-line max-h-[320px] overflow-auto">
+              {(alerts || []).slice(0, 8).map((a) => (
+                <motion.button key={a.alertId} whileHover={{ x: 3 }}
+                  onClick={() => a.caseMasterId ? nav(`/graph?case=${a.caseMasterId}`) : a.offenderIdentityId ? nav(`/offenders/${a.offenderIdentityId}`) : a.clusterId ? nav(`/graph?cluster=${a.clusterId}`) : nav('/health')}
                   className="w-full text-left px-4 py-2.5 hover:bg-surface-3 flex gap-2">
                   <SeverityDot severity={a.severity} />
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{a.title}</div>
-                    <div className="text-xs text-ink-muted truncate">{a.reason}</div>
-                  </div>
+                  <div className="min-w-0"><div className="text-sm font-medium truncate">{a.title}</div><div className="text-xs text-ink-muted truncate">{a.reason}</div></div>
                   <ArrowRight size={14} className="ml-auto text-ink-muted mt-0.5 shrink-0" />
-                </button>
+                </motion.button>
               ))}
               {!alerts && <Skeleton rows={5} />}
             </div>
-          </Section>
+          </VizCard>
+
+          {national && (
+            <VizCard title="India context" hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context).">
+              <div className="p-3 text-sm">
+                <p className="text-xs text-ink-muted mb-2">Karnataka ranks <b className="text-kadi-navy">#{national.focusRank}</b> of {national.states.length} · {national.focusRatePerLakh}/lakh</p>
+                {national.states.slice(0, 5).map((s: any) => (
+                  <div key={s.state} className={`flex items-center gap-2 py-0.5 text-xs ${s.isFocus ? 'font-semibold text-kadi-navy' : ''}`}>
+                    <span className="w-4 text-ink-muted">{s.rank}</span><span className="flex-1 truncate">{s.state}{s.isFocus ? ' ★' : ''}</span>
+                    <div className="w-14 h-1.5 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-kadi-blue" style={{ width: `${(s.crimesThousands / national.states[0].crimesThousands) * 100}%` }} /></div>
+                    <span className="font-num w-9 text-right">{s.crimesThousands}k</span>
+                  </div>
+                ))}
+              </div>
+            </VizCard>
+          )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

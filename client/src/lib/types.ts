@@ -80,6 +80,9 @@ export interface Stats {
   emergingHotspots: number; caseAnomalies: number;
   topCrimeHeads: { headId: string; name: string; count: number }[];
   trend: { month: string; count: number }[];
+  heat: { dow: number; hour: number; count: number }[];
+  statusBreakdown: { open: number; chargeSheeted: number; closed: number; undetected: number };
+  gravitySplit: { heinous: number; nonHeinous: number };
 }
 
 export interface Alert {

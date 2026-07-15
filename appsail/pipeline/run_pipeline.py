@@ -308,13 +308,20 @@ def _build_stats(tables, health, clusters, offenders, geo, anomalies, today):
     # a "network" = a cluster containing a resolved multi-case offender (not just similar MO)
     offender_networks = [c for c in clusters if c.get("topOffenders")]
     serious_flagged = sum(1 for h in health if h.get("severity") == "high")
-    # cases per month (last 12) for trend
+    # cases per month (last 18) for trend; hour x weekday heatmap; gravity split
     by_month = Counter()
+    hour_dow = [[0] * 24 for _ in range(7)]  # [weekday][hour]
+    gravity = Counter()
     for r in cases.itertuples(index=False):
         d = common.parse_dt(r.CrimeRegisteredDate)
         if d:
             by_month[d.strftime("%Y-%m")] += 1
+        inc = common.parse_dt(r.IncidentFromDate)
+        if inc:
+            hour_dow[inc.weekday()][inc.hour] += 1
+        gravity[str(r.GravityOffenceID)] += 1
     trend = [{"month": m, "count": by_month[m]} for m in sorted(by_month)][-18:]
+    heat = [{"dow": wd, "hour": h, "count": hour_dow[wd][h]} for wd in range(7) for h in range(24)]
     return {
         "totalCases": len(cases),
         "openCases": status.get("1", 0),
@@ -331,6 +338,10 @@ def _build_stats(tables, health, clusters, offenders, geo, anomalies, today):
         "topCrimeHeads": [{"headId": h, "name": head_names.get(h, str(h)), "count": c}
                           for h, c in head_counts.most_common(8)],
         "trend": trend,
+        "heat": heat,
+        "statusBreakdown": {"open": status.get("1", 0), "chargeSheeted": status.get("2", 0),
+                            "closed": status.get("3", 0), "undetected": status.get("4", 0)},
+        "gravitySplit": {"heinous": gravity.get("1", 0), "nonHeinous": gravity.get("2", 0)},
         "computedTs": today.isoformat(),
     }
 
