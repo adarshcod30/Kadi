@@ -22,7 +22,7 @@ export default function Cases() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-semibold text-kadi-navy">Cases</h1>
-          <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in scope` : 'Loading…'}</p>
+          <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in your scope` : 'Loading…'} · filter by crime head, district, status or gravity. The <b>Links</b> column shows how many other cases each FIR connects to; open any row for its full detail + network.</p>
         </div>
       </div>
 

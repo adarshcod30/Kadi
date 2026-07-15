@@ -1,7 +1,8 @@
 // Shell — top bar (brand, global search, language, alerts, role), sidebar nav,
 // persistent fairness banner. Light, government-grade layout (docs/04 §3).
 import { ReactNode, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Share2, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X,
@@ -29,6 +30,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const { lang, setLang } = useLang();
   const t = useT();
   const nav = useNavigate();
+  const location = useLocation();
   const { data: me } = useMe();
   const { data: alerts } = useAlerts();
   const role = getRole();
@@ -94,7 +96,13 @@ export function Shell({ children }: { children: ReactNode }) {
         {/* Main */}
         <main className="flex-1 min-w-0 overflow-auto">
           <FairnessBanner />
-          <div className="p-5 max-w-[1500px] mx-auto">{children}</div>
+          <AnimatePresence mode="wait">
+            <motion.div key={location.pathname.split('/')[1] || 'home'}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }} className="p-5 max-w-[1500px] mx-auto">
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>
