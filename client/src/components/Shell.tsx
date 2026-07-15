@@ -46,7 +46,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* Top bar */}
       <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20">
         <div className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="w-7 h-7 rounded bg-white/15 grid place-items-center text-kadi-saffron font-bold">क</span>
+          <span className="w-7 h-7 rounded bg-white/15 grid place-items-center text-kadi-saffron font-bold kn">ಕ</span>
           <span>{t('appName')}</span>
           <span className="hidden md:inline text-white/70 text-sm font-normal ml-2">{t('ksp')}</span>
         </div>
