@@ -66,19 +66,28 @@ precomputed read-model) behind a store interface, so the Catalyst adapters drop 
 ## ⚠️ Needs Adarsh (console / credentials — I can't do these)
 
 > Every one of these is mocked behind an interface, so the app runs fully locally meanwhile.
+> Full runbook: **[docs/07_CATALYST_SETUP.md](docs/07_CATALYST_SETUP.md)**.
 
-1. **Install Catalyst CLI + login** on your machine to deploy: `npm i -g zcatalyst-cli && catalyst login`.
-   (Not installable in this environment.)
-2. **Project** = KadiLabs, ID **55468000000013048** ✅. Still need **org/environment ID** and the
-   data-centre domain (`.catalyst.zoho.in` vs `.com`).
-3. **Enable services** (Cloud Scale): Authentication, Data Store, NoSQL, Cache, Stratus, QuickML,
-   Zia, Cron, API Gateway, Signals, AppSail, Pipelines.
-4. **Data import**: create a Stratus bucket; run `catalyst data-store import` (config per table,
-   FK order in `data/output/_manifest.json`).
-5. **QuickML**: GLM-4.7 deployment ID + endpoint URL; Connection scope `quickml.deployment.read`;
+### Resolved 2026-07-16 (verified against the live account — no longer blocking)
+
+- ~~Install CLI + login~~ — CLI **v1.26.2** present; `catalyst whoami` → `23ucs509`.
+- ~~Org / environment ID / data centre~~ — org **60078029367**, env **Development** (id `60078029367`),
+  DC **`in`**, domain `kadilabs-60078029367.development`. Project bound via `catalyst project:use`.
+- ~~AppSail Python 3.9 vs 3.11~~ — `catalyst config:list` shows python3_9…3_13; **3.11 available**.
+
+### Still blocking
+
+1. **Enable services** (console only — no CLI equivalent): Authentication, Data Store, NoSQL, Cache,
+   Stratus, Zia, Cron, Signals, AppSail, Slate, QuickML, Pipelines → <https://console.catalyst.zoho.in/>
+2. **API Gateway** is currently **DISABLED** (`catalyst apig:status`). One command fixes it:
+   `catalyst apig:enable` — say the word and I'll run it.
+3. **Data import**: create a Stratus bucket; `catalyst ds:import --table <T> --config <cfg>` in the FK
+   order from `data/output/_manifest.json`. Needs a per-table column-mapping config.
+4. **QuickML**: GLM-4.7 deployment ID + endpoint URL; Connection scope `quickml.deployment.read`;
    RAG knowledge-base document IDs (IPC/BNS/SOP docs).
-6. **Zia**: enable Zia Services; confirm **Kannada STT/TTS** availability (else translation fallback).
-7. **Auth / CORS**: whitelist the Slate front-end domain + enable CORS once deployed.
-8. **Credits**: confirm free-credit claim covers Data Store + AppSail + QuickML.
-9. **Submission**: exact deadline + team details for README/deck; confirm AppSail Python stack
-   version (3.9 vs 3.11) for `appsail/app-config.json`.
+5. **Zia**: enable Zia Services; confirm **Kannada STT/TTS** availability (else translation fallback).
+6. **Auth / CORS**: whitelist the Slate front-end domain + enable CORS once deployed.
+7. **Credits**: confirm free-credit claim covers Data Store + AppSail + QuickML.
+8. **Submission**: exact deadline + team details for README/deck.
+9. **Deploy** publishes to your Zoho account — I won't run `catalyst deploy` unless you tell me to.
+   Everything is built and ready meanwhile.
