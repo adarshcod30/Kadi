@@ -1,19 +1,21 @@
 {
-  "project_name": "KadiLabs",
-  "project_id": 55468000000013048,
-  "targets": {
-    "client": {
-      "source": "client/dist",
-      "type": "webclienthosting"
-    },
-    "functions": {
-      "source": "functions",
-      "type": "functions"
-    },
-    "appsail": {
-      "source": "appsail",
-      "type": "appsail"
-    }
+  "client": {
+    "source": "client/dist"
   },
-  "_note": "org_id / environment_id / data-center domain to be filled once Adarsh runs `catalyst login` + `catalyst init`. See PROGRESS.md -> Needs Adarsh."
+  "functions": {
+    "targets": [
+      "api"
+    ],
+    "ignore": [],
+    "source": "functions"
+  },
+  "appsail": [
+    {
+      "source": "appsail",
+      "name": "kadi-appsail"
+    }
+  ],
+  "apig": {
+    "enabled": true
+  }
 }

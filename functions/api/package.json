@@ -1,0 +1,13 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "description": "KADI API — Catalyst Advanced I/O Function (Node)",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "express": "^4.19.2",
+    "zcatalyst-sdk-node": "^1.0.0"
+  }
+}
