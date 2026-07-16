@@ -38,6 +38,8 @@ export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });
 export const useHotspots = (emerging?: boolean) =>
   useQuery({ queryKey: ['hotspots', emerging], queryFn: () => api.get<{ hotspots: Hotspot[]; districtCounts: Record<string, number> }>(`/geo/hotspots${qs({ emerging })}`) });
+export const useGeoGrid = (params: Record<string, unknown>, enabled = true) =>
+  useQuery({ queryKey: ['geo-grid', params], queryFn: () => api.get<any>(`/geo/grid${qs(params)}`), enabled });
 export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
 export const useNational = () =>

@@ -274,6 +274,47 @@ function geoPoints(user, q = {}) {
   return { items, total: rows.length, districtCounts: db.hotspots.districtCounts || {} };
 }
 
+/**
+ * geoGrid — bin every incident into a fixed lat/lng grid and return per-cell counts.
+ *
+ * Rendering a raw heatmap from thousands of equally-weighted points gives no control:
+ * the density field either floors (all blue) or saturates (all red). Binning server-side
+ * over the FULL dataset (not a sample) yields real counts per cell, so the client can
+ * weight the heat by actual volume and show a legend in genuine case numbers.
+ */
+function geoGrid(user, q = {}) {
+  const db = load();
+  const cell = Math.min(0.25, Math.max(0.02, parseFloat(q.cell || '0.05')));
+  const hourFrom = q.hourFrom != null && q.hourFrom !== '' ? parseInt(q.hourFrom, 10) : 0;
+  const hourTo = q.hourTo != null && q.hourTo !== '' ? parseInt(q.hourTo, 10) : 23;
+  const wholeDay = hourFrom === 0 && hourTo === 23;
+
+  const bins = new Map();
+  let total = 0;
+  for (const c of db.caseList) {
+    if (!c.latitude || !c.longitude) continue;
+    if (q.head && c.crimeHeadId !== String(q.head)) continue;
+    if (!wholeDay) {
+      const hh = c.incidentFromDate ? parseInt(c.incidentFromDate.slice(11, 13), 10) : NaN;
+      if (!Number.isFinite(hh) || hh < hourFrom || hh > hourTo) continue;
+    }
+    const gy = Math.floor(c.latitude / cell);
+    const gx = Math.floor(c.longitude / cell);
+    const key = `${gx}:${gy}`;
+    let b = bins.get(key);
+    if (!b) {
+      b = { lat: (gy + 0.5) * cell, lng: (gx + 0.5) * cell, count: 0 };
+      bins.set(key, b);
+    }
+    b.count += 1;
+    total += 1;
+  }
+  const cells = [...bins.values()];
+  let maxCount = 0;
+  for (const c of cells) if (c.count > maxCount) maxCount = c.count;
+  return { cells, maxCount, cellSize: cell, total, cellCount: cells.length };
+}
+
 function hotspots(user, q = {}) {
   const db = load();
   let hs = db.hotspots.hotspots || [];
@@ -304,7 +345,7 @@ function vulnerability(user) {
 
 module.exports = {
   FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
-  listOffenders, getOffender, listHealth, healthSummary, geoPoints, hotspots, vulnerability,
+  listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   stats: (user) => load().stats,
   districtStats: () => load().districtStats,
   national: () => load().national,

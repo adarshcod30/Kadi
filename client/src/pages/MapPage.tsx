@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3 } from 'lucide-react';
-import { useGeoPoints, useHotspots, useLookups, useDistricts, useNational } from '../api/hooks';
+import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational } from '../api/hooks';
 import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
@@ -58,6 +58,9 @@ export default function MapPage() {
   const { data: points } = useGeoPoints({ head, limit: 9000 });
   const { data: hotspots } = useHotspots();
   const { data: lookups } = useLookups();
+  // binned density over the FULL dataset (only fetched when the heat layer is showing)
+  const { data: grid } = useGeoGrid(
+    { cell: 0.05, head, hourFrom: hours[0], hourTo: hours[1] }, layer === 'heat');
 
   const countById = useMemo(() => {
     const m: Record<string, number> = {};
@@ -90,24 +93,25 @@ export default function MapPage() {
       m.addLayer({ id: 'ka-sel', type: 'line', source: 'ka', paint: { 'line-color': '#E8871E', 'line-width': 3 }, filter: ['==', ['get', 'districtId'], ''] });
 
       m.addSource('pts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } as any });
+      // Heat is driven by SERVER-BINNED cells carrying a log-normalised weight (`w`), not
+      // by thousands of equally-weighted raw points. One weighted kernel per grid cell,
+      // with the radius tracking the cell's on-screen size, makes heat density a direct
+      // function of real case counts — so the ramp maps to volume instead of flooring
+      // (all blue) or saturating (all red). Counts span ~1..1300 per cell, hence log.
+      m.addSource('grid', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } as any });
       m.addLayer({
-        id: 'heat', type: 'heatmap', source: 'pts', layout: { visibility: 'none' },
+        id: 'heat', type: 'heatmap', source: 'grid', layout: { visibility: 'none' },
         paint: {
-          // Tuned so density gradates instead of saturating: with ~9k points at state
-          // zoom a high weight/intensity turns the whole state solid red.
-          // Tight radius + low per-point weight so sparse rural areas stay transparent
-          // and only genuinely dense areas (cities) climb the ramp to red. A large radius
-          // blurs every district into the same uniform wash.
-          'heatmap-weight': 0.9,
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.9, 9, 1.4, 13, 2.4],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 5, 5, 9, 14, 13, 28],
-          'heatmap-opacity': 0.9,
-          // Ramp compressed to the density range these point volumes actually produce,
-          // so towns read teal/yellow and city cores burn orange/red instead of the whole
-          // state sitting in the flat blue floor of a 0..1 ramp.
+          'heatmap-weight': ['get', 'w'],
+          // >1 so a run of dense adjacent cells (a city core) reaches the top of the ramp
+          'heatmap-intensity': 1.4,
+          // radius must exceed the cell's on-screen spacing (~2px at z6) so kernels
+          // overlap into a smooth surface instead of a speckled dot-grid
+          'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'], 5, 8, 7, 18, 9, 45, 11, 150, 13, 400],
+          'heatmap-opacity': 0.85,
           'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(0,0,0,0)', 0.02, 'rgba(43,108,176,0.55)', 0.08, '#38b2ac',
-            0.16, '#ecc94b', 0.26, '#ed8936', 0.4, '#c53030'],
+            0, 'rgba(0,0,0,0)', 0.1, 'rgba(43,108,176,0.7)', 0.3, '#38b2ac',
+            0.5, '#ecc94b', 0.7, '#ed8936', 1, '#c53030'],
         } as any,
       });
       m.addLayer({
@@ -163,7 +167,7 @@ export default function MapPage() {
 
   }, [ready, districts, layer, countById]);
 
-  // ---- point/heat data ----
+  // ---- incident points ----
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
@@ -175,6 +179,20 @@ export default function MapPage() {
       })),
     });
   }, [ready, filteredPoints]);
+
+  // ---- binned heat: log-normalise real per-cell counts into the 0..1 heat weight ----
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !grid || !m.getSource('grid')) return;
+    const denom = Math.log((grid.maxCount || 1) + 1) || 1;
+    (m.getSource('grid') as any).setData({
+      type: 'FeatureCollection',
+      features: (grid.cells || []).map((c: any) => ({
+        type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+        properties: { w: Math.log(c.count + 1) / denom, count: c.count },
+      })),
+    });
+  }, [ready, grid]);
 
   // ---- layer + basemap visibility ----
   useEffect(() => {
@@ -250,7 +268,11 @@ export default function MapPage() {
           <input type="range" min={0} max={23} value={hours[0]} onChange={(e) => setHours(([, b]) => [Math.min(Number(e.target.value), b), b])} className="w-32 accent-kadi-blue" />
           <input type="range" min={0} max={23} value={hours[1]} onChange={(e) => setHours(([a]) => [a, Math.max(Number(e.target.value), a)])} className="w-32 accent-kadi-blue" />
           <span className="font-num text-sm text-kadi-navy font-medium">{String(hours[0]).padStart(2, '0')}:00 – {String(hours[1]).padStart(2, '0')}:59</span>
-          <span className="text-xs text-ink-muted">{filteredPoints.length.toLocaleString()} incidents</span>
+          <span className="text-xs text-ink-muted">
+            {layer === 'heat'
+              ? `${(grid?.total ?? 0).toLocaleString()} incidents (all)`
+              : `${filteredPoints.length.toLocaleString()} incidents (sample)`}
+          </span>
           {(hours[0] !== 0 || hours[1] !== 23) && <button onClick={() => setHours([0, 23])} className="text-xs link">reset</button>}
           <div className="flex gap-1 ml-auto flex-wrap">
             {([['Late night', [0, 4]], ['Day', [9, 17]], ['Evening', [18, 21]], ['Night', [22, 23]]] as [string, [number, number]][]).map(([l, r]) => (
@@ -272,9 +294,12 @@ export default function MapPage() {
           )}
           {layer === 'heat' && (
             <div className="absolute bottom-8 left-3 card px-3 py-2 text-xs bg-white/95">
-              <div className="font-medium text-ink-muted mb-1">Incident density</div>
-              <div className="h-2 w-40 rounded" style={{ background: 'linear-gradient(90deg,#2b6cb0,#38b2ac,#ecc94b,#ed8936,#c53030)' }} />
-              <div className="flex justify-between mt-0.5"><span>low</span><span>high</span></div>
+              <div className="font-medium text-ink-muted mb-1">Incidents per ~5 km cell</div>
+              <div className="h-2 w-44 rounded" style={{ background: 'linear-gradient(90deg,rgba(43,108,176,.7),#38b2ac,#ecc94b,#ed8936,#c53030)' }} />
+              <div className="flex justify-between font-num mt-0.5">
+                <span>1</span><span>{grid ? Math.round(Math.sqrt(grid.maxCount)) : ''}</span><span>{grid?.maxCount?.toLocaleString() ?? ''}</span>
+              </div>
+              <div className="text-[10px] text-ink-muted mt-0.5">log scale · {grid?.total?.toLocaleString() ?? 0} incidents binned</div>
             </div>
           )}
           {layer === 'points' && lookups && (
