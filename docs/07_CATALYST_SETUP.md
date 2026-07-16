@@ -63,12 +63,14 @@ Enable each of these (most are one click; they're off by default):
 | **Zia** | Zia Services | Kannada STT/TTS/translation |
 | **Pipelines** | DevOps → Pipelines | CI/CD from GitHub (optional) |
 
-**API Gateway is the exception — it's CLI-controlled.** Currently **DISABLED**:
+**API Gateway is the exception — it's CLI-controlled, and it's already done ✅:**
 
 ```bash
-catalyst apig:status     # -> API Gateway: DISABLED
-catalyst apig:enable     # turn it on
+catalyst apig:enable     # ran 2026-07-16 -> "successfully enabled"
+catalyst apig:status     # -> API Gateway: ENABLED
 ```
+
+This also writes `"apig": { "enabled": true }` into `catalyst.json`.
 
 ## Step 3 — Permissions / credentials to send back to me
 
@@ -129,16 +131,62 @@ Console → Cron → new Cron → target the AppSail job `jobs/recompute_graph.p
 
 ---
 
+## The real `catalyst.json` schema (verified, not guessed)
+
+Recovered by scaffolding a throwaway project in a scratch dir with
+`catalyst init` + `client:setup` + `functions:add` + `appsail:add`, then reading what
+the CLI generated. **Our original hand-written file was wrong in every structural way**
+and has been corrected:
+
+```json
+{
+  "client":    { "source": "client/dist" },
+  "functions": { "targets": ["api"], "ignore": [], "source": "functions" },
+  "appsail":   [ { "source": "appsail", "name": "kadi-appsail" } ],
+  "apig":      { "enabled": true }
+}
+```
+
+- Flat feature keys — there is **no `targets` wrapper** and no `type` field.
+- **`appsail` is an array**, not an object.
+- **No `project_name` / `project_id`.** Project binding lives in `.catalystrc` alone.
+
+> ### ⚠️ Why `project_id` must never sit in `catalyst.json` as a number
+> `55468000000013048` is 17 digits and **exceeds JS `MAX_SAFE_INTEGER`
+> (9007199254740991)**. `JSON.parse` cannot represent it, so it silently becomes
+> `55468000000013050` — both literals parse to the *same* double. The CLI read our file
+> and wrote the corrupted value straight back, which would have targeted a project that
+> does not exist. `.catalystrc` stores every id as a **string** for exactly this reason.
+
+### Required files deploy will not work without
+
+| File | Purpose |
+|---|---|
+| `functions/api/catalyst-config.json` | per-function manifest (`advancedio`, `node20`, `main: index.js`) |
+| `functions/api/package.json` | the function folder is self-contained; parent deps don't ship |
+| `client/dist/client-package.json` | client-hosting manifest — kept in `client/public/` so every build emits it |
+| `appsail/app-config.json` | `{command, build_path, stack, env_variables, memory, scripts}` |
+
+All four were missing or malformed and are now fixed & committed.
+
+### Exact runtime stack strings
+
+From `catalyst config:list` — **underscores, no dots**. `python3.9` is not a valid stack
+string; the correct value is `python_3_11`:
+
+```
+node12 node14 node16 node18 node20 node22 node24
+python_3_9 python_3_10 python_3_11 python_3_12 python_3_13
+java8 java11 java17 java21 java25
+```
+
 ## Known gaps / things to check on first deploy
 
-- **`catalyst.json` schema** — ours is hand-written. The CLI only validated `.catalystrc`
-  so far; if `catalyst deploy` rejects it, run `catalyst init --force` in a scratch copy
-  to see the generated schema and reconcile. Don't run `init` over the repo blind — it
-  can restructure `functions/` and `client/`.
-- **`appsail/app-config.json`** currently pins `python3.9`; `python3_11` is available and
-  matches what we develop against — worth switching once AppSail is enabled.
 - **Data Store column limits** — confirm `BriefFacts` (long text) maps to `text`, and the
   max rows per import batch (40k CaseMaster rows may need chunking).
 - The mock store loads CSVs from `DATA_DIR`; the Catalyst adapter must replace it with
   ZCQL/NoSQL reads. The store interface (`functions/api/services/store.mock.js`) is the
   single seam to implement against.
+- **AppSail deps**: `requirements.txt` pins scikit-learn/pandas/networkx. Confirm the
+  managed `python_3_11` image builds them, and that 1024 MB memory is enough for the
+  40k-FIR pipeline (it peaks well under this locally).
