@@ -135,7 +135,7 @@ export default function About() {
 
 function Section({ title, kicker, children }: { title: string; kicker?: string; children: React.ReactNode }) {
   return (
-    <motion.section initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.5 }}>
+    <motion.section initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
       {kicker && <div className="text-xs font-semibold uppercase tracking-wider text-kadi-blue mb-1">{kicker}</div>}
       <h2 className="text-2xl font-bold text-kadi-navy mb-6">{title}</h2>
       {children}

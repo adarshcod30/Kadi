@@ -55,9 +55,9 @@ export default function GraphExplorer() {
 
   return (
     <div className="h-[calc(100vh-8.5rem)] flex flex-col">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-kadi-navy flex items-center gap-2"><Network size={18} /> Case-Linkage Graph</h1>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-kadi-navy flex items-center gap-2"><Network size={18} className="shrink-0" /> Case-Linkage Graph</h1>
           <p className="text-xs text-ink-muted max-w-2xl">{data?.explanation?.summary
             || 'Assembling the network…'} Each node is an FIR or an offender; each line is a proven link. Click a line to see <b>why two cases connect</b>. Drag nodes, switch layout, filter link types.</p>
         </div>

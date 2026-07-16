@@ -163,7 +163,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ---- Illustrated capabilities: what you can actually do from here ---- */}
-      <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}>
+      <motion.div variants={stagger} initial="hidden" animate="show">
         <div className="flex items-baseline gap-2 mb-3">
           <h2 className="text-lg font-semibold text-kadi-navy">Explore the intelligence</h2>
           <p className="text-sm text-ink-muted">— four ways KADI turns these records into action.</p>
@@ -185,7 +185,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ---- Fairness + how it works ---- */}
-      <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}
+      <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <VizCard title="Fair by design" hint="Protected attributes are excluded from every model and the exclusion is enforced by a unit test that fails if any protected column reaches a feature set.">
           <div className="p-4 flex items-center gap-4">

@@ -24,21 +24,21 @@ export function SiloToGraph({ className = '' }: { className?: string }) {
       <text x="60" y="220" fontSize="11" fill={GREY} textAnchor="middle">Siloed FIRs</text>
       {/* arrow */}
       <motion.path d="M130 120 h50" stroke={BLUE} strokeWidth="2.5" fill="none" markerEnd="url(#il-arrow)"
-        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} transition={{ duration: 0.8 }} />
+        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8 }} />
       <defs><marker id="il-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill={BLUE} /></marker></defs>
       {/* right: connected network */}
       <g transform="translate(200, 0)">
         {[[70, 60], [150, 45], [40, 130], [120, 120], [180, 130], [95, 190]].map((p, i) => (
           <motion.line key={i} x1="110" y1="110" x2={p[0]} y2={p[1]} stroke={i % 2 ? TEAL : NAVY} strokeWidth="2" strokeOpacity="0.6"
-            initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 0.4 + i * 0.08 }} />
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 0.4 + i * 0.08 }} />
         ))}
         <line x1="70" y1="60" x2="150" y2="45" stroke={TEAL} strokeWidth="2" strokeOpacity="0.5" />
         {([[70, 60], [150, 45], [40, 130], [120, 120], [180, 130], [95, 190]] as [number, number][]).map((n, i) => (
           <motion.rect key={i} x={n[0] - 11} y={n[1] - 8} width="22" height="16" rx="4" fill={BLUE} stroke="#fff" strokeWidth="1.5"
-            initial={{ scale: 0 }} whileInView={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.08, type: 'spring', stiffness: 200 }} />
+            initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 + i * 0.08, type: 'spring', stiffness: 200 }} />
         ))}
         <motion.circle cx="110" cy="110" r="16" fill={SAFFRON} stroke="#fff" strokeWidth="2.5"
-          initial={{ scale: 0 }} whileInView={{ scale: 1 }} transition={{ type: 'spring', stiffness: 160 }} />
+          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 160 }} />
       </g>
       <text x="310" y="220" fontSize="11" fill={NAVY} fontWeight="600" textAnchor="middle">One living graph</text>
     </svg>
@@ -50,9 +50,9 @@ export function FairnessShield({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 200 200" className={className} role="img" aria-label="Fairness — protected attributes excluded">
       <motion.path d="M100 20 L165 45 V105 C165 150 135 172 100 185 C65 172 35 150 35 105 V45 Z"
-        fill="#EAF3FB" stroke={BLUE} strokeWidth="3" initial={{ pathLength: 0, opacity: 0 }} whileInView={{ pathLength: 1, opacity: 1 }} transition={{ duration: 1 }} />
+        fill="#EAF3FB" stroke={BLUE} strokeWidth="3" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 1 }} />
       <motion.path d="M72 100 l18 18 l38 -42" fill="none" stroke={'#1E874B'} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"
-        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 0.8 }} />
+        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 0.8 }} />
       {['caste', 'religion', 'occupation'].map((t, i) => (
         <g key={t} transform={`translate(${40 + i * 45}, 150)`}>
           <text x="0" y="0" fontSize="9" fill={RED} textAnchor="middle" textDecoration="line-through">{t}</text>
@@ -70,11 +70,11 @@ export function PipelineFlow({ className = '' }: { className?: string }) {
       {steps.map((s, i) => (
         <g key={i} transform={`translate(${20 + i * 115}, 25)`}>
           <motion.rect width="90" height="42" rx="9" fill="#fff" stroke={s[1] as string} strokeWidth="2"
-            initial={{ y: 10, opacity: 0 }} whileInView={{ y: 0, opacity: 1 }} transition={{ delay: i * 0.15 }} />
+            initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: i * 0.15 }} />
           <circle cx="18" cy="21" r="6" fill={s[1] as string} />
           <text x="34" y="26" fontSize="12" fontWeight="600" fill={NAVY}>{s[0]}</text>
           {i < 3 && <motion.path d={`M92 21 h20`} stroke={GREY} strokeWidth="2" markerEnd="url(#pf-a)"
-            initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} transition={{ delay: 0.2 + i * 0.15 }} />}
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.2 + i * 0.15 }} />}
         </g>
       ))}
       <defs><marker id="pf-a" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 z" fill={GREY} /></marker></defs>
@@ -103,7 +103,7 @@ export function RiskArt({ className = '' }: { className?: string }) {
     <svg viewBox="0 0 160 110" className={className} role="img" aria-label="Behaviour-based risk score">
       <path d={`M30 90 A${r} ${r} 0 0 1 130 90`} fill="none" stroke="#EDF1F6" strokeWidth="12" strokeLinecap="round" />
       <motion.path d={`M30 90 A${r} ${r} 0 0 1 130 90`} fill="none" stroke={SAFFRON} strokeWidth="12" strokeLinecap="round"
-        strokeDasharray={c} initial={{ strokeDashoffset: c }} whileInView={{ strokeDashoffset: c * 0.35 }} transition={{ duration: 1.1 }} />
+        strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * 0.35 }} transition={{ duration: 1.1 }} />
       <text x="80" y="86" fontSize="26" fontWeight="700" fill={NAVY} textAnchor="middle">72</text>
       <text x="80" y="102" fontSize="10" fill={GREY} textAnchor="middle">behaviour only</text>
     </svg>
@@ -118,10 +118,10 @@ export function HealthPulse({ className = '' }: { className?: string }) {
       <motion.path
         d="M0 60 h30 l8 -22 l10 44 l9 -22 h28 l8 -16 l10 32 l9 -16 h30 l8 -10 l10 20 l9 -10 h40"
         fill="none" stroke={TEAL} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 1.4 }} />
+        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4 }} />
       <motion.path d="M209 60 h51" fill="none" stroke={RED} strokeWidth="2.5" strokeDasharray="4 3"
-        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 1.2 }} />
-      <motion.g initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 1.6, type: 'spring' }}>
+        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 1.2 }} />
+      <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.6, type: 'spring' }}>
         <circle cx="235" cy="60" r="9" fill={RED} />
         <text x="235" y="64" fontSize="11" fontWeight="700" fill="#fff" textAnchor="middle">!</text>
       </motion.g>
@@ -137,17 +137,17 @@ export function NetworkCluster({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 200 150" className={className} role="img" aria-label="Offender network cluster">
       <motion.ellipse cx="98" cy="74" rx="76" ry="58" fill={BLUE} fillOpacity="0.08" stroke={BLUE} strokeOpacity="0.35"
-        strokeDasharray="5 4" initial={{ scale: 0.7, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }} />
+        strokeDasharray="5 4" initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.6 }} />
       {nodes.map((n, i) => (
         <motion.line key={i} x1="98" y1="74" x2={n[0]} y2={n[1]} stroke={NAVY} strokeOpacity="0.45" strokeWidth="1.4"
-          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ delay: 0.3 + i * 0.07, duration: 0.5 }} />
+          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.3 + i * 0.07, duration: 0.5 }} />
       ))}
       {nodes.map((n, i) => (
         <motion.rect key={i} x={n[0] - 8} y={n[1] - 6} width="16" height="12" rx="3" fill={BLUE} stroke="#fff" strokeWidth="1.2"
-          initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.35 + i * 0.07, type: 'spring', stiffness: 220 }} />
+          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.35 + i * 0.07, type: 'spring', stiffness: 220 }} />
       ))}
       <motion.circle cx="98" cy="74" r="13" fill={RED} stroke="#fff" strokeWidth="2.5"
-        initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: 'spring', stiffness: 180 }} />
+        initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 180 }} />
       <text x="98" y="145" fontSize="9" fill={GREY} textAnchor="middle">one offender · seven FIRs</text>
     </svg>
   );
@@ -166,17 +166,17 @@ export function SheetToDashboard({ className = '' }: { className?: string }) {
         <text x="51" y="124" fontSize="9" fill={GREY} textAnchor="middle">Excel</text>
       </g>
       <motion.path d="M104 66 h32" stroke={BLUE} strokeWidth="2.5" markerEnd="url(#s2d)"
-        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }} />
+        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.6 }} />
       <defs><marker id="s2d" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill={BLUE} /></marker></defs>
       <g transform="translate(150,20)">
         <rect width="102" height="92" rx="6" fill="#fff" stroke="#D9E1EC" />
         {[[10, 62, 14], [30, 50, 26], [50, 34, 42], [70, 56, 20]].map(([x, y, h], i) => (
           <motion.rect key={i} x={x} y={y} width="12" height={h} rx="2" fill={[BLUE, TEAL, SAFFRON, NAVY][i]}
-            initial={{ scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true }}
+            initial={{ scaleY: 0 }} animate={{ scaleY: 1 }}
             style={{ transformOrigin: `${x + 6}px ${y + h}px` }} transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }} />
         ))}
         <motion.path d="M10 30 q22 -14 40 4 t42 -10" fill="none" stroke={TEAL} strokeWidth="2"
-          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ delay: 0.8, duration: 0.7 }} />
+          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.8, duration: 0.7 }} />
         <text x="51" y="104" fontSize="9" fill={NAVY} fontWeight="600" textAnchor="middle">Live intelligence</text>
       </g>
     </svg>
@@ -187,10 +187,10 @@ export function SheetToDashboard({ className = '' }: { className?: string }) {
 export function AssistantArt({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 200 150" className={className} role="img" aria-label="AI assistant with citations">
-      <motion.rect x="20" y="20" width="120" height="30" rx="10" fill={NAVY} initial={{ x: 40, opacity: 0 }} whileInView={{ x: 20, opacity: 1 }} />
+      <motion.rect x="20" y="20" width="120" height="30" rx="10" fill={NAVY} initial={{ x: 40, opacity: 0 }} animate={{ x: 20, opacity: 1 }} />
       <rect x="32" y="31" width="70" height="4" rx="2" fill="#fff" opacity="0.85" />
       <rect x="32" y="39" width="45" height="4" rx="2" fill="#fff" opacity="0.5" />
-      <motion.rect x="60" y="62" width="120" height="40" rx="10" fill="#fff" stroke="#D9E1EC" initial={{ x: 40, opacity: 0 }} whileInView={{ x: 60, opacity: 1 }} transition={{ delay: 0.2 }} />
+      <motion.rect x="60" y="62" width="120" height="40" rx="10" fill="#fff" stroke="#D9E1EC" initial={{ x: 40, opacity: 0 }} animate={{ x: 60, opacity: 1 }} transition={{ delay: 0.2 }} />
       <rect x="72" y="72" width="90" height="4" rx="2" fill={GREY} />
       <rect x="72" y="80" width="60" height="4" rx="2" fill="#D9E1EC" />
       <rect x="72" y="90" width="34" height="9" rx="4" fill={TEAL} opacity="0.25" />
