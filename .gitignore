@@ -26,9 +26,13 @@ client/dist/
 .env.local
 .env.*.local
 *.pem
-catalyst-config.json
 .catalyst/
+# Local project binding written by `catalyst project:use` — machine-specific, not secret.
 .catalystrc
+
+# NOTE: functions/*/catalyst-config.json and appsail/app-config.json are deploy
+# manifests and MUST be committed — deploy fails without them. Keep their
+# env_variables free of secrets; real values go in the Catalyst console.
 
 # Generated data (large, regenerable via generate.py / run_pipeline.py).
 # Keep only the small spec artifacts: _ground_truth.json, _manifest.json.
