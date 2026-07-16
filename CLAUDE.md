@@ -11,7 +11,8 @@
 
 ## Hard rules (non-negotiable — this is a hackathon we intend to win)
 1. **Must deploy on Zoho Catalyst.** Using a third-party service where a Catalyst service exists can invalidate the submission. Prefer Catalyst services always (see `docs/02_TRD.md` §Catalyst service map).
-2. **Serverless Functions have a 30-second timeout.** Never run graph builds, entity resolution, or ML training inside a Function. Heavy compute runs in **AppSail (Python)** or **Catalyst Jobs** (15-min limit), scheduled via **Cron** or triggered via **Signals/Event Functions**. The web app only *reads* precomputed results.
+2. **The 30-second timeout applies to Functions AND AppSail.** Confirmed by the Zoho team in the official KSP Datathon workshop Q&A: *"catalyst function has a 30 seconds timeout limit. So AppSail also having the same limit."* It cannot be raised. **Only Catalyst Jobs get 15 minutes.** So heavy compute (entity resolution, MO similarity, graph build) must run in a **Job function**, triggered by **Cron** or by the dynamic Cron SDK from AppSail/a Function — never behind an HTTP request. The web app only *reads* precomputed results.
+   > Our pipeline is 24.3s locally (MO similarity alone is 14.1s). That fits 30s only on fast hardware — on a 1024 MB managed container it would blow the limit, and only in production. This is why `appsail/app.py`'s `POST /run-pipeline` is not a safe production entry point.
 3. **Fairness is a feature, not an afterthought.** Never use caste, religion, or occupation as an input to any linkage, risk score, or prediction. Show this exclusion in the UI. This directly answers the jury's hardest question.
 4. **Explainability everywhere.** Every graph edge, score, and AI answer must be click-through to its source FIR(s) and the reason it was produced.
 5. **Light, government-grade UI.** Follow `docs/04_UI_UX_GUIDELINES.md`. Clean, trustworthy, KSP-like. No dark theme.
