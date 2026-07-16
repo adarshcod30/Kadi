@@ -47,11 +47,12 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="h-full flex flex-col">
       {/* Top bar */}
-      <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20">
+      {/* KSP chrome: navy-teal bar with their signature gold rule beneath */}
+      <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20 border-b-[3px] border-kadi-gold">
         <div className="flex items-center gap-2.5">
           <img src="/seal-karnataka.svg" alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
           <div className="flex items-center gap-1.5 font-semibold tracking-tight">
-            <span className="w-6 h-6 rounded bg-white/15 grid place-items-center text-kadi-saffron font-bold kn text-sm">ಕ</span>
+            <span className="w-6 h-6 rounded bg-white/15 grid place-items-center text-kadi-gold font-bold kn text-sm">ಕ</span>
             <span>{t('appName')}</span>
           </div>
           <span className="hidden md:inline text-white/70 text-sm font-normal ml-1 border-l border-white/20 pl-3">{t('ksp')}</span>
@@ -69,7 +70,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <button onClick={() => setShowAlerts((s) => !s)} className="relative p-1.5 rounded hover:bg-white/10">
             <Bell size={18} />
             {alerts && alerts.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-kadi-saffron text-[10px] rounded-full w-4 h-4 grid place-items-center">{alerts.length}</span>
+              <span className="absolute -top-0.5 -right-0.5 bg-kadi-gold text-kadi-navy font-semibold text-[10px] rounded-full w-4 h-4 grid place-items-center">{alerts.length}</span>
             )}
           </button>
           {showAlerts && <AlertsPanel onClose={() => setShowAlerts(false)} />}

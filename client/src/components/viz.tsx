@@ -54,7 +54,7 @@ export function HeatMap({ data }: { data: { dow: number; hour: number; count: nu
         ])}
       </div>
       <div className="flex items-center gap-2 mt-2 text-[10px] text-ink-muted">
-        Fewer <span className="h-2 w-24 rounded" style={{ background: 'linear-gradient(90deg,#F0F4F9,#C8DCF0,#4A90D9,#0B3D75)' }} /> More · darker = more incidents at that hour
+        Fewer <span className="h-2 w-24 rounded" style={{ background: 'linear-gradient(90deg,#F0F4F9,#C8DCF0,#4A90D9,#0f2f44)' }} /> More · darker = more incidents at that hour
       </div>
     </div>
   );

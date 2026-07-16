@@ -2,7 +2,7 @@
 // Custom vector art (no external images) so they stay crisp, themeable and CSP-safe.
 import { motion } from 'framer-motion';
 
-const NAVY = '#0B3D75', BLUE = '#1A6FC4', TEAL = '#2FA8A0', SAFFRON = '#E8871E', RED = '#C0392B', GREY = '#8A94A3';
+const NAVY = '#0f2f44', BLUE = '#1A6FC4', TEAL = '#2FA8A0', SAFFRON = '#E8871E', RED = '#C0392B', GREY = '#8A94A3';
 
 // 1) Silos → connected graph: the core "connect the links" idea.
 export function SiloToGraph({ className = '' }: { className?: string }) {

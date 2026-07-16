@@ -2,8 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Official Karnataka State Police palette (ksp.karnataka.gov.in) */
 :root {
-  --kadi-navy: #0B3D75;
+  --kadi-navy: #0f2f44;   /* KSP chrome navy-teal */
+  --kadi-gold: #ffc712;   /* KSP gold accent — dark surfaces only (fails contrast on white) */
+  --kadi-deep: #183883;   /* KSP deep blue */
   --kadi-blue: #1A6FC4;
   --kadi-teal: #2FA8A0;
   --kadi-saffron: #E8871E;
@@ -14,8 +17,10 @@ body {
   @apply bg-surface-2 text-ink font-sans antialiased;
   margin: 0;
 }
+/* KSP pair Ubuntu headings with an Open Sans body */
+h1, h2, h3 { font-family: Ubuntu, 'Open Sans', system-ui, sans-serif; }
 .font-num { font-variant-numeric: tabular-nums; }
-.kn { font-family: 'Noto Sans Kannada', Inter, sans-serif; }
+.kn { font-family: 'Noto Sans Kannada', 'Open Sans', sans-serif; }
 
 /* Focus visibility for accessibility */
 :focus-visible { outline: 2px solid var(--kadi-blue); outline-offset: 2px; border-radius: 4px; }

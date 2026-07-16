@@ -10,7 +10,7 @@ import type { GraphData, GraphNode, GraphEdge } from '../../lib/types';
 cytoscape.use(fcose);
 
 export const EDGE_COLOR: Record<string, string> = {
-  shared_offender: '#0B3D75',
+  shared_offender: '#0f2f44',
   co_accused: '#1A6FC4',
   mo_similarity: '#2FA8A0',
   same_location: '#8A94A3',
@@ -100,7 +100,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
           selector: 'node[type="offender"]',
           style: {
             shape: 'ellipse', 'background-color': 'data(bg)', width: 'data(size)', height: 'data(size)',
-            label: 'data(label)', 'font-size': 10, 'font-weight': 700, color: '#12305C',
+            label: 'data(label)', 'font-size': 10, 'font-weight': 700, color: '#0a2231',
             'text-valign': 'bottom', 'text-margin-y': 4, 'text-max-width': '110px',
             'text-wrap': 'wrap', 'border-width': 3, 'border-color': '#FFFFFF',
           } as any,

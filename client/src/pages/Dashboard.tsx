@@ -96,7 +96,7 @@ export default function Dashboard() {
                     <YAxis type="category" dataKey="district" width={110} tick={{ fontSize: 11, fill: '#1C2A3A' }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                     <Bar dataKey="total" radius={[0, 4, 4, 0]} animationDuration={800}>
-                      {districts.districts.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={i === 0 ? '#0B3D75' : '#1A6FC4'} />)}
+                      {districts.districts.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={i === 0 ? '#0f2f44' : '#1A6FC4'} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

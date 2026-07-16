@@ -158,7 +158,7 @@ export default function MapPage() {
     if (!m || !ready || !districts || !m.getLayer('ka-fill')) return;
     const max = Math.log(districts.maxCount + 1);
     const expr: any = ['interpolate', ['linear'], ['/', ['ln', ['+', ['coalesce', ['get', 'count'], 1], 1]], max],
-      0, '#dbeafe', 0.35, '#93c5fd', 0.6, '#3b82f6', 0.8, '#1d4ed8', 1, '#0B3D75'];
+      0, '#dbeafe', 0.35, '#93c5fd', 0.6, '#3b82f6', 0.8, '#1d4ed8', 1, '#0f2f44'];
     const fc = { ...(kaDistricts as any), features: (kaDistricts as any).features.map((f: any) => ({
       ...f, properties: { ...f.properties, count: countById[f.properties.districtId] || 0 } })) };
     (m.getSource('ka') as any)?.setData(fc);
@@ -288,7 +288,7 @@ export default function MapPage() {
           {layer === 'density' && (
             <div className="absolute bottom-8 left-3 card px-3 py-2 text-xs bg-white/95">
               <div className="font-medium text-ink-muted mb-1">Cases per district</div>
-              <div className="h-2 w-40 rounded" style={{ background: 'linear-gradient(90deg,#dbeafe,#93c5fd,#3b82f6,#1d4ed8,#0B3D75)' }} />
+              <div className="h-2 w-40 rounded" style={{ background: 'linear-gradient(90deg,#dbeafe,#93c5fd,#3b82f6,#1d4ed8,#0f2f44)' }} />
               <div className="flex justify-between font-num mt-0.5"><span>{districts?.minCount ?? 0}</span><span>{districts?.maxCount?.toLocaleString() ?? ''}</span></div>
             </div>
           )}

@@ -25,7 +25,7 @@ export default function About() {
           <div className="text-sm text-white/70 leading-tight">Karnataka State Police<br />Government of Karnataka</div>
         </motion.div>
         <motion.h1 variants={rise} className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg bg-white/15 grid place-items-center text-kadi-saffron kn">ಕ</span>
+          <span className="w-10 h-10 rounded-lg bg-white/15 grid place-items-center text-kadi-gold kn">ಕ</span>
           KADI
         </motion.h1>
         <motion.p variants={rise} className="text-lg text-white/90 mt-2 max-w-2xl">Karnataka Analytics &amp; Detection Intelligence — an AI-driven crime analytics &amp; visualization platform.</motion.p>
