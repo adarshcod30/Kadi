@@ -30,11 +30,23 @@ def _first_ok(a_tokens, b_tokens):
     return fa == fb or fa.startswith(fb) or fb.startswith(fa) or fuzz.ratio(fa, fb) >= 86
 
 
+def _surname_same(la, lb):
+    """Surnames agree only if identical, a near-identical spelling variant, or a prefix
+    that is *almost* the whole word. Without the length guard, genuinely different
+    surnames collapse ("Bhat" is a prefix of "Bhatkal" but is a different surname)."""
+    if la == lb:
+        return True
+    short, long_ = (la, lb) if len(la) <= len(lb) else (lb, la)
+    if long_.startswith(short) and len(short) >= 0.75 * len(long_):
+        return True
+    return fuzz.ratio(la, lb) >= 86
+
+
 def _last_match(a_tokens, b_tokens, a_inits, b_inits):
     """Return ('exact'|'initial'|None) for how the surnames agree."""
     la = a_tokens[-1] if len(a_tokens) > 1 else ""
     lb = b_tokens[-1] if len(b_tokens) > 1 else ""
-    if la and lb and (la == lb or la.startswith(lb) or lb.startswith(la) or fuzz.ratio(la, lb) >= 86):
+    if la and lb and _surname_same(la, lb):
         return "exact"
     # initial bridging: "Ravikumar G" (init 'g') vs "Ravikumar Gowda" (surname 'gowda')
     if (la and la[0] in b_inits) or (lb and lb[0] in a_inits):
@@ -155,14 +167,21 @@ def resolve(tables: dict):
                 if last is None:
                     continue
                 sim = _name_sim(ri["join"], ri["compact"], rj["join"], rj["compact"])
-                # Distinctiveness: a rare surname on either side makes the name itself a
-                # strong identity signal. Common surnames require corroboration.
-                distinctive = ((ri["surname"] and surname_freq[ri["surname"]] <= SURNAME_RARE) or
-                               (rj["surname"] and surname_freq[rj["surname"]] <= SURNAME_RARE))
+                # Distinctiveness: BOTH surnames must be rare for the name alone to be a
+                # trustworthy identity signal. If either side carries a common surname the
+                # pair needs corroboration — otherwise one rare surname drags a whole
+                # crowd of common-named strangers into a single identity.
+                sur_a, sur_b = ri["surname"], rj["surname"]
+                distinctive = (bool(sur_a) and bool(sur_b)
+                               and surname_freq[sur_a] <= SURNAME_RARE
+                               and surname_freq[sur_b] <= SURNAME_RARE)
+                # A distinctive shared co-accused is specific corroboration. A shared
+                # location cell alone is NOT trusted for common surnames — dense metros
+                # (Bengaluru) collide heavily and would chain unrelated same-name people.
                 fine_cell = bool(ri["geo3"]) and ri["geo3"] == rj["geo3"]
                 shared_dist_co = any(surname_freq.get(s, 999) <= SURNAME_RARE
                                      for s in (ri["co_surnames"] & rj["co_surnames"]))
-                corroborated = fine_cell or shared_dist_co
+                corroborated = shared_dist_co or (fine_cell and shared_dist_co)
 
                 link = False
                 if sim >= STRUCT_THRESHOLD:
