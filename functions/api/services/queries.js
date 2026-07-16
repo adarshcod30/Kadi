@@ -266,8 +266,10 @@ function geoPoints(user, q = {}) {
   const items = [];
   for (let i = 0; i < rows.length && items.length < limit; i += step) {
     const c = rows[Math.floor(i)];
+    const hh = c.incidentFromDate ? parseInt(c.incidentFromDate.slice(11, 13), 10) : NaN;
     items.push({ caseId: c.caseMasterId, crimeNo: c.crimeNo, lat: c.latitude, lng: c.longitude,
-      head: c.crimeHead, subHead: c.crimeSubHead, gravity: c.gravity, district: c.districtName });
+      head: c.crimeHead, headId: c.crimeHeadId, subHead: c.crimeSubHead, gravity: c.gravity,
+      district: c.districtName, hour: Number.isFinite(hh) ? hh : null });
   }
   return { items, total: rows.length, districtCounts: db.hotspots.districtCounts || {} };
 }

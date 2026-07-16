@@ -100,6 +100,14 @@ class Builder:
         self.courts_by_district = {}
         self.subhead_index = {sh[0]: sh for sh in K.CRIME_SUBHEADS}
         self.head_of_subhead = {sh[0]: sh[1] for sh in K.CRIME_SUBHEADS}
+        # real district geometry for coordinate sampling (optional dependency)
+        try:
+            from geo_sampler import GeoSampler
+            self.geo = GeoSampler(seed=SEED)
+            print(f"[KADI] geo sampler: {len(self.geo._polys)} district polygons loaded")
+        except Exception as e:  # shapely/geojson missing -> bbox fallback
+            self.geo = None
+            print(f"[KADI] geo sampler unavailable ({e}); falling back to bounding boxes")
 
     def _next(self, key: str) -> int:
         self._ids[key] += 1
@@ -134,23 +142,16 @@ class Builder:
 
     # --- geo ---
     def sample_latlng(self, district_id: int):
+        """Coordinates INSIDE the real district polygon, clustered around urban centres.
+        Sampling a bounding box (the naive way) puts incidents in visible rectangles and
+        even in the sea. Falls back to the bbox only if geometry is unavailable."""
+        centres = K.BENGALURU_HOTSPOTS if district_id == 1 else None
+        if self.geo is not None:
+            pt = self.geo.sample(district_id, centres)
+            if pt:
+                return round(pt[0], 6), round(pt[1], 6)
         d = next(x for x in K.DISTRICTS if x["DistrictID"] == district_id)
-        if district_id == 1:
-            # Bengaluru: fill the whole metro with realistic soft clustering around wards
-            # (not a few tight dots) so the map reads like a real city, not a blob.
-            roll = self.rng.random()
-            if roll < 0.45:
-                clat, clng = self.rng.choice(K.BENGALURU_HOTSPOTS)
-                return (round(clat + self.rng.uniform(-0.03, 0.03), 6),
-                        round(clng + self.rng.uniform(-0.03, 0.03), 6))
-            return (round(self.rng.uniform(12.85, 13.14), 6),
-                    round(self.rng.uniform(77.45, 77.78), 6))
         lat0, lat1, lng0, lng1 = d["box"]
-        # cluster ~35% around a few sub-centres per district so towns are visible
-        if self.rng.random() < 0.35:
-            clat = self.rng.uniform(lat0 + 0.05 * (lat1 - lat0), lat1 - 0.05 * (lat1 - lat0))
-            clng = self.rng.uniform(lng0 + 0.05 * (lng1 - lng0), lng1 - 0.05 * (lng1 - lng0))
-            return (round(clat + self.rng.uniform(-0.02, 0.02), 6), round(clng + self.rng.uniform(-0.02, 0.02), 6))
         return round(self.rng.uniform(lat0, lat1), 6), round(self.rng.uniform(lng0, lng1), 6)
 
     # --- protected attributes, sampled independently of everything else ---
