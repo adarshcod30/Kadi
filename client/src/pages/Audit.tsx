@@ -16,7 +16,8 @@ export default function Audit() {
       </div>
       <Section title="Recent activity">
         {isLoading ? <Skeleton rows={10} /> : !data?.items.length ? <Empty title="No audit entries yet" hint="Browse cases / offenders to generate activity." /> : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
               <tr><th className="text-left px-4 py-2 font-medium">Time</th><th className="text-left px-4 py-2 font-medium">User</th><th className="text-left px-4 py-2 font-medium">Action</th><th className="text-left px-4 py-2 font-medium">Target</th></tr>
             </thead>
@@ -31,6 +32,7 @@ export default function Audit() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Section>
     </div>

@@ -227,12 +227,18 @@ def _build_alerts(clusters, health, anomalies, geo, offenders, unit_district, to
                        "title": title, "reason": reason, "ts": today.isoformat(),
                        "acknowledged": False, **kw})
 
-    for c in clusters[:8]:
-        if c["crossDistrict"] and c["size"] >= 4:
-            add("new-link", "high",
-                f"Cross-district network of {c['size']} cases",
-                f"Cluster {c['clusterId']} spans {len(c['districts'])} districts / {len(c['stations'])} stations",
-                clusterId=c["clusterId"], districtId=c["districts"][0] if c["districts"] else "")
+    # A "cross-silo network" alert is about an OFFENDER whose own cases span districts.
+    # Do NOT report cluster size here: communities glued by similar-MO text can span half
+    # the state, which would produce nonsense like "184 FIRs across 28 districts".
+    cross_silo = [o for o in offenders
+                  if o.get("distinctDistricts", 0) >= 2 and o.get("distinctCases", 0) >= 3]
+    cross_silo.sort(key=lambda o: (o["distinctDistricts"], o["distinctCases"]), reverse=True)
+    for o in cross_silo[:8]:
+        add("new-link", "high",
+            f"Cross-district offender: {o['canonicalName']}",
+            f"Linked to {o['distinctCases']} FIRs across {o['distinctDistricts']} districts "
+            f"(risk {o.get('riskScore')}/100)",
+            offenderIdentityId=o["offenderIdentityId"])
     for o in offenders[:6]:
         if o.get("band") == "High":
             add("offender", "high", f"High-risk offender: {o['canonicalName']}",
@@ -305,8 +311,11 @@ def _build_stats(tables, health, clusters, offenders, geo, anomalies, today):
     status = Counter(str(r.CaseStatusID) for r in cases.itertuples(index=False))
     head_names = tables["CrimeHead"].set_index("CrimeHeadID")["CrimeGroupName"].to_dict()
     head_counts = Counter(r.CrimeMajorHeadID for r in cases.itertuples(index=False))
-    # a "network" = a cluster containing a resolved multi-case offender (not just similar MO)
-    offender_networks = [c for c in clusters if c.get("topOffenders")]
+    # A "network" = a resolved offender who operates WITH co-offenders (a group), not a
+    # Louvain community — those can be glued by similar-MO text alone and span the state.
+    offender_networks = [o for o in offenders if o.get("coOffenders")]
+    cross_silo_networks = [o for o in offenders
+                           if o.get("distinctDistricts", 0) >= 2 and o.get("distinctCases", 0) >= 2]
     serious_flagged = sum(1 for h in health if h.get("severity") == "high")
     # cases per month (last 18) for trend; hour x weekday heatmap; gravity split
     by_month = Counter()
@@ -330,7 +339,7 @@ def _build_stats(tables, health, clusters, offenders, geo, anomalies, today):
         "flaggedCases": len(health),
         "seriousFlaggedCases": serious_flagged,
         "activeNetworks": len(offender_networks),
-        "crossDistrictNetworks": sum(1 for c in offender_networks if c["crossDistrict"]),
+        "crossDistrictNetworks": len(cross_silo_networks),
         "resolvedOffenders": len(offenders),
         "highRiskOffenders": sum(1 for o in offenders if o.get("band") == "High"),
         "emergingHotspots": sum(1 for h in geo["hotspots"] if h["emergingFlag"]),

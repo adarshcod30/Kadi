@@ -24,9 +24,9 @@ export default function Offenders() {
         ))}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         {isLoading ? <Skeleton rows={10} /> : !data?.items.length ? <Empty title="No offenders" /> : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[740px]">
             <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Offender</th>

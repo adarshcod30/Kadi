@@ -110,6 +110,79 @@ export function RiskArt({ className = '' }: { className?: string }) {
   );
 }
 
+// 7) Investigation health: an ECG pulse that flatlines into a flagged case.
+export function HealthPulse({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 260 110" className={className} role="img" aria-label="Investigation health early warning">
+      <line x1="0" y1="60" x2="260" y2="60" stroke="#EDF1F6" strokeWidth="1" />
+      <motion.path
+        d="M0 60 h30 l8 -22 l10 44 l9 -22 h28 l8 -16 l10 32 l9 -16 h30 l8 -10 l10 20 l9 -10 h40"
+        fill="none" stroke={TEAL} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 1.4 }} />
+      <motion.path d="M209 60 h51" fill="none" stroke={RED} strokeWidth="2.5" strokeDasharray="4 3"
+        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 1.2 }} />
+      <motion.g initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 1.6, type: 'spring' }}>
+        <circle cx="235" cy="60" r="9" fill={RED} />
+        <text x="235" y="64" fontSize="11" fontWeight="700" fill="#fff" textAnchor="middle">!</text>
+      </motion.g>
+      <text x="6" y="92" fontSize="9" fill={GREY}>investigation progressing</text>
+      <text x="196" y="92" fontSize="9" fill={RED}>slipping</text>
+    </svg>
+  );
+}
+
+// 8) Offender network cluster: a gang emerging from scattered cases.
+export function NetworkCluster({ className = '' }: { className?: string }) {
+  const nodes: [number, number][] = [[52, 40], [110, 26], [150, 62], [96, 78], [40, 92], [140, 112], [78, 122]];
+  return (
+    <svg viewBox="0 0 200 150" className={className} role="img" aria-label="Offender network cluster">
+      <motion.ellipse cx="98" cy="74" rx="76" ry="58" fill={BLUE} fillOpacity="0.08" stroke={BLUE} strokeOpacity="0.35"
+        strokeDasharray="5 4" initial={{ scale: 0.7, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }} />
+      {nodes.map((n, i) => (
+        <motion.line key={i} x1="98" y1="74" x2={n[0]} y2={n[1]} stroke={NAVY} strokeOpacity="0.45" strokeWidth="1.4"
+          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ delay: 0.3 + i * 0.07, duration: 0.5 }} />
+      ))}
+      {nodes.map((n, i) => (
+        <motion.rect key={i} x={n[0] - 8} y={n[1] - 6} width="16" height="12" rx="3" fill={BLUE} stroke="#fff" strokeWidth="1.2"
+          initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.35 + i * 0.07, type: 'spring', stiffness: 220 }} />
+      ))}
+      <motion.circle cx="98" cy="74" r="13" fill={RED} stroke="#fff" strokeWidth="2.5"
+        initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: 'spring', stiffness: 180 }} />
+      <text x="98" y="145" fontSize="9" fill={GREY} textAnchor="middle">one offender · seven FIRs</text>
+    </svg>
+  );
+}
+
+// 9) Excel sheets → live dashboard.
+export function SheetToDashboard({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 260 130" className={className} role="img" aria-label="Static sheets replaced by live dashboards">
+      <g>
+        <rect x="8" y="20" width="86" height="92" rx="6" fill="#fff" stroke="#D9E1EC" />
+        {Array.from({ length: 7 }).map((_, i) => (
+          <line key={i} x1="8" y1={32 + i * 12} x2="94" y2={32 + i * 12} stroke="#EDF1F6" />
+        ))}
+        <line x1="36" y1="20" x2="36" y2="112" stroke="#EDF1F6" /><line x1="64" y1="20" x2="64" y2="112" stroke="#EDF1F6" />
+        <text x="51" y="124" fontSize="9" fill={GREY} textAnchor="middle">Excel</text>
+      </g>
+      <motion.path d="M104 66 h32" stroke={BLUE} strokeWidth="2.5" markerEnd="url(#s2d)"
+        initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ duration: 0.6 }} />
+      <defs><marker id="s2d" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill={BLUE} /></marker></defs>
+      <g transform="translate(150,20)">
+        <rect width="102" height="92" rx="6" fill="#fff" stroke="#D9E1EC" />
+        {[[10, 62, 14], [30, 50, 26], [50, 34, 42], [70, 56, 20]].map(([x, y, h], i) => (
+          <motion.rect key={i} x={x} y={y} width="12" height={h} rx="2" fill={[BLUE, TEAL, SAFFRON, NAVY][i]}
+            initial={{ scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true }}
+            style={{ transformOrigin: `${x + 6}px ${y + h}px` }} transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }} />
+        ))}
+        <motion.path d="M10 30 q22 -14 40 4 t42 -10" fill="none" stroke={TEAL} strokeWidth="2"
+          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }} transition={{ delay: 0.8, duration: 0.7 }} />
+        <text x="51" y="104" fontSize="9" fill={NAVY} fontWeight="600" textAnchor="middle">Live intelligence</text>
+      </g>
+    </svg>
+  );
+}
+
 // 6) Assistant / chat with citation.
 export function AssistantArt({ className = '' }: { className?: string }) {
   return (

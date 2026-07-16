@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
-import { Share2, ArrowRight, CheckCircle2, Activity, Layers } from 'lucide-react';
+import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
 import { useStats, useAlerts, useMe, useEval, useDistricts, useNational } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
-import { SiloToGraph } from '../components/illustrations';
+import {
+  SiloToGraph, NetworkCluster, HealthPulse, MapHotspot, AssistantArt,
+  FairnessShield, SheetToDashboard, PipelineFlow,
+} from '../components/illustrations';
 import { useT } from '../lib/i18n';
 
 export default function Dashboard() {
@@ -50,7 +53,7 @@ export default function Dashboard() {
         {[
           { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation in your scope.', to: '/cases?status=1' },
           { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases flagged as slipping (ageing / pendency / undetected-risk).', accent: '#C9820A', to: '/health' },
-          { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offender networks (clusters sharing an offender), not just similar MO.', accent: '#1A6FC4', to: '/graph' },
+          { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offenders who operate with co-offenders — genuine groups, not just cases with a similar modus operandi.', accent: '#1A6FC4', to: '/offenders' },
           { label: 'Resolved offenders', value: stats?.resolvedOffenders, hint: 'Distinct repeat offenders after name-variant entity resolution.', to: '/offenders' },
           { label: 'Emerging hotspots', value: stats?.emergingHotspots, hint: 'Areas where recent activity far exceeds the historical baseline.', accent: '#C0392B', to: '/map' },
         ].map((k) => (
@@ -158,6 +161,65 @@ export default function Dashboard() {
           )}
         </div>
       </motion.div>
+
+      {/* ---- Illustrated capabilities: what you can actually do from here ---- */}
+      <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}>
+        <div className="flex items-baseline gap-2 mb-3">
+          <h2 className="text-lg font-semibold text-kadi-navy">Explore the intelligence</h2>
+          <p className="text-sm text-ink-muted">— four ways KADI turns these records into action.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <CapCard onClick={() => nav('/graph')} icon={<Share2 size={16} />} title="Case-Linkage Graph"
+            art={<NetworkCluster className="w-full h-32" />}
+            desc="Open a case and its network assembles — related FIRs, shared offenders and serial chains across stations. Every link opens a 'Why linked' trail of matched attributes and source FIRs." />
+          <CapCard onClick={() => nav('/health')} icon={<Activity size={16} />} title="Investigation Health"
+            art={<HealthPulse className="w-full h-32" />}
+            desc="Early warning for cases slipping past detection timelines — ageing vs peer median, pendency, undetected-risk — each with a reason and a recommended next action." />
+          <CapCard onClick={() => nav('/map')} icon={<Layers size={16} />} title="Spatiotemporal Map"
+            art={<MapHotspot className="w-full h-32" />}
+            desc="District crime density, a live heatmap and incident points over satellite imagery. Layer time-of-day over location to find patrol windows; red zones pulse where trends emerge." />
+          <CapCard onClick={() => nav('/assistant')} icon={<MessageSquare size={16} />} title="Ask KADI"
+            art={<AssistantArt className="w-full h-32" />}
+            desc="Ask in English or ಕನ್ನಡ, by text or voice. Answers are grounded in the records, always cite FIR numbers, deep-link into the graph, and export to a PDF briefing." />
+        </div>
+      </motion.div>
+
+      {/* ---- Fairness + how it works ---- */}
+      <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <VizCard title="Fair by design" hint="Protected attributes are excluded from every model and the exclusion is enforced by a unit test that fails if any protected column reaches a feature set.">
+          <div className="p-4 flex items-center gap-4">
+            <FairnessShield className="w-24 shrink-0" />
+            <p className="text-sm text-ink-muted">Links and risk scores use <b className="text-ink">evidence and behaviour only</b> — never caste, religion or occupation. Every offender profile states <b className="text-ink">"protected attributes used: none"</b>.</p>
+          </div>
+        </VizCard>
+        <VizCard title="From Excel to live intelligence" hint="KADI replaces static per-station sheets with one continuously-recomputed relational picture of state-wide crime.">
+          <div className="p-4"><SheetToDashboard className="w-full h-28" />
+            <p className="text-sm text-ink-muted mt-2">Fragmented station sheets become one queryable graph — refreshed by a nightly pipeline, not manual collation.</p>
+          </div>
+        </VizCard>
+        <VizCard title="How an insight is made" hint="Heavy compute (entity resolution, graph build, community detection, risk, health, spatial) runs asynchronously; the app only reads precomputed results, so every screen loads instantly.">
+          <div className="p-4"><PipelineFlow className="w-full h-20" />
+            <p className="text-sm text-ink-muted mt-2">FIR → offender identities resolved → graph + communities → ranked insight. Each stage writes its own explanation, so nothing is a black box.</p>
+          </div>
+        </VizCard>
+      </motion.div>
     </div>
+  );
+}
+
+function CapCard({ icon, title, desc, art, onClick }: {
+  icon: React.ReactNode; title: string; desc: string; art: React.ReactNode; onClick: () => void;
+}) {
+  return (
+    <motion.button variants={rise} whileHover={{ y: -4 }} onClick={onClick}
+      className="card overflow-hidden text-left flex flex-col hover:shadow-hover transition-shadow">
+      <div className="bg-surface-2 border-b border-line p-3">{art}</div>
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 font-semibold text-kadi-navy"><span className="text-kadi-blue">{icon}</span>{title}</div>
+        <p className="text-xs text-ink-muted mt-1.5 flex-1">{desc}</p>
+        <span className="text-xs link mt-2 flex items-center gap-1">Open <ArrowRight size={12} /></span>
+      </div>
+    </motion.button>
   );
 }

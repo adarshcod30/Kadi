@@ -58,10 +58,10 @@ export default function Cases() {
         </label>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden">
+      {/* Table — scrolls horizontally on small screens instead of breaking the layout */}
+      <div className="card overflow-x-auto">
         {isLoading ? <Skeleton rows={10} /> : !data?.items.length ? <Empty title="No cases found" hint="Try adjusting the filters." /> : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[820px]">
             <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">CrimeNo</th>

@@ -67,9 +67,10 @@ export default function GraphExplorer() {
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-[210px_1fr_320px] grid-rows-1 gap-3 min-h-0">
+      {/* Responsive: stacks on small screens, 3-column workbench from xl up */}
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
         {/* Controls */}
-        <div className="card overflow-auto p-3 space-y-4">
+        <div className="card overflow-auto p-3 space-y-4 xl:max-h-none max-h-72">
           <Control title="Layout" icon={<GitBranch size={13} />}>
             <div className="grid grid-cols-2 gap-1">
               {LAYOUTS.map(([k, label]) => (
@@ -115,7 +116,7 @@ export default function GraphExplorer() {
         </div>
 
         {/* Canvas */}
-        <div className="card relative overflow-hidden min-h-0">
+        <div className="card relative overflow-hidden min-h-0 h-[60vh] xl:h-auto">
           <AnimatePresence>
             {loading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -129,7 +130,7 @@ export default function GraphExplorer() {
         </div>
 
         {/* Why panel */}
-        <div className="card overflow-auto">
+        <div className="card overflow-auto max-h-96 xl:max-h-none">
           <AnimatePresence mode="wait">
             <motion.div key={sel?.edge?.id || sel?.node?.id || 'empty'}
               initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>

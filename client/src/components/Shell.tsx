@@ -78,21 +78,22 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar */}
-        <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all ${collapsed ? 'w-14' : 'w-52'}`}>
+        {/* Sidebar — icon-only below md, labelled (collapsible) from md up */}
+        <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all w-14 ${collapsed ? 'md:w-14' : 'md:w-52'}`}>
           <nav className="flex-1 py-3">
             {visibleNav.map((n) => (
-              <NavLink key={n.key} to={n.to} end={n.end}
+              <NavLink key={n.key} to={n.to} end={n.end} title={t(n.key)}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
                     isActive ? 'text-kadi-blue bg-kadi-blue50 border-r-2 border-kadi-blue' : 'text-ink-muted hover:bg-surface-3'
                   }`}>
                 <n.icon size={20} className="shrink-0" />
-                {!collapsed && <span>{t(n.key)}</span>}
+                {!collapsed && <span className="hidden md:inline">{t(n.key)}</span>}
               </NavLink>
             ))}
           </nav>
-          <button onClick={() => setCollapsed((c) => !c)} className="p-3 text-ink-muted hover:bg-surface-3 border-t border-line">
+          <button onClick={() => setCollapsed((c) => !c)}
+            className="p-3 text-ink-muted hover:bg-surface-3 border-t border-line hidden md:block">
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </aside>
