@@ -7,7 +7,10 @@ community detection -> risk -> health -> anomaly -> spatial, then writes the der
 read-model that the API serves (mirrors Catalyst NoSQL/Cache). Finally runs the
 ground-truth evaluation (recovery of planted gangs/chains) into eval_report.json.
 
-This is the heavy compute that runs in AppSail / a Catalyst Job — NEVER in a 30s Function.
+This is the heavy compute that runs in a Catalyst Job — NEVER in a Function or AppSail,
+both of which cap a request at 30s. Jobs allow 15 minutes but only 512 MB, so each stage
+logs the peak RSS high-water mark: if that crosses ~512 MB the Job is OOM-killed in
+production while still passing locally. Keep an eye on the MB column.
 
 Usage:  python appsail/pipeline/run_pipeline.py --data data/output
 """
@@ -16,6 +19,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import resource
+import sys
 import time
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
@@ -38,8 +43,13 @@ def run(data_dir: str):
     t0 = time.time()
     log = []
 
+    def _peak_mb():
+        # ru_maxrss is the high-water mark: bytes on macOS, kilobytes on Linux.
+        r = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return r / 1e6 if sys.platform == "darwin" else r / 1e3
+
     def step(msg):
-        log.append(f"[{time.time()-t0:6.1f}s] {msg}")
+        log.append(f"[{time.time()-t0:6.1f}s {_peak_mb():5.0f}MB] {msg}")
         print(log[-1], flush=True)
 
     step("loading source tables")

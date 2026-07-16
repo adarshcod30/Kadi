@@ -7,13 +7,15 @@ links — the planted gang / serial / cyber rings share near-identical MO templa
 they surface with high cosine, while unrelated cases stay below threshold.
 
 Lightweight by design (sklearn TF-IDF, not sentence-transformers) so it runs inside a
-Catalyst Job's time budget. FAIRNESS: only free-text MO is used, no protected fields.
+Catalyst Job's time and memory budget. FAIRNESS: only free-text MO is used, no
+protected fields.
 """
 from __future__ import annotations
 
 from collections import defaultdict
 
 import numpy as np
+import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import NearestNeighbors
 
@@ -21,6 +23,13 @@ MO_THRESHOLD = 0.85   # cosine similarity to record an MO pair (distinctive text
 TOP_K = 4
 MIN_GROUP = 2
 MAX_GROUP = 8000
+
+# Brute-force kneighbors materialises the distance block in chunks sized by sklearn's
+# `working_memory`, which defaults to 1 GiB — on its own that is twice a Catalyst Job's
+# 512 MB ceiling, and a MAX_GROUP-sized block (8000x8000 float64) is 512 MB by itself.
+# Chunking smaller costs nothing measurable here (the work is the same, just in more
+# passes) and yields byte-identical pairs; it only bounds the scratch buffer.
+WORKING_MEMORY_MB = 32
 
 
 def compute(tables: dict):
@@ -46,7 +55,8 @@ def compute(tables: dict):
         k = min(TOP_K + 1, len(ids))
         nn = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute")
         nn.fit(X)
-        dist, idx = nn.kneighbors(X)
+        with sklearn.config_context(working_memory=WORKING_MEMORY_MB):
+            dist, idx = nn.kneighbors(X)
         for i in range(len(ids)):
             for d, j in zip(dist[i], idx[i]):
                 if i == j:
