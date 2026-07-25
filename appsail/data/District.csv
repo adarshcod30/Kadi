@@ -1,0 +1,32 @@
+DistrictID,DistrictName,StateID,Active
+1,Bengaluru City,1,True
+2,Bengaluru Rural,1,True
+3,Mysuru,1,True
+4,Dakshina Kannada,1,True
+5,Belagavi,1,True
+6,Kalaburagi,1,True
+7,Hubballi-Dharwad,1,True
+8,Ballari,1,True
+9,Vijayapura,1,True
+10,Shivamogga,1,True
+11,Tumakuru,1,True
+12,Davanagere,1,True
+13,Udupi,1,True
+14,Hassan,1,True
+15,Mandya,1,True
+16,Chitradurga,1,True
+17,Kolar,1,True
+18,Raichur,1,True
+19,Bidar,1,True
+20,Koppal,1,True
+21,Haveri,1,True
+22,Gadag,1,True
+23,Chikkamagaluru,1,True
+24,Chamarajanagar,1,True
+25,Kodagu,1,True
+26,Bagalkote,1,True
+27,Yadgir,1,True
+28,Chikkaballapura,1,True
+29,Ramanagara,1,True
+30,Uttara Kannada,1,True
+31,Dharwad,1,True

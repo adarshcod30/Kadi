@@ -1,8 +1,5 @@
-flask>=3.0
-pandas>=2.0
-numpy>=1.24
-scikit-learn>=1.3
-networkx>=3.2
-rapidfuzz>=3.6
-scipy>=1.10
-zcatalyst-sdk-python>=1.0 ; python_version >= "3.9"
+# Intentionally empty. Deployed AppSail containers here cannot import packages from
+# requirements.txt (verified: a Flask/pandas build fails to start with no logs, while a
+# stdlib-only build on the same config serves fine), so app.py uses the standard library
+# only. socio.py and forecast.py were already dependency-free; the single pandas call was
+# replaced by a csv reader in app.py.

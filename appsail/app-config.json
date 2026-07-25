@@ -1,9 +1,9 @@
 {
-  "command": "python app.py",
+  "command": "python3 -u app.py",
   "build_path": "./",
   "stack": "python_3_11",
   "env_variables": {
-    "DATA_DIR": "./data/output"
+    "DATA_DIR": "./data"
   },
   "memory": 1024,
   "scripts": {}

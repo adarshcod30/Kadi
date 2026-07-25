@@ -1,0 +1,28 @@
+CrimeSubHeadID,CrimeHeadID,CrimeHeadName,SeqID
+101,1,Murder,101
+102,1,Attempt to Murder,102
+103,1,Hurt / Grievous Hurt,103
+104,1,Assault,104
+201,2,Theft,201
+202,2,House Breaking / Burglary,202
+203,2,Robbery,203
+204,2,Dacoity,204
+205,2,Motor Vehicle Theft,205
+206,2,Chain Snatching,206
+301,3,Dowry Harassment,301
+302,3,Assault on Woman,302
+303,3,Sexual Harassment,303
+401,4,Online Financial Fraud (UPI/OTP),401
+402,4,Sextortion,402
+403,4,Identity Theft / Phishing,403
+404,4,Job / Investment Fraud,404
+501,5,Cheating,501
+502,5,Forgery,502
+503,5,Criminal Breach of Trust,503
+601,6,NDPS - Possession,601
+602,6,NDPS - Trafficking,602
+701,7,Man Missing,701
+702,7,Woman Missing,702
+703,7,Unnatural Death (UDR),703
+801,8,Rash Driving / Accident,801
+802,8,Drunk Driving,802
