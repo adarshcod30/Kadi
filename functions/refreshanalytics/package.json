@@ -1,0 +1,10 @@
+{
+  "name": "refreshanalytics",
+  "version": "0.1.0",
+  "description": "KADI nightly job: publish analytics tables to Data Store",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "zcatalyst-sdk-node": "^1.6.0"
+  }
+}
