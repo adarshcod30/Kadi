@@ -26,13 +26,14 @@ function segment(req) {
   if (!catalyst) { lastError = 'sdk-not-loaded'; return null; }
   if (!req) { lastError = 'no-request'; return null; }
   try {
-    const app = catalyst.initialize(req);
-    // The function is invoked anonymously, so the SDK defaults to the *user* credential,
-    // which has no Cache write scope (401 PERMISSION_NEEDED). KPIs are project-owned data,
-    // not user data, so switch to the admin credential for this component.
-    if (typeof app.switchUser === 'function') app.switchUser('admin');
-    // Segment id is numeric in the SDK; fall back to the default segment if unset.
-    return app.cache().segment(Number(SEGMENT_ID));
+    // Scope must be set at initialize time — the second argument. Without it the request
+    // resolves to the *user* credential and Cache writes come back 401 PERMISSION_NEEDED,
+    // because an anonymous HTTP call carries no signed-in user. KPIs are project-owned
+    // data rather than user data, so admin is the correct scope here.
+    const app = catalyst.initialize(req, { scope: 'admin' });
+    // Pass the id as a STRING. It is 17 digits; Number() on a Catalyst id is the same
+    // trap that corrupted the project id earlier, and the SDK accepts string | number.
+    return app.cache().segment(SEGMENT_ID);
   } catch (e) {
     lastError = `initialize: ${e && e.message ? e.message : e}`;
     return null; // not running inside Catalyst
