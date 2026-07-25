@@ -85,7 +85,7 @@ async function publish(app, tableName, rows) {
   return written;
 }
 
-module.exports = (jobRequest, context) => {
+module.exports = async (jobRequest, context) => {
   const t0 = Date.now();
   try {
     const districts = districtRows();
