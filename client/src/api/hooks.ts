@@ -42,6 +42,10 @@ export const useGeoGrid = (params: Record<string, unknown>, enabled = true) =>
   useQuery({ queryKey: ['geo-grid', params], queryFn: () => api.get<any>(`/geo/grid${qs(params)}`), enabled });
 export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
+export const useSocio = () =>
+  useQuery({ queryKey: ['socio'], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });
+export const useForecast = () =>
+  useQuery({ queryKey: ['forecast'], queryFn: () => api.get<any>('/analytics/forecast'), staleTime: Infinity });
 export const useNational = () =>
   useQuery({ queryKey: ['national'], queryFn: () => api.get<any>('/geo/national'), staleTime: Infinity });
 export const useVulnerability = (enabled: boolean) =>

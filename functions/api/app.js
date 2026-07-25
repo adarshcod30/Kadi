@@ -77,6 +77,10 @@ function buildApp() {
 
   // analytics (role-gated)
   r.get('/analytics/vulnerability', handle(async (req) => q.vulnerability(req.user)));
+  // Sociological + predictive intelligence (problem statement pillar 3). Both are
+  // state-wide, area-level aggregates — no person-level rows, so no RBAC scoping.
+  r.get('/analytics/socio', handle(async () => q.socio()));
+  r.get('/analytics/forecast', handle(async () => q.forecast()));
 
   // assistant
   r.post('/assistant/query', handle(async (req) => {

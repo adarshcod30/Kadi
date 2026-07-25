@@ -349,6 +349,18 @@ module.exports = {
   stats: (user) => load().stats,
   districtStats: () => load().districtStats,
   national: () => load().national,
+  socio: () => load().socio,
+  // Forecast rows are keyed by districtId only; join the name here so the client never
+  // has to hold a second lookup just to label a chart.
+  forecast: () => {
+    const db = load();
+    const names = db.lookups.districts;
+    const withNames = (db.forecast.districts || []).map((d) => ({
+      ...d,
+      districtName: (names.get(String(d.districtId)) || {}).DistrictName || `District ${d.districtId}`,
+    }));
+    return { ...db.forecast, districts: withNames };
+  },
   alerts: (user) => load().alerts,
   evalReport: () => load().evalReport,
   anomalies: () => load().caseAnomalies,

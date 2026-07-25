@@ -11,6 +11,7 @@ import Offenders from './pages/Offenders';
 import OffenderDetail from './pages/OffenderDetail';
 import Health from './pages/Health';
 import MapPage from './pages/MapPage';
+import Intelligence from './pages/Intelligence';
 import Assistant from './pages/Assistant';
 import Audit from './pages/Audit';
 import Admin from './pages/Admin';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/cases" element={<Cases />} />
           <Route path="/cases/:id" element={<CaseDetail />} />
+          <Route path="/intelligence" element={<Intelligence />} />
           <Route path="/graph" element={<GraphExplorer />} />
           <Route path="/offenders" element={<Offenders />} />
           <Route path="/offenders/:id" element={<OffenderDetail />} />

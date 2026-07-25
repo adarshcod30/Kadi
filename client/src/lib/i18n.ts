@@ -14,6 +14,7 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   offenders: { en: 'Offenders', kn: 'ಆರೋಪಿಗಳು' },
   health: { en: 'Health', kn: 'ಆರೋಗ್ಯ' },
   map: { en: 'Map', kn: 'ನಕ್ಷೆ' },
+  intelligence: { en: 'Intelligence', kn: 'ಗುಪ್ತಚರ' },
   assistant: { en: 'Assistant', kn: 'ಸಹಾಯಕ' },
   audit: { en: 'Audit', kn: 'ಲೆಕ್ಕಪರಿಶೋಧನೆ' },
   admin: { en: 'Admin', kn: 'ನಿರ್ವಹಣೆ' },

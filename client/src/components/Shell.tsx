@@ -4,7 +4,7 @@ import { ReactNode, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Home, Share2, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
+  Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
 } from 'lucide-react';
 import { useMe, useAlerts } from '../api/hooks';
@@ -20,6 +20,7 @@ const NAV = [
   { to: '/offenders', icon: Users, key: 'offenders' },
   { to: '/health', icon: Activity, key: 'health' },
   { to: '/map', icon: Map, key: 'map' },
+  { to: '/intelligence', icon: Brain, key: 'intelligence' },
   { to: '/assistant', icon: MessageSquare, key: 'assistant' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['ACP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin'] },
