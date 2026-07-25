@@ -35,6 +35,8 @@ import anomaly
 import spatial
 import evaluate
 import national
+import socio
+import forecast
 
 TODAY = date(2026, 7, 13)
 
@@ -184,6 +186,12 @@ def run(data_dir: str):
     district_stats = _build_district_stats(tables, health, offenders, geo, unit_district)
     national_ctx = national.national_context()
 
+    step("socio-economic correlation")
+    socio_ctx = socio.compute(tables, unit_district)
+
+    step("crime forecasting")
+    forecast_ctx = forecast.compute(tables, unit_district, TODAY)
+
     # ---------------- write artifacts ----------------
     step("writing derived artifacts")
     common.write_json(data_dir, "offenders", offenders)
@@ -200,6 +208,8 @@ def run(data_dir: str):
     common.write_json(data_dir, "stats", stats)
     common.write_json(data_dir, "district_stats", district_stats)
     common.write_json(data_dir, "national", national_ctx)
+    common.write_json(data_dir, "socio", socio_ctx)
+    common.write_json(data_dir, "forecast", forecast_ctx)
 
     step("ground-truth evaluation")
     gt_path = os.path.join(data_dir, "_ground_truth.json")
