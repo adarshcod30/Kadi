@@ -66,9 +66,45 @@ function query(user, text, lang) {
   const hasSlip = /slip|at.?risk|ageing|aging|pending|pendenc|ಜಾರುತ್ತಿರುವ|ವಿಳಂಬ/.test(t);
   const hasPast = /past case|previous case|history|prior|ಹಿಂದಿನ ಪ್ರಕರಣ|previous/.test(t);
   const hasHotspot = /hotspot|emerging|spike|ಹಾಟ್‌ಸ್ಪಾಟ್|ಏರಿಕೆ/.test(t);
+  const hasForecast = /forecast|predict|next month|coming month|projection|ಮುನ್ಸೂಚನೆ|ಮುನ್ನೋಟ/.test(t);
+  // Per-capita / socio-economic questions. \b on "rate" matters: without it this also
+  // fires on "accurate", stealing "how accurate is the forecast" from the branch above.
+  const hasRate = /per.?capita|per 100|\brates?\b|literac|urbanis|urbaniz|densit|socio|ತಲಾ|ದರ/.test(t);
   const hasList = /fir|case|ಪ್ರಕರಣ|show|list|how many|count/.test(t);
 
-  if (hasSlip) {
+  if (hasForecast) {
+    intent = 'forecast';
+    const fc = queries.forecast();
+    const rising = (fc.districts || []).filter((d) => d.direction === 'rising').slice(0, 5);
+    rising.forEach((d) => citations.push({
+      type: 'district', id: String(d.districtId), label: `${d.districtName} ${d.changePct > 0 ? '+' : ''}${d.changePct}%`,
+    }));
+    const acc = fc.accuracy ? ` Backtest MAPE ${fc.accuracy.mape}% over ${fc.accuracy.holdoutMonths} withheld months.` : '';
+    answer = isKn
+      ? `ಮುಂದಿನ ${fc.horizonMonths || 3} ತಿಂಗಳ ಮುನ್ಸೂಚನೆ ಪ್ರಕಾರ ${rising.length} ಜಿಲ್ಲೆಗಳಲ್ಲಿ ಏರಿಕೆ ನಿರೀಕ್ಷಿಸಲಾಗಿದೆ.`
+      : `Over the next ${fc.horizonMonths || 3} months, ${rising.length} district(s) are projected to rise against their own 12-month average.${acc}`;
+    action = { type: 'open_intelligence' };
+  } else if (hasRate) {
+    intent = 'socio_rates';
+    const socio = queries.socio();
+    const top = (socio.districts || []).slice(0, 5);
+    top.forEach((d) => citations.push({
+      type: 'district', id: String(d.districtId), label: `${d.districtName} ${d.ratePer100k}/100k`,
+    }));
+    const lead = top[0];
+    // The interesting finding is the rank shift: districts raw counts hide.
+    const hidden = (socio.districts || [])
+      .filter((d) => d.rankShift > 5)
+      .sort((a, b) => b.rankShift - a.rankShift)[0];
+    const corr = (socio.correlations || []).find((c) => c.strength !== 'not significant');
+    answer = isKn
+      ? `ತಲಾ ಒಂದು ಲಕ್ಷ ಜನಸಂಖ್ಯೆಗೆ ಅತಿ ಹೆಚ್ಚು ಅಪರಾಧ ದರ ${lead ? lead.districtName : ''} ನಲ್ಲಿದೆ (${lead ? lead.ratePer100k : 0}).`
+        + (hidden ? ` ${hidden.districtName} ಒಟ್ಟು ಸಂಖ್ಯೆಯಲ್ಲಿ ${hidden.rankByCount}ನೇ ಸ್ಥಾನದಲ್ಲಿದ್ದರೂ ದರದಲ್ಲಿ ${hidden.rankByRate}ನೇ ಸ್ಥಾನದಲ್ಲಿದೆ.` : '')
+      : `Normalised by population, the highest rate is ${lead ? lead.districtName : 'n/a'} at ${lead ? lead.ratePer100k : 0} per 100,000 residents.`
+        + (hidden ? ` Raw counts hide ${hidden.districtName}: ${hidden.rankByCount}th by count but ${hidden.rankByRate}th per capita.` : '')
+        + (corr ? ` ${corr.indicator} correlates ${corr.direction}ly with the rate (r=${corr.pearson}, p=${corr.pValue}).` : '');
+    action = { type: 'open_intelligence' };
+  } else if (hasSlip) {
     intent = 'slipping_cases';
     const res = TOOLS.slippingCases(user);
     const top = res.items.slice(0, 5);
@@ -109,16 +145,20 @@ function query(user, text, lang) {
     const dateFrom = detectDateFrom(text);
     const res = TOOLS.casesByHeadDistrict(user, { head, district, dateFrom });
     res.items.slice(0, 6).forEach((c) => citations.push({ type: 'case', id: c.caseMasterId, label: c.crimeNo }));
-    const headName = head ? (db.lookups.heads.get(head) || {}).CrimeGroupName : 'matching';
-    const distName = district ? (db.lookups.districts.get(district) || {}).DistrictName : 'the state';
+    // Fall-backs must match the answer's language or the Kannada sentence ends up with
+    // English words spliced into it ("the state ನಲ್ಲಿ 40836 matching ಪ್ರಕರಣಗಳು").
+    const headName = head ? (db.lookups.heads.get(head) || {}).CrimeGroupName : '';
+    const distName = district
+      ? (db.lookups.districts.get(district) || {}).DistrictName
+      : (isKn ? 'ರಾಜ್ಯಾದ್ಯಂತ' : 'the state');
     answer = isKn
-      ? `${distName} ನಲ್ಲಿ ${res.total} ${headName || ''} ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
-      : `Found ${res.total} ${headName} case(s) in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
+      ? `${distName} ${res.total} ${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
+      : `Found ${res.total} ${headName || 'matching'} case(s) in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
     action = { type: 'open_cases', filters: { head, district, dateFrom } };
   } else {
     answer = isKn
-      ? 'ನಾನು ಪ್ರಕರಣಗಳು, ಆರೋಪಿಗಳ ಇತಿಹಾಸ, ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಮತ್ತು ಅಪರಾಧ ತಾಣಗಳ ಬಗ್ಗೆ ಉತ್ತರಿಸಬಲ್ಲೆ.'
-      : 'I can answer over the case records — try: "cyber-crime FIRs in Bengaluru this quarter", "show this accused\'s past cases", "which cases are slipping?", or "emerging hotspots".';
+      ? 'ನಾನು ಪ್ರಕರಣಗಳು, ಆರೋಪಿಗಳ ಇತಿಹಾಸ, ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು, ಅಪರಾಧ ತಾಣಗಳು, ತಲಾ ಜನಸಂಖ್ಯೆಯ ಅಪರಾಧ ದರ ಮತ್ತು ಮುನ್ಸೂಚನೆಯ ಬಗ್ಗೆ ಉತ್ತರಿಸಬಲ್ಲೆ.'
+      : 'I can answer over the case records — try: "cyber-crime FIRs in Bengaluru this quarter", "show this accused\'s past cases", "which cases are slipping?", "emerging hotspots", "highest crime rate per capita", or "forecast for next month".';
   }
 
   return {
