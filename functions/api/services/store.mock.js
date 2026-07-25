@@ -33,6 +33,33 @@ function readJson(name, fallback) {
   if (!fs.existsSync(p)) return fallback;
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
+// Rehydrate one case's interned edges back to the shape the queries expect.
+function makeLazyAdjacency({ typeTable, detailTable, adj }) {
+  const T = typeTable || [];
+  const D = detailTable || [];
+  const cache = new Map();
+  const expand = (edges) => edges.map((e) => ({
+    neighborId: e.n,
+    neighborCrimeNo: e.c,
+    edgeType: T[e.t],
+    allTypes: (e.a || []).map((i) => T[i]),
+    strength: e.s,
+    clusterId: e.k,
+    evidence: { matched: (e.m || []).map(([ti, di]) => ({ type: T[ti], detail: D[di] })) },
+  }));
+  return new Proxy(adj, {
+    get(target, prop) {
+      if (typeof prop !== 'string' || !(prop in target)) return target[prop];
+      if (!cache.has(prop)) cache.set(prop, expand(target[prop]));
+      return cache.get(prop);
+    },
+    has: (target, prop) => prop in target,
+    ownKeys: (target) => Reflect.ownKeys(target),
+    getOwnPropertyDescriptor: (target, prop) =>
+      Reflect.getOwnPropertyDescriptor(target, prop),
+  });
+}
+
 function indexBy(rows, key) {
   const m = new Map();
   for (const r of rows) m.set(String(r[key]), r);
@@ -120,7 +147,14 @@ function load() {
 
   const offenders = readJson('offenders', []);
   const offendersById = indexBy(offenders, 'offenderIdentityId');
-  const adjacency = readJson('graph_adjacency', {});
+  // build_bundle.py ships the adjacency interned: edge fields are single letters and every
+  // type/reason string is an index into a shared table. Rehydrating the whole thing would
+  // undo the saving (~50MB resident), so expose a Proxy that rehydrates one case's edges on
+  // access. Callers keep using db.adjacency[caseId] and see the original shape.
+  const rawAdj = readJson('graph_adjacency', {});
+  const adjacency = rawAdj && rawAdj.adj && rawAdj.typeTable
+    ? makeLazyAdjacency(rawAdj)
+    : rawAdj;
   const offenderOfCase = readJson('offender_of_case', {});
   const clusters = readJson('clusters', []);
   const clustersById = indexBy(clusters, 'clusterId');

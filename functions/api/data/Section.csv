@@ -1,0 +1,31 @@
+ActCode,SectionCode,SectionDescription,Active
+IPC,302,Punishment for murder,True
+IPC,307,Attempt to murder,True
+IPC,323,Voluntarily causing hurt,True
+IPC,325,Voluntarily causing grievous hurt,True
+IPC,354,Assault on woman with intent to outrage modesty,True
+IPC,379,Punishment for theft,True
+IPC,380,Theft in dwelling house,True
+IPC,392,Punishment for robbery,True
+IPC,395,Punishment for dacoity,True
+IPC,457,House-breaking by night,True
+IPC,420,Cheating and dishonestly inducing delivery of property,True
+IPC,465,Punishment for forgery,True
+IPC,406,Criminal breach of trust,True
+IPC,498A,Husband or relative subjecting woman to cruelty,True
+IPC,363,Punishment for kidnapping,True
+BNS,103,Punishment for murder,True
+BNS,109,Attempt to murder,True
+BNS,115,Voluntarily causing hurt,True
+BNS,303,Theft,True
+BNS,309,Robbery,True
+BNS,310,Dacoity,True
+BNS,318,Cheating,True
+ITA,66C,Identity theft,True
+ITA,66D,Cheating by personation using computer resource,True
+ITA,67,Publishing obscene material in electronic form,True
+NDPS,20,Punishment for contravention in relation to cannabis,True
+NDPS,22,Punishment for contravention in relation to psychotropic substances,True
+MVA,279,Rash driving on a public way,True
+MVA,185,Driving by a drunken person,True
+KPA,110,Penalty for causing public nuisance,True

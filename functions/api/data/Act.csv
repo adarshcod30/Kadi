@@ -1,0 +1,7 @@
+ActCode,ActDescription,ShortName,Active
+IPC,"Indian Penal Code, 1860",IPC,True
+BNS,"Bharatiya Nyaya Sanhita, 2023",BNS,True
+ITA,"Information Technology Act, 2000",IT Act,True
+NDPS,"Narcotic Drugs and Psychotropic Substances Act, 1985",NDPS,True
+MVA,"Motor Vehicles Act, 1988",MV Act,True
+KPA,"Karnataka Police Act, 1963",KP Act,True

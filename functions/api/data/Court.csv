@@ -1,0 +1,32 @@
+CourtID,CourtName,DistrictID,StateID,Active
+1,Bengaluru City District & Sessions Court,1,1,True
+2,Bengaluru Rural District & Sessions Court,2,1,True
+3,Mysuru District & Sessions Court,3,1,True
+4,Dakshina Kannada District & Sessions Court,4,1,True
+5,Belagavi District & Sessions Court,5,1,True
+6,Kalaburagi District & Sessions Court,6,1,True
+7,Hubballi-Dharwad District & Sessions Court,7,1,True
+8,Ballari District & Sessions Court,8,1,True
+9,Vijayapura District & Sessions Court,9,1,True
+10,Shivamogga District & Sessions Court,10,1,True
+11,Tumakuru District & Sessions Court,11,1,True
+12,Davanagere District & Sessions Court,12,1,True
+13,Udupi District & Sessions Court,13,1,True
+14,Hassan District & Sessions Court,14,1,True
+15,Mandya District & Sessions Court,15,1,True
+16,Chitradurga District & Sessions Court,16,1,True
+17,Kolar District & Sessions Court,17,1,True
+18,Raichur District & Sessions Court,18,1,True
+19,Bidar District & Sessions Court,19,1,True
+20,Koppal District & Sessions Court,20,1,True
+21,Haveri District & Sessions Court,21,1,True
+22,Gadag District & Sessions Court,22,1,True
+23,Chikkamagaluru District & Sessions Court,23,1,True
+24,Chamarajanagar District & Sessions Court,24,1,True
+25,Kodagu District & Sessions Court,25,1,True
+26,Bagalkote District & Sessions Court,26,1,True
+27,Yadgir District & Sessions Court,27,1,True
+28,Chikkaballapura District & Sessions Court,28,1,True
+29,Ramanagara District & Sessions Court,29,1,True
+30,Uttara Kannada District & Sessions Court,30,1,True
+31,Dharwad District & Sessions Court,31,1,True
