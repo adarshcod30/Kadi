@@ -5,6 +5,7 @@
 // Never infers/uses caste, religion or occupation for any judgment.
 const { load } = require('./store.mock');
 const queries = require('./queries');
+const quickml = require('./quickml');
 
 const KN = /[ಀ-೿]/; // Kannada script range
 
@@ -168,4 +169,23 @@ function query(user, text, lang) {
   };
 }
 
-module.exports = { query, TOOLS };
+/**
+ * QuickML-enhanced answer. The deterministic engine above still produces the facts and
+ * citations; GLM-4.7 is only asked to word them. If it is unconfigured, slow, or errors,
+ * the original answer is returned unchanged - the model can improve phrasing but can
+ * never be a single point of failure, and can never invent an FIR number.
+ */
+async function queryEnhanced(user, text, lang, req) {
+  const base = query(user, text, lang);
+  if (!quickml.configured()) return { ...base, llm: 'disabled' };
+  const facts = [
+    base.answer,
+    ...(base.citations || []).slice(0, 8).map((c) => `- ${c.type} ${c.label} (id ${c.id})`),
+  ].join('\n');
+  const phrased = await quickml.phrase(req, { question: text, facts, lang: base.lang });
+  if (!phrased) return { ...base, llm: 'fallback' };
+  // Citations, intent and action stay as computed; only the prose is replaced.
+  return { ...base, answer: phrased, llm: 'glm-4.7', deterministicAnswer: base.answer };
+}
+
+module.exports = { queryEnhanced, query, TOOLS };

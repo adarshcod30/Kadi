@@ -10,6 +10,8 @@ const q = require('./services/queries');
 const assistant = require('./services/assistant');
 const audit = require('./services/audit');
 const cache = require('./services/cache');
+const quickml = require('./services/quickml');
+const zia = require('./services/zia');
 
 function buildApp() {
   const app = express();
@@ -100,15 +102,23 @@ function buildApp() {
     const text = (req.body && req.body.text) || '';
     const lang = (req.body && req.body.lang) || 'en';
     audit.record({ user: req.user, action: 'assistant_query', targetType: 'nl', queryText: text, ip: req.clientIp });
-    return assistant.query(req.user, text, lang);
+    return assistant.queryEnhanced(req.user, text, lang, req);
   }));
   r.post('/assistant/voice', handle(async (req) => {
     // Local fallback: client does Web Speech STT/TTS; here we answer the transcribed text.
     const text = (req.body && req.body.text) || '';
     const lang = (req.body && req.body.lang) || 'en';
     audit.record({ user: req.user, action: 'assistant_voice', targetType: 'nl', queryText: text, ip: req.clientIp });
-    const ans = assistant.query(req.user, text, lang);
-    return { ...ans, ttsText: ans.answer };
+    const ans = await assistant.queryEnhanced(req.user, text, lang, req);
+    // Zia TTS when available; otherwise the client speaks it with Web Speech.
+    const spoken = await zia.translateThenSpeak(req, ans.answer, lang);
+    return {
+      ...ans,
+      ttsText: ans.answer,
+      tts: spoken && !spoken.unsupported
+        ? { engine: 'zia', lang: spoken.lang, note: spoken.note }
+        : { engine: 'browser-web-speech', reason: (spoken && spoken.reason) || 'Zia not configured' },
+    };
   }));
   r.post('/assistant/export', handle(async (req) => {
     const { title, messages } = req.body || {};
@@ -122,6 +132,13 @@ function buildApp() {
     rbac.requireRole(req.user, ['ACP', 'Admin']);
     return { items: audit.list({ limit: Number(req.query.limit) || 100, action: req.query.action }) };
   }));
+
+  // One call to see whether the Catalyst AI services are actually wired.
+  r.get('/ai/status', handle(async () => ({
+    quickml: quickml.status(),
+    zia: zia.status(),
+    assistant: { grounded: true, fallback: 'deterministic intent engine over the case DB' },
+  })));
 
   app.use('/', r);
   app.use((req, res) => res.status(404).json({ ok: false, error: { code: 'not_found', message: `No route ${req.method} ${req.path}` } }));
