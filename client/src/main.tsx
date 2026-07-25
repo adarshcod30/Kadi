@@ -12,7 +12,10 @@ const qc = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
-      <BrowserRouter>
+      {/* Catalyst hosts the client under /app/, so the router needs the same prefix that
+          vite's `base` applies to assets - otherwise every in-app link points at the origin
+          root and a refresh 404s. import.meta.env.BASE_URL is exactly that value. */}
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>

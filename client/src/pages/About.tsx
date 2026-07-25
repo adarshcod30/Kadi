@@ -21,7 +21,7 @@ export default function About() {
         className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kadi-navy via-kadi-navy700 to-[#0a2547] text-white p-8 md:p-12">
         <div className="absolute -right-10 -top-10 opacity-20 pointer-events-none"><SiloToGraph className="w-[520px]" /></div>
         <motion.div variants={rise} className="flex items-center gap-3 mb-4">
-          <img src="/seal-karnataka.svg" className="h-12 w-12 rounded-full bg-white/95 p-1" alt="Government of Karnataka" />
+          <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} className="h-12 w-12 rounded-full bg-white/95 p-1" alt="Government of Karnataka" />
           <div className="text-sm text-white/70 leading-tight">Karnataka State Police<br />Government of Karnataka</div>
         </motion.div>
         <motion.h1 variants={rise} className="text-3xl md:text-4xl font-bold flex items-center gap-3">

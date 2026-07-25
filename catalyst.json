@@ -16,6 +16,6 @@
     }
   ],
   "apig": {
-    "enabled": true
+    "enabled": false
   }
 }

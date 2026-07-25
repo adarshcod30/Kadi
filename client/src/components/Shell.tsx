@@ -51,7 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* KSP chrome: navy-teal bar with their signature gold rule beneath */}
       <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20 border-b-[3px] border-kadi-gold">
         <div className="flex items-center gap-2.5">
-          <img src="/seal-karnataka.svg" alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
+          <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
           <div className="flex items-center gap-1.5 font-semibold tracking-tight">
             <span className="w-6 h-6 rounded bg-white/15 grid place-items-center text-kadi-gold font-bold kn text-sm">ಕ</span>
             <span>{t('appName')}</span>

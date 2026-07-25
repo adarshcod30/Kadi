@@ -1,0 +1,9 @@
+CrimeHeadID,CrimeGroupName,Active
+1,Crimes Against Body,True
+2,Crimes Against Property,True
+3,Crimes Against Women,True
+4,Cyber Crime,True
+5,Economic Offences,True
+6,NDPS,True
+7,Missing / UDR,True
+8,Traffic / PAR,True
