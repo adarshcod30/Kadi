@@ -63,6 +63,44 @@ precomputed read-model) behind a store interface, so the Catalyst adapters drop 
 
 ---
 
+## 🔎 What is REAL vs what is MOCKED (read this before demoing)
+
+Verified live on 2026-07-25. Nothing here is aspirational — each row was tested.
+
+### Genuinely running on Catalyst
+
+| Service | Evidence |
+|---|---|
+| **Web Client Hosting** | SPA at `/app/` returns 200 |
+| **Serverless Functions** | `api` (advancedio, 512 MB) + `refreshanalytics` (job) deployed |
+| **AppSail** | `kadi-appsail` live; `/analytics/socio` 135 ms, `/analytics/forecast` 158 ms |
+| **Data Store** | 11 tables; **40,836 FIRs**; `SELECT COUNT(CaseMasterID)` → 40836 via ZCQL |
+| **Stratus** | bucket `kadi-readmodel` holding the 8.4 MB import CSV |
+| **Job Scheduling + Cron** | pool `kadi_nightly`, cron `0 2 * * *` IST, ran on demand → SUCCESS |
+| **Connections** | `kadi_quickml`, scope `QuickML.deployment.READ`, status Connected |
+
+### Mocked, stubbed, or not wired — be upfront about these
+
+| # | Thing | Reality |
+|---|---|---|
+| 1 | **Authentication** | Service is enabled, but **the app has no login and the API is open**. `rbac.js` reads a `x-kadi-role` header anyone can set, so the role switcher is self-declared. The RBAC *logic* (SI→unit, ACP→district, Analyst→state) is real and enforced server-side on every query; only the identity binding is fake. |
+| 2 | **Runtime data source** | The deployed API reads **bundled CSV/JSON shipped inside the function**, not Data Store. The 40,836 rows in Data Store are real and ZCQL-queryable, but the UI does not read from them. |
+| 3 | **Audit log** | In-memory ring buffer in `audit.js`. Wiped on every cold start — `/audit` currently returns `[]`. Not persisted to Data Store. |
+| 4 | **PDF export** | Returns **HTML**, not PDF. SmartBrowz is not wired. |
+| 5 | **Cache** | Adapter written; writes fail `401 PERMISSION_NEEDED` from inside a function. Every call is a miss that recomputes. No user impact. |
+| 6 | **QuickML** | Endpoint/model/token all correct; the endpoint rejects our body with `400 PATTERN_NOT_MATCHED`. Gated off via `QUICKML_ENABLED`. The assistant is a deterministic intent engine, not an LLM. |
+| 7 | **Zia** | Adapter written, service not enabled. Voice is the **browser Web Speech API**, client-side. |
+| 8 | **The dataset** | Synthetic by design (40,836 FIRs from `data/generator`). Real Census 2011 population is used as the per-capita denominator. |
+| 9 | **API Gateway** | Deliberately **off** — enabling it with no routes configured took the whole site down. |
+
+### One caveat to state if asked about the correlation
+
+The urbanisation↔crime-rate correlation (r=0.878) is **partly circular**: the generator was
+built with urban weighting, so "cities have more crime" is partly by construction. The
+analysis is sound and would run identically on real KSP data — but it is not a discovery.
+
+---
+
 ## ⚠️ Needs Adarsh (console / credentials — I can't do these)
 
 > Every one of these is mocked behind an interface, so the app runs fully locally meanwhile.

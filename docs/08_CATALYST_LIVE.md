@@ -83,3 +83,28 @@ answered in the database rather than asserted in a slide.
 `PATTERN_NOT_MATCHED` — an em-dash is enough to fail the whole batch. Keep descriptions
 plain ASCII. Also note `decimal_digits` is capped: requesting 6 on a double silently
 yields 4 (~11 m of positional precision, which is fine for incident mapping).
+
+
+---
+
+## What is real vs mocked (2026-07-25, all verified live)
+
+**Running on Catalyst:** Web Client Hosting · Serverless Functions (`api` + `refreshanalytics`
+job) · AppSail (`kadi-appsail`) · Data Store (40,836 FIRs, ZCQL) · Stratus · Job Scheduling +
+Cron (nightly 02:00 IST) · Connections (`kadi_quickml`).
+
+**Not real yet — do not claim these:**
+
+1. **Authentication** is enabled as a service but the app has **no login** and the API is
+   **open**. `rbac.js` trusts an `x-kadi-role` header. The RBAC scoping logic is genuinely
+   enforced server-side; only the identity binding is mocked.
+2. **The deployed API reads bundled files, not Data Store.** The 40,836 rows are really in
+   Data Store and really queryable via ZCQL, but the UI does not read from them.
+3. **Audit log** is an in-memory ring buffer, lost on cold start.
+4. **PDF export** returns HTML; SmartBrowz is not wired.
+5. **Cache** writes fail 401 from inside a function.
+6. **QuickML** rejects our request body (400 PATTERN_NOT_MATCHED); gated off.
+7. **Zia** is not enabled; voice is the browser Web Speech API.
+8. **API Gateway** is off by design - enabling it without routes took the site down.
+
+See PROGRESS.md for the full table and the correlation caveat.
