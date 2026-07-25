@@ -9,6 +9,7 @@ const rbac = require('./services/rbac');
 const q = require('./services/queries');
 const assistant = require('./services/assistant');
 const audit = require('./services/audit');
+const cache = require('./services/cache');
 
 function buildApp() {
   const app = express();
@@ -33,7 +34,19 @@ function buildApp() {
   })));
 
   r.get('/lookups', handle(async () => q.lookups()));
-  r.get('/stats', handle(async (req) => q.stats(req.user)));
+  // Dashboard KPIs are identical for every user in a role and only change when the
+  // pipeline reruns, so they are served through Catalyst Cache. A cache miss (or no
+  // Catalyst context at all, e.g. local dev) just computes as before.
+  r.get('/stats', handle(async (req) => {
+    // Served through the Catalyst Cache adapter. NOTE: writes currently return 401
+    // PERMISSION_NEEDED because the deployed function runs without a credential that
+    // has Cache scope, so every call is a miss and falls through to compute. The
+    // adapter is a no-op until that permission is granted - see docs/08.
+    const { data } = await cache.through(
+      req, `stats:${req.user.role}`, async () => q.stats(req.user),
+    );
+    return data;
+  }));
   r.get('/alerts', handle(async (req) => q.alerts(req.user)));
   r.get('/eval', handle(async () => q.evalReport()));
   r.get('/clusters', handle(async () => q.clusters().slice(0, 100)));
