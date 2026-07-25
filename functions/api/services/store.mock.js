@@ -5,16 +5,20 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
 
-// Deployed functions get a self-contained bundle at functions/api/data (small derived
-// artifacts + lookup CSVs, ~860KB). The repo-root data/output tree is 121MB and is neither
-// committed nor shipped, so prefer the bundle whenever it exists and only fall back to the
-// full local tree for development.
+// Two possible data roots:
+//   FULL    repo-root data/output - 121MB, every CSV and derived artifact. Present in
+//           development, but gitignored and far too large to ship.
+//   BUNDLED functions/api/data - a self-contained ~860KB subset (small derived artifacts
+//           + lookup CSVs) that IS shipped, so the deployed function has something to read.
+// Prefer FULL when it exists: locally and in tests we want the complete dataset. Only the
+// deployed function, where FULL is absent, falls back to the bundle.
 const BUNDLED = path.resolve(__dirname, '../data');
+const FULL = path.resolve(__dirname, '../../../data/output');
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
-  : fs.existsSync(path.join(BUNDLED, 'derived'))
-    ? BUNDLED
-    : path.resolve(__dirname, '../../../data/output');
+  : fs.existsSync(path.join(FULL, 'derived'))
+    ? FULL
+    : BUNDLED;
 const DERIVED = path.join(DATA_DIR, 'derived');
 
 let DB = null;
