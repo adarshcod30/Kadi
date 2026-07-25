@@ -12,8 +12,19 @@
 //   QUICKML_RAG_KB_ID         knowledge-base / document id for RAG answers
 //   QUICKML_CONNECTION_NAME   Catalyst Connection holding scope quickml.deployment.read
 //
-// Auth: QuickML rejects anonymous calls. Credentials come from a Catalyst Connection,
-// fetched through the SDK at call time so no token is ever stored in the repo.
+// STATUS: wired but not yet live. What is confirmed working, and what is not:
+//   working  - endpoint, model id (crm-di-glm47b-30b-it), CATALYST-ORG header, and a
+//              valid 70-char OAuth token taken from the x-zc-admin-cred-token that
+//              Catalyst injects into every deployed function request.
+//   failing  - the endpoint answers HTTP 400 PATTERN_NOT_MATCHED with
+//              reason "Error in processing `zoho-inputstream` parameter", i.e. it does
+//              not accept our request body. Ruled out: non-ASCII content (sanitised),
+//              a manual Content-Length (removed), a missing token (obtained), and the
+//              auth prefix (configurable).
+//   note     - a Connection created in Cloud Scale cannot be read by the SDK's
+//              app.connection(): that API is for self-managed connectors and demands
+//              client_id/client_secret, erroring "client_id cannot be null" otherwise.
+// Set QUICKML_ENABLED=true once the exact payload shape is confirmed with Zoho support.
 const https = require('https');
 const { URL } = require('url');
 
@@ -24,29 +35,32 @@ try {
   catalyst = null;
 }
 
-const ENDPOINT = process.env.QUICKML_LLM_ENDPOINT || '';
+const ENDPOINT = process.env.QUICKML_LLM_ENDPOINT
+  || 'https://api.catalyst.zoho.in/quickml/v1/project/55468000000013048/glm/chat';
 const DEPLOYMENT_ID = process.env.QUICKML_LLM_DEPLOYMENT_ID || '';
 const RAG_KB_ID = process.env.QUICKML_RAG_KB_ID || '';
-const CONNECTION = process.env.QUICKML_CONNECTION_NAME || '';
+const CONNECTION = process.env.QUICKML_CONNECTION_NAME || 'kadi_quickml';
 const TIMEOUT_MS = Number(process.env.QUICKML_TIMEOUT_MS || 12000);
+// Model id and org header are what the console's own sample request uses.
+const MODEL = process.env.QUICKML_MODEL || 'crm-di-glm47b-30b-it';
+const ORG = process.env.CATALYST_ORG_ID || '60078029367';
+// The console shows 'Zoho-oauthtoken' in Headers but 'Bearer' in the JS sample.
+const AUTH_PREFIX = process.env.QUICKML_AUTH_PREFIX || 'Zoho-oauthtoken';
 
 // The assistant runs inside a 30s Function. A model call that hangs would burn the whole
 // budget and return nothing, so it is capped well below and falls back on timeout.
-const SYSTEM_PROMPT = `You are KADI, an assistant for the Karnataka State Police crime
-records system. You will be given FACTS retrieved from the case database and a QUESTION.
-
-Rules:
-- Answer ONLY from the FACTS. Never invent an FIR number, name, count, or date.
-- If the FACTS do not answer the question, say so plainly.
-- Be concise: two or three sentences, in the register a police officer would use.
-- Never mention or infer caste, religion, or occupation. They are excluded from every
-  model in this system by design; if asked, say that exclusion is deliberate.
-- Reply in the same language as the QUESTION (English or Kannada).`;
+const SYSTEM_PROMPT = 'You are KADI, an assistant for the Karnataka State Police crime records system. You are given FACTS from the case database and a QUESTION. Answer ONLY from the FACTS. Never invent an FIR number, name, count or date. If the FACTS do not answer it, say so. Be concise: two or three sentences. Never mention or infer caste, religion or occupation; they are excluded from every model here by design. Reply in the same language as the QUESTION.';
 
 let lastError = null;
+let tokenState = 'not-attempted';
 
+// Explicit opt-in. The endpoint currently rejects our request body with
+// PATTERN_NOT_MATCHED / "Error in processing `zoho-inputstream` parameter" (see the
+// note at the top of this file), so leaving it on would add a doomed round-trip to
+// every assistant call for no benefit. Set QUICKML_ENABLED=true to re-enable once the
+// payload contract is confirmed with Zoho.
 function configured() {
-  return Boolean(ENDPOINT);
+  return Boolean(ENDPOINT) && String(process.env.QUICKML_ENABLED || '').toLowerCase() === 'true';
 }
 
 function status() {
@@ -57,22 +71,47 @@ function status() {
     ragKbSet: Boolean(RAG_KB_ID),
     connectionSet: Boolean(CONNECTION),
     sdkLoaded: Boolean(catalyst),
+    model: MODEL,
+    tokenState,
     lastError,
   };
 }
 
-/** Access token from the Catalyst Connection (never persisted). */
+/**
+ * OAuth token for QuickML.
+ *
+ * Note on the console Connection: the SDK's app.connection() is for *self-managed*
+ * connectors - it wants client_id/client_secret/refresh_url supplied by the caller and
+ * errors with "client_id cannot be null" when handed a console-created Connection. So a
+ * Connection made in Cloud Scale is not consumable this way.
+ *
+ * What a deployed function does have is the credential Catalyst injects per request.
+ * Prefer an explicit token from config, then that injected admin credential.
+ */
 async function accessToken(req) {
-  if (!catalyst || !CONNECTION || !req) return null;
-  try {
-    const app = catalyst.initialize(req, { scope: 'admin' });
-    const conn = app.connection({ [CONNECTION]: { /* scopes configured in console */ } });
-    const svc = conn.getConnector(CONNECTION);
-    return await svc.getAccessToken();
-  } catch (e) {
-    lastError = `connection: ${e && e.message ? e.message : e}`;
-    return null;
+  if (process.env.QUICKML_ACCESS_TOKEN) {
+    tokenState = 'env-token';
+    return process.env.QUICKML_ACCESS_TOKEN;
   }
+  const h = (req && req.headers) || {};
+  const injected = h['x-zc-admin-cred-token'] || h['x-zc-user-cred-token'];
+  if (injected) {
+    tokenState = `injected(${h['x-zc-admin-cred-token'] ? 'admin' : 'user'},len=${String(injected).length})`;
+    return injected;
+  }
+  tokenState = 'no-credential-available';
+  return null;
+}
+
+// The gateway in front of QuickML is strict about punctuation, so normalise the
+// typographic characters our own templates produce while leaving real script
+// characters (e.g. Kannada) untouched.
+function asciiSafe(str) {
+  return String(str)
+    .replace(/[\u2010-\u2015]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, '...');
 }
 
 function postJson(urlStr, body, headers) {
@@ -91,7 +130,7 @@ function postJson(urlStr, body, headers) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
+        'CATALYST-ORG': ORG,
         ...headers,
       },
       timeout: TIMEOUT_MS,
@@ -142,15 +181,16 @@ async function phrase(req, { question, facts, lang }) {
   if (!configured()) return null;
   try {
     const token = await accessToken(req);
-    const headers = token ? { Authorization: `Zoho-oauthtoken ${token}` } : {};
+    const headers = token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {};
     const body = {
-      ...(DEPLOYMENT_ID ? { deployment_id: DEPLOYMENT_ID } : {}),
+      model: MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `FACTS:\n${facts}\n\nQUESTION (${lang}): ${question}` },
+        { role: 'user', content: asciiSafe(`FACTS:\n${facts}\n\nQUESTION (${lang}): ${question}`) },
       ],
       temperature: 0.2,
       max_tokens: 300,
+      stream: false,
     };
     const out = await postJson(ENDPOINT, body, headers);
     const text = extractText(out);
@@ -175,9 +215,9 @@ async function ragAnswer(req, { question, lang }) {
   if (!configured() || !RAG_KB_ID) return null;
   try {
     const token = await accessToken(req);
-    const headers = token ? { Authorization: `Zoho-oauthtoken ${token}` } : {};
+    const headers = token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {};
     const body = {
-      ...(DEPLOYMENT_ID ? { deployment_id: DEPLOYMENT_ID } : {}),
+      model: MODEL,
       knowledge_base_id: RAG_KB_ID,
       documents: [RAG_KB_ID],
       messages: [
@@ -186,6 +226,7 @@ async function ragAnswer(req, { question, lang }) {
       ],
       temperature: 0.1,
       max_tokens: 400,
+      stream: false,
     };
     const out = await postJson(ENDPOINT, body, headers);
     const text = extractText(out);
