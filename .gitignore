@@ -55,3 +55,9 @@ Thumbs.db
 # Coverage
 coverage/
 .nyc_output/
+
+# Deck build artefacts (the .pptx itself is committed; its scaffolding is not)
+deck/node_modules/
+deck/unpacked/
+deck/template.pptx
+deck/_t.*

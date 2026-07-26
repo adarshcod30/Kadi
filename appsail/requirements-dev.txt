@@ -1,0 +1,14 @@
+# Local development / pipeline dependencies.
+#
+# NOTE: appsail/requirements.txt is intentionally empty — the deployed AppSail container
+# cannot install packages (see appsail/app.py), so that service is stdlib-only. The full
+# pipeline, which runs as a Catalyst Job and locally, does need these.
+flask>=3.0
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+networkx>=3.2
+rapidfuzz>=3.6
+scipy>=1.10
+shapely>=2.0
+pytest>=8.0
