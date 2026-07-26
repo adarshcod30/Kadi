@@ -53,10 +53,11 @@ export function FairnessShield({ className = '' }: { className?: string }) {
         fill="#EAF3FB" stroke={BLUE} strokeWidth="3" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 1 }} />
       <motion.path d="M72 100 l18 18 l38 -42" fill="none" stroke={'#1E874B'} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"
         initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.6, delay: 0.8 }} />
+      {/* Below the shield, not across it: at y=150 the outline tapers and the words
+          collided with the border. Spread across the full width so none clips. */}
       {['caste', 'religion', 'occupation'].map((t, i) => (
-        <g key={t} transform={`translate(${40 + i * 45}, 150)`}>
-          <text x="0" y="0" fontSize="9" fill={RED} textAnchor="middle" textDecoration="line-through">{t}</text>
-        </g>
+        <text key={t} x={35 + i * 65} y="197" fontSize="10" fill={RED}
+          textAnchor="middle" textDecoration="line-through">{t}</text>
       ))}
     </svg>
   );
@@ -195,7 +196,9 @@ export function AssistantArt({ className = '' }: { className?: string }) {
       <rect x="72" y="80" width="60" height="4" rx="2" fill="#D9E1EC" />
       <rect x="72" y="90" width="34" height="9" rx="4" fill={TEAL} opacity="0.25" />
       <text x="89" y="97" fontSize="7" fill={TEAL} textAnchor="middle">FIR-2026</text>
-      <circle cx="150" cy="125" r="4" fill={SAFFRON} /><text x="70" y="128" fontSize="9" fill={GREY}>ಕನ್ನಡ · English · voice</text>
+      {/* dot is a bullet to the LEFT of the label - at x=150 it landed mid-word */}
+      <circle cx="44" cy="125" r="3.5" fill={SAFFRON} />
+      <text x="54" y="128" fontSize="9" fill={GREY}>ಕನ್ನಡ · English · voice</text>
     </svg>
   );
 }

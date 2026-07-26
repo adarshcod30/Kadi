@@ -155,10 +155,19 @@ function Control({ title, icon, children }: { title: string; icon?: React.ReactN
 function GraphEntry() {
   const nav = useNavigate();
   const { data } = useCases({ sort: 'linked_desc', pageSize: 8 });
+
+  // Land on an actual network rather than an explainer. This is the hero feature; a page
+  // that only *describes* it wastes the first impression. Opens the most-connected case,
+  // and `replace` keeps the back button pointing wherever the user came from.
+  useEffect(() => {
+    const top = data?.items?.[0];
+    if (top) nav(`/graph?case=${top.caseMasterId}`, { replace: true });
+  }, [data, nav]);
+
   return (
     <div className="max-w-3xl mx-auto mt-6">
       <h1 className="text-lg font-semibold text-kadi-navy flex items-center gap-2"><Network size={18} /> Case-Linkage Graph</h1>
-      <p className="text-sm text-ink-muted mt-1">Open a case to watch its connected network assemble — related FIRs, shared offenders, and serial-crime chains across stations and districts, with a click-through evidence trail on every link.</p>
+      <p className="text-sm text-ink-muted mt-1">Opening the most-connected case — related FIRs, shared offenders, and serial-crime chains across stations and districts, with a click-through evidence trail on every link.</p>
       <div className="card mt-4 divide-y divide-line">
         <div className="px-4 py-2 label">Most-connected cases (good starting points)</div>
         {(data?.items || []).map((c) => (

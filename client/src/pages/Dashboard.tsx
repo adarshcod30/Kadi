@@ -10,6 +10,7 @@ import {
   SiloToGraph, NetworkCluster, HealthPulse, MapHotspot, AssistantArt,
   FairnessShield, SheetToDashboard, PipelineFlow,
 } from '../components/illustrations';
+import HomeAnalytics from '../components/HomeAnalytics';
 import { useT } from '../lib/i18n';
 
 export default function Dashboard() {
@@ -103,6 +104,50 @@ export default function Dashboard() {
               ) : <Skeleton rows={4} />}
             </div>
           </VizCard>
+
+          {/* Disposal funnel — the left column was a card shorter than the right, leaving a
+              visible gap, and clearance rate is the metric a DGP actually asks for. */}
+          <VizCard title="Where cases end up" hint="Every registered FIR flows to one of three outcomes. The clearance rate is chargesheeted over total; a large undetected share is where investigative effort is being lost.">
+            {stats ? (
+              <div className="p-4">
+                <div className="flex h-9 rounded-ctl overflow-hidden border border-line">
+                  {[
+                    { k: 'Chargesheeted', v: stats.chargeSheeted, c: '#2FA8A0' },
+                    { k: 'Under investigation', v: stats.openCases, c: '#1A6FC4' },
+                    { k: 'Undetected', v: stats.undetected, c: '#C0392B' },
+                  ].map((seg) => {
+                    const pct = (seg.v / (stats.totalCases || 1)) * 100;
+                    return (
+                      <div key={seg.k} title={`${seg.k}: ${seg.v.toLocaleString()} (${pct.toFixed(1)}%)`}
+                        style={{ width: `${pct}%`, background: seg.c }}
+                        className="grid place-items-center text-[11px] font-medium text-white transition-all">
+                        {pct > 11 ? `${pct.toFixed(0)}%` : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {[
+                    { k: 'Chargesheeted', v: stats.chargeSheeted, c: '#2FA8A0' },
+                    { k: 'Under investigation', v: stats.openCases, c: '#1A6FC4' },
+                    { k: 'Undetected', v: stats.undetected, c: '#C0392B' },
+                  ].map((seg) => (
+                    <div key={seg.k} className="rounded-ctl bg-surface-2 border border-line px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                        <span className="w-2 h-2 rounded-full" style={{ background: seg.c }} />{seg.k}
+                      </div>
+                      <div className="text-lg font-semibold font-num text-ink">{seg.v.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[12px] text-ink-muted">
+                  Clearance rate <strong className="text-ink">
+                    {((stats.chargeSheeted / (stats.totalCases || 1)) * 100).toFixed(1)}%
+                  </strong> of {stats.totalCases.toLocaleString()} registered FIRs.
+                </p>
+              </div>
+            ) : <Skeleton rows={4} />}
+          </VizCard>
         </div>
 
         {/* Right: eval, donuts, alerts */}
@@ -162,6 +207,15 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* ---- Analytical section: forecast, composition, correlation, volume ---- */}
+      <motion.div variants={stagger} initial="hidden" animate="show" className="mt-4">
+        <div className="flex items-baseline gap-2 mb-3">
+          <h2 className="text-lg font-semibold text-kadi-navy">The picture behind the numbers</h2>
+          <p className="text-sm text-ink-muted">— where it is heading, what kind, why there, and who carries it.</p>
+        </div>
+        <HomeAnalytics stats={stats} />
+      </motion.div>
+
       {/* ---- Illustrated capabilities: what you can actually do from here ---- */}
       <motion.div variants={stagger} initial="hidden" animate="show">
         <div className="flex items-baseline gap-2 mb-3">
@@ -180,7 +234,7 @@ export default function Dashboard() {
             desc="District crime density, a live heatmap and incident points over satellite imagery. Layer time-of-day over location to find patrol windows; red zones pulse where trends emerge." />
           <CapCard onClick={() => nav('/assistant')} icon={<MessageSquare size={16} />} title="Ask KADI"
             art={<AssistantArt className="w-full h-32" />}
-            desc="Ask in English or ಕನ್ನಡ, by text or voice. Answers are grounded in the records, always cite FIR numbers, deep-link into the graph, and export to a PDF briefing." />
+            desc="Ask in English or ಕನ್ನಡ, by text or voice. Answers are grounded in the records, always cite FIR numbers, deep-link into the graph, and export as a print-ready briefing." />
         </div>
       </motion.div>
 

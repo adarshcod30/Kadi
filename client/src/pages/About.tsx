@@ -82,7 +82,7 @@ export default function About() {
           <Feature icon={<Layers />} art={<MapHotspot className="w-full h-36" />} title="Spatiotemporal Intelligence" to="/map" onNav={nav}
             desc="District-level crime density on a satellite map, live incident points, and DBSCAN hotspots. Time-of-day × weekday layering surfaces patrol windows, and pulsing red-zones flag emerging trends where recent activity far exceeds the historical baseline." />
           <Feature icon={<MessageSquare />} art={<AssistantArt className="w-full h-36" />} title="Conversational + Kannada Assistant" to="/assistant" onNav={nav}
-            desc="Ask questions over the case records in English or Kannada, by text or voice. Answers are grounded in the data, always cite FIR numbers, deep-link into the graph/cockpit, and export to a PDF briefing — never using protected attributes for any judgment." />
+            desc="Ask questions over the case records in English or Kannada, by text or voice. Answers are grounded in the data, always cite FIR numbers, deep-link into the graph/cockpit, and export as a print-ready briefing — never using protected attributes for any judgment." />
           <Feature icon={<ShieldCheck />} art={<FairnessShield className="w-full h-36" />} title="Explainability, Fairness & Audit" to="/audit" onNav={nav}
             desc="Every edge, score and answer carries an explanation. Caste, religion and occupation are excluded from every model by design — enforced by a unit test that fails if any protected column appears in a feature set — and every sensitive read is written to an audit log." />
         </div>
@@ -99,7 +99,7 @@ export default function About() {
           </p>
           <div className="grid sm:grid-cols-3 gap-4 mt-6">
             {[[<Cpu size={18} />, 'Entity resolution + graph', 'rapidfuzz name matching, networkx multigraph, Louvain communities'],
-              [<Database size={18} />, 'Precomputed read-model', 'Catalyst Data Store · NoSQL graph mirror · Cache'],
+              [<Database size={18} />, 'Precomputed read-model', 'Catalyst Data Store (40,836 FIRs, live ZCQL) \u00b7 Stratus object store'],
               [<Lock size={18} />, 'Fair by construction', 'protected attributes excluded + asserted in tests']].map(([ic, t, d], i) => (
               <div key={i} className="bg-surface-2 rounded-card p-4"><div className="text-kadi-blue mb-1">{ic}</div><div className="font-semibold text-sm">{t}</div><div className="text-xs text-ink-muted mt-0.5">{d}</div></div>
             ))}

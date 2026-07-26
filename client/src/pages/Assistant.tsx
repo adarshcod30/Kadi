@@ -95,7 +95,7 @@ export default function Assistant() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setLang(lang === 'en' ? 'kn' : 'en')} className="btn-outline text-sm">{lang === 'en' ? 'ಕನ್ನಡ' : 'English'}</button>
-          <button onClick={doExport} disabled={!msgs.length} className="btn-outline text-sm disabled:opacity-40"><FileDown size={14} /> Export PDF</button>
+          <button onClick={doExport} disabled={!msgs.length} className="btn-outline text-sm disabled:opacity-40"><FileDown size={14} /> Export briefing</button>
         </div>
       </div>
 
