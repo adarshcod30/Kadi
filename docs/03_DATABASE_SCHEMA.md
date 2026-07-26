@@ -1,165 +1,198 @@
-# 03 — Database Schema
+# 03 — The data contract
+
 ### KADI on Catalyst Data Store (relational, queried with ZCQL)
 
-This doc has three parts:
-- **Part A** — the **source FIR schema** exactly as given in the KSP ER-diagram PDF (this is the data contract; do not rename columns).
-- **Part B** — **KADI-added tables** (app/auth/audit + derived analytics tables the platform needs).
-- **Part C** — **Catalyst Data Store notes** (type mapping, system columns, import).
+Three parts:
 
-> Naming: keep the source column names from the PDF verbatim so a real KSP export drops in unchanged. Catalyst auto-adds `ROWID`, `CREATEDTIME`, `MODIFIEDTIME`, `CREATORID` to every table — do not redefine those.
+- **Part A** — the **source FIR schema**, exactly as given in the KSP ER diagram. This is a
+  contract, not a suggestion.
+- **Part B** — the tables **you added** (app, audit, and the derived analytics tables).
+- **Part C** — Catalyst specifics: type mapping, import order, and the traps.
+
+> **Rule one: keep the source column names verbatim.** The whole point is that a real KSP
+> export drops in unchanged. The moment you rename `CaseMasterID` to something tidier, you
+> have built a demo instead of a system. Catalyst auto-adds `ROWID`, `CREATEDTIME`,
+> `MODIFIEDTIME` and `CREATORID` to every table — never redefine those.
+
+**Live right now:** 11 tables in Data Store, 40,836 FIRs, queryable with ZCQL. The generator
+emits 29 tables in total; you imported the subset the API actually reads.
 
 ---
 
-## PART A — Source FIR schema (from the KSP ER diagram)
+## PART A — Source FIR schema
 
-### CaseMaster (the FIR core)
+### CaseMaster — the FIR core
+
 | Column | Type | Key | Description |
 |---|---|---|---|
-| CaseMasterID | INT | PK | Unique FIR/case id |
-| CrimeNo | VARCHAR | | Structured crime number: 1-digit category + 4-digit district + 4-digit PS(unit) + 4-digit year + 5-digit serial. e.g. FIR `104430006202600001`, UDR `3…`, Zero FIR `8…`, PAR `4…` |
+| CaseMasterID | INT | PK | Unique FIR / case id |
+| CrimeNo | VARCHAR | | 1-digit category + 4-digit district + 4-digit unit + 4-digit year + 5-digit serial. FIR `1…`, UDR `3…`, PAR `4…`, Zero FIR `8…` |
 | CaseNo | VARCHAR | | YYYY + 5-digit serial (last 9 of CrimeNo) |
-| CrimeRegisteredDate | DATE | | Date FIR registered |
-| PolicePersonID | INT | FK→Employee.EmployeeID | Registering officer |
+| CrimeRegisteredDate | DATE | | Date the FIR was registered |
+| PolicePersonID | INT | FK→Employee | Registering officer |
 | PoliceStationID | INT | FK→Unit.UnitID | Registering station |
-| CaseCategoryID | INT | FK→CaseCategory.CaseCategoryID | FIR/UDR/PAR/Zero-FIR |
-| GravityOffenceID | INT | FK→GravityOffence.GravityOffenceID | Heinous/Non-heinous |
-| CrimeMajorHeadID | INT | FK→CrimeHead.CrimeHeadID | Major crime head |
-| CrimeMinorHeadID | INT | FK→CrimeSubHead.CrimeSubHeadID | Sub-head |
-| CaseStatusID | INT | FK→CaseStatusMaster.CaseStatusID | Current status |
-| CourtID | INT | FK→Court.CourtID | Trying court |
+| CaseCategoryID | INT | FK→CaseCategory | FIR / UDR / PAR / Zero-FIR |
+| GravityOffenceID | INT | FK→GravityOffence | Heinous / Non-heinous |
+| CrimeMajorHeadID | INT | FK→CrimeHead | Major crime head |
+| CrimeMinorHeadID | INT | FK→CrimeSubHead | Sub-head |
+| CaseStatusID | INT | FK→CaseStatusMaster | Current status |
+| CourtID | INT | FK→Court | Trying court |
 | IncidentFromDate | DATETIME | | Incident start |
 | IncidentToDate | DATETIME | | Incident end |
-| InfoReceivedPSDate | DATETIME | | When PS received info |
-| latitude | DECIMAL | | Incident GPS lat |
-| longitude | DECIMAL | | Incident GPS long |
-| BriefFacts | NVARCHAR(MAX) | | Case summary (used for MO similarity) |
+| InfoReceivedPSDate | DATETIME | | When the station received the information |
+| latitude | DECIMAL | | Incident GPS latitude |
+| longitude | DECIMAL | | Incident GPS longitude |
+| BriefFacts | NVARCHAR(MAX) | | Case summary — the MO-similarity input |
 
-**Derived operational signals (compute, don't store raw):** reporting delay = `InfoReceivedPSDate − IncidentFromDate`; investigation age = `today − CrimeRegisteredDate`; time-of-day/day-of-week from `IncidentFromDate`.
+**Compute these, do not store them:** reporting delay =
+`InfoReceivedPSDate − IncidentFromDate`; investigation age = `today − CrimeRegisteredDate`;
+time-of-day and day-of-week from `IncidentFromDate`. Storing derived time fields is how they
+drift out of sync.
 
 ### ComplainantDetails
+
 | Column | Type | Key | Description |
 |---|---|---|---|
 | ComplainantID | INT | PK | |
 | CaseMasterID | INT | FK→CaseMaster | |
 | ComplainantName | VARCHAR | | |
 | AgeYear | INT | | |
-| OccupationID | INT | FK→OccupationMaster | ⚠️ analytics only — never predictive |
-| ReligionID | INT | FK→ReligionMaster | ⚠️ **protected — excluded from all models** |
-| CasteID | INT | FK→CasteMaster | ⚠️ **protected — excluded from all models** |
+| OccupationID | INT | FK→OccupationMaster | ⚠️ **protected — excluded from every model** |
+| ReligionID | INT | FK→ReligionMaster | ⚠️ **protected — excluded from every model** |
+| CasteID | INT | FK→CasteMaster | ⚠️ **protected — excluded from every model** |
 | GenderID | INT | | lookup |
 
 ### Victim
+
 | Column | Type | Key | Description |
 |---|---|---|---|
 | VictimMasterID | INT | PK | |
 | CaseMasterID | INT | FK→CaseMaster | |
 | VictimName | VARCHAR | | |
 | AgeYear | INT | | |
-| GenderID | INT | | m/f/t |
-| VictimPolice | VARCHAR | | 1 if victim is police else 0 |
+| GenderID | INT | | |
+| VictimPolice | VARCHAR | | 1 if the victim is police, else 0 |
 
 ### Accused
+
 | Column | Type | Key | Description |
 |---|---|---|---|
 | AccusedMasterID | INT | PK | |
 | CaseMasterID | INT | FK→CaseMaster | |
-| AccusedName | VARCHAR | | (entity-resolution input) |
+| AccusedName | VARCHAR | | The entity-resolution input |
 | AgeYear | INT | | |
-| GenderID | INT | | M/F/T |
+| GenderID | INT | | |
 | PersonID | VARCHAR | | Accused sort key: A1, A2, A3… |
 
 ### ArrestSurrender
+
 | Column | Type | Key | Description |
 |---|---|---|---|
 | ArrestSurrenderID | INT | PK | |
 | CaseMasterID | INT | FK→CaseMaster | |
-| ArrestSurrenderTypeID | INT | | arrest vs surrender (lookup) |
+| ArrestSurrenderTypeID | INT | | Arrest vs surrender |
 | ArrestSurrenderDate | DATE | | |
-| ArrestSurrenderStateId | INT | FK→State.StateID | |
-| ArrestSurrenderDistrictId | INT | FK→District.DistrictID | |
-| PoliceStationID | INT | FK→Unit.UnitID | |
-| IOID | INT | FK→Employee.EmployeeID | Investigating officer |
-| CourtID | INT | FK→Court.CourtID | |
-| AccusedMasterID | INT | FK→Accused.AccusedMasterID | |
-| IsAccused | BIT | | primary accused? |
-| IsComplainantAccused | BIT | | complainant also accused? |
+| ArrestSurrenderStateId | INT | FK→State | |
+| ArrestSurrenderDistrictId | INT | FK→District | |
+| PoliceStationID | INT | FK→Unit | |
+| IOID | INT | FK→Employee | Investigating officer |
+| CourtID | INT | FK→Court | |
+| AccusedMasterID | INT | FK→Accused | |
+| IsAccused | BIT | | Primary accused? |
+| IsComplainantAccused | BIT | | Complainant also accused? |
 
 ### Act / Section / CrimeHead group
-**Act:** ActCode (PK, VARCHAR), ActDescription, ShortName, Active(BIT).
-**Section:** ActCode (FK), SectionCode, SectionDescription, Active(BIT).
-**ActSectionAssociation:** CaseMasterID(FK), ActID(FK→Act.ActCode), SectionID(FK→Section.SectionCode), ActOrderID, SectionOrderID.
-**CrimeHead:** CrimeHeadID(PK), CrimeGroupName (e.g. "Crimes Against Body"), Active.
-**CrimeSubHead:** CrimeSubHeadID(PK), CrimeHeadID(FK), CrimeHeadName (e.g. Murder, Robbery), SeqID.
-**CrimeHeadActSection:** CrimeHeadID(FK), ActCode(FK), SectionCode.
+
+- **Act** — ActCode (PK, VARCHAR), ActDescription, ShortName, Active
+- **Section** — ActCode (FK), SectionCode, SectionDescription, Active
+- **ActSectionAssociation** — CaseMasterID, ActID→Act.ActCode, SectionID→Section.SectionCode, ActOrderID, SectionOrderID
+- **CrimeHead** — CrimeHeadID (PK), CrimeGroupName (e.g. "Crimes Against Body"), Active
+- **CrimeSubHead** — CrimeSubHeadID (PK), CrimeHeadID (FK), CrimeHeadName (Murder, Robbery…), SeqID
+- **CrimeHeadActSection** — CrimeHeadID (FK), ActCode (FK), SectionCode
 
 ### ChargesheetDetails
+
 | Column | Type | Key | Description |
 |---|---|---|---|
 | CSID | INT | PK | |
 | CaseMasterID | INT | FK→CaseMaster | |
-| csdate | DATETIME | | chargesheet date |
-| cstype | CHAR | | A=Chargesheet, B=False Case, C=Undetected |
-| PolicePersonID | INT | FK→Employee.EmployeeID | |
+| csdate | DATETIME | | Chargesheet date |
+| cstype | CHAR | | A = Chargesheet, B = False Case, C = Undetected |
+| PolicePersonID | INT | FK→Employee | |
 
 ### Lookup / master tables
-- **CaseCategory** (CaseCategoryID PK, LookupValue: FIR/UDR/PAR…)
-- **GravityOffence** (GravityOffenceID PK, LookupValue: Heinous/Non-Heinous)
-- **CaseStatusMaster** (CaseStatusID PK, CaseStatusName: Under Investigation/Charge Sheeted/Closed…)
-- **CasteMaster** (caste_master_id PK, caste_master_name) — *protected*
-- **ReligionMaster** (ReligionID PK, ReligionName) — *protected*
-- **OccupationMaster** (OccupationID PK, OccupationName)
-- **Court** (CourtID PK, CourtName, DistrictID FK, StateID FK, Active)
-- **District** (DistrictID PK, DistrictName, StateID FK, Active)
-- **State** (StateID PK, StateName, NationalityID, Active)
-- **Unit** (UnitID PK, UnitName, TypeID FK→UnitType, ParentUnit self-ref, NationalityID, StateID FK, DistrictID FK, Active) — this is the police-station table
-- **UnitType** (UnitTypeID PK, UnitTypeName, CityDistState, Hierarchy, Active)
-- **Rank** (RankID PK, RankName, Hierarchy, Active)
-- **Designation** (DesignationID PK, DesignationName, Active, SortOrder)
-- **Employee** (EmployeeID PK, DistrictID FK, UnitID FK, RankID FK, DesignationID FK, KGID, FirstName, EmployeeDOB, GenderID, BloodGroupID, PhysicallyChallenged BIT, AppointmentDate)
 
-### Junction (referenced in relationship matrix)
-- **inv_arrestsurrenderaccused** (ArrestSurrenderID FK, AccusedMasterID FK) — many-accused per arrest.
-- **Inv_OccuranceTime** (CaseMasterID FK, 1:1) — occurrence time/location record (fold into CaseMaster if simpler for the build).
+- **CaseCategory** — CaseCategoryID, LookupValue (FIR / UDR / PAR…)
+- **GravityOffence** — GravityOffenceID, LookupValue (Heinous / Non-Heinous)
+- **CaseStatusMaster** — CaseStatusID, CaseStatusName
+- **CasteMaster** — caste_master_id, caste_master_name · *protected*
+- **ReligionMaster** — ReligionID, ReligionName · *protected*
+- **OccupationMaster** — OccupationID, OccupationName · *protected*
+- **Court** — CourtID, CourtName, DistrictID, StateID, Active
+- **District** — DistrictID, DistrictName, StateID, Active
+- **State** — StateID, StateName, NationalityID, Active
+- **Unit** — UnitID, UnitName, TypeID, ParentUnit (self-ref), NationalityID, StateID, DistrictID, Active — **this is the police-station table**
+- **UnitType** — UnitTypeID, UnitTypeName, CityDistState, Hierarchy, Active
+- **Rank** — RankID, RankName, Hierarchy, Active
+- **Designation** — DesignationID, DesignationName, Active, SortOrder
+- **Employee** — EmployeeID, DistrictID, UnitID, RankID, DesignationID, KGID, FirstName, EmployeeDOB, GenderID, BloodGroupID, PhysicallyChallenged, AppointmentDate
 
-### Relationship summary (cardinality)
-- CaseMaster **1—N** Victim, Accused, ArrestSurrender, ComplainantDetails, ActSectionAssociation.
-- CaseMaster **N—1** CaseCategory, GravityOffence, CrimeHead, CrimeSubHead, CaseStatusMaster, Court, Employee.
-- ArrestSurrender **N—1** State, District, Court, Employee(IO); **N—N** Accused (via junction).
-- ComplainantDetails **N—1** Occupation, Religion, Caste.
-- Act **1—N** Section, CrimeHeadActSection. CrimeHead **1—N** CrimeSubHead, CrimeHeadActSection.
-- District **N—1** State. Unit **N—1** UnitType/State/District. Employee **N—1** District/Unit/Rank/Designation.
+### Junction tables
 
----
+- **inv_arrestsurrenderaccused** — ArrestSurrenderID, AccusedMasterID (many accused per arrest)
+- **Inv_OccuranceTime** — CaseMasterID (1:1 occurrence time/location record)
 
-## PART B — KADI-added tables
+### Cardinality
 
-### App / auth / audit
-**AppUser** — appUserId(PK), catalystUserId, name, email, RoleID(FK), UnitID(FK, nullable), DistrictID(FK, nullable), active.
-**Role** — RoleID(PK), roleName (SI, Inspector, ACP, Analyst, Admin), hierarchyLevel.
-**AuditLog** — auditId(PK), appUserId(FK), action, targetType, targetId, queryText(nullable), ip, ts.
-**Conversation** — convId(PK), appUserId(FK), title, createdTs; **ConversationMessage** — msgId(PK), convId(FK), role(user/assistant), content, citationsJSON, ts.
-**SavedView** — viewId(PK), appUserId(FK), name, kind(graph/map/cockpit), paramsJSON.
-**Alert** — alertId(PK), kind(new-link/health/anomaly/hotspot), severity, caseMasterId(nullable), offenderIdentityId(nullable), payloadJSON, unitId, districtId, ts, acknowledged.
-
-### Derived / materialized analytics tables (rebuilt by AppSail/Jobs)
-**OffenderIdentity** — offenderIdentityId(PK), canonicalName, resolvedFromCount, firstSeenDate, lastSeenDate, districtsJSON, confidence.
-**OffenderIdentityMap** — id(PK), offenderIdentityId(FK), AccusedMasterID(FK), matchScore, matchReasonJSON.
-**LinkEdge** — edgeId(PK), srcType, srcId, dstType, dstId, edgeType(shared_offender|co_accused|same_location|same_timewindow|mo_similarity|shared_section), strength(0–1), evidenceJSON(source FIRs + matched attrs), clusterId(nullable).
-**CaseHealthMetric** — caseMasterId(PK/FK), reportingDelayHrs, investigationAgeDays, peerMedianAgeDays, pendencyFlag, undetectedRiskScore, falseCasePatternFlag, ioWorkloadAtRegister, flagsJSON, recommendationText, computedTs.
-**OffenderRisk** — offenderIdentityId(PK/FK), riskScore(0–100), factorsJSON(feature→contribution), protectedAttributesUsed(BIT, must be 0), computedTs.
-**HotspotCell** — cellId(PK), geohash, crimeHeadId, timeBucket, count, baselineCount, emergingFlag, centroidLat, centroidLng, computedTs.
-**GraphNodeCache / GraphEdgeCache** (or NoSQL equivalents) — denormalized node/edge docs for fast reads.
-
-> **Fairness invariant (enforce in code + tests):** `OffenderRisk.protectedAttributesUsed` must always be `0`; ER and risk features must exclude `ReligionID`, `CasteID`, `OccupationID`. Add a unit test that fails if any protected column appears in the feature set.
+- CaseMaster **1—N** Victim, Accused, ArrestSurrender, ComplainantDetails, ActSectionAssociation
+- CaseMaster **N—1** CaseCategory, GravityOffence, CrimeHead, CrimeSubHead, CaseStatusMaster, Court, Employee
+- ArrestSurrender **N—1** State, District, Court, Employee(IO); **N—N** Accused via the junction
+- ComplainantDetails **N—1** Occupation, Religion, Caste
+- Act **1—N** Section, CrimeHeadActSection · CrimeHead **1—N** CrimeSubHead, CrimeHeadActSection
+- District **N—1** State · Unit **N—1** UnitType / State / District · Employee **N—1** District / Unit / Rank / Designation
 
 ---
 
-## PART C — Catalyst Data Store notes
+## PART B — Tables you added
 
-**Type mapping (source → Catalyst column type):**
+### App and audit
+
+- **AppUser** — appUserId, catalystUserId, name, email, RoleID, UnitID, DistrictID, active
+- **Role** — RoleID, roleName (SI, Inspector, ACP, Analyst, Admin), hierarchyLevel
+- **AuditLog** — auditId, appUserId, action, targetType, targetId, queryText, ip, ts
+- **Alert** — alertId, kind (new-link / health / anomaly / hotspot), severity, caseMasterId, offenderIdentityId, payloadJSON, unitId, districtId, ts, acknowledged
+
+> The audit trail is currently an **in-memory ring buffer** in `services/audit.js`, not this
+> table. It does not survive a cold start. Persisting it is a genuine next step — do not
+> claim it is durable until it is.
+
+### Derived tables — rebuilt by the Job, never hand-edited
+
+- **OffenderIdentity** — offenderIdentityId, canonicalName, resolvedFromCount, firstSeenDate, lastSeenDate, districtsJSON, confidence
+- **OffenderIdentityMap** — offenderIdentityId, AccusedMasterID, matchScore, matchReasonJSON
+- **LinkEdge** — edgeId, srcType, srcId, dstType, dstId, `edgeType` ∈ {shared_offender, co_accused, same_location, same_timewindow, mo_similarity, shared_section}, strength 0–1, evidenceJSON (source FIRs + matched attributes), clusterId
+- **CaseHealthMetric** — caseMasterId, reportingDelayHrs, investigationAgeDays, peerMedianAgeDays, pendencyFlag, undetectedRiskScore, falseCasePatternFlag, ioWorkloadAtRegister, flagsJSON, recommendationText, computedTs
+- **OffenderRisk** — offenderIdentityId, riskScore 0–100, factorsJSON (feature → contribution), `protectedAttributesUsed` (must be 0), computedTs
+- **HotspotCell** — cellId, geohash, crimeHeadId, timeBucket, count, baselineCount, emergingFlag, centroidLat, centroidLng, computedTs
+
+> **The fairness invariant.** `OffenderRisk.protectedAttributesUsed` must always be `0`, and
+> entity resolution, linkage and risk features must never contain `ReligionID`, `CasteID` or
+> `OccupationID`. There is a unit test that fails the build if any of them appears in a
+> feature set. That test is the reason you can make the claim out loud — protect it.
+
+`evidenceJSON` on `LinkEdge` is what powers every "why linked" panel. If you ever find
+yourself tempted to drop it to save space, intern the strings instead (see
+[02](02_TRD.md) §9) — do not lose the evidence.
+
+---
+
+## PART C — Catalyst specifics
+
+### Type mapping
+
 | Source | Catalyst Data Store type |
 |---|---|
-| INT (id/PK) | `bigint` (or `int`); use an auto-number PK where you don't import an explicit id |
+| INT (id / PK) | `bigint` — see the precision trap below |
 | VARCHAR / CHAR | `varchar` (short) / `text` (long, e.g. BriefFacts) |
 | NVARCHAR(MAX) | `text` |
 | DATE | `date` |
@@ -167,10 +200,58 @@ This doc has three parts:
 | DECIMAL (lat/long) | `double` |
 | BIT | `boolean` |
 
-**System columns:** every table auto-gets `ROWID` (Catalyst PK), `CREATEDTIME`, `MODIFIEDTIME`, `CREATORID`. Keep the source PK (e.g. `CaseMasterID`) as a **unique-indexed business key** and join on it; use `ROWID` internally as needed.
+### Three traps that will cost you an evening each
 
-**Querying:** use **ZCQL** (SQL-like) via the Node/Python SDK. Prefer parametrized, whitelisted queries (the assistant must not run arbitrary SQL). Index the hot join/filter columns: `CaseMaster(CrimeRegisteredDate, PoliceStationID, CrimeMajorHeadID, CaseStatusID)`, `Accused(CaseMasterID, AccusedName)`, `ArrestSurrender(AccusedMasterID)`, `LinkEdge(srcId,dstId,edgeType)`.
+1. **17-digit IDs break `JSON.parse`.** Catalyst project and row IDs exceed
+   `Number.MAX_SAFE_INTEGER`. They corrupt *silently* — `...013048` becomes `...013050` and
+   nothing throws. **Store and pass them as strings.** This is why `.catalystrc` keeps IDs
+   quoted and why `catalyst.json` carries no `project_id` at all.
+2. **`Create_Column` rejects non-ASCII.** A single em-dash in a column `description` returns
+   `PATTERN_NOT_MATCHED` with no hint as to which character. Keep DDL descriptions plain
+   ASCII.
+3. **Deploy manifests look like secrets but are not.** `functions/*/catalyst-config.json`
+   and `appsail/app-config.json` **must be committed** — deploy fails without them. Keep
+   their `env_variables` free of real values; those live in the Catalyst console.
 
-**Import (see `06_SYNTHETIC_DATA_SPEC.md`):** generate one CSV per table → upload to a **Stratus** bucket → run `catalyst data-store import` with a per-table config JSON (column mapping). Import lookup/master tables first, then CaseMaster, then child tables (respect FK order). Derived tables are populated by the pipeline, not imported.
+### System columns
 
-**Graph storage decision:** relational truth in Data Store; **mirror the derived graph (nodes/edges + evidence) into NoSQL** keyed by caseMasterId/offenderIdentityId/clusterId for <1.5s ego-graph reads. Cache dashboard aggregates in **Cache** with short TTL.
+Every table gets `ROWID` (the Catalyst PK), `CREATEDTIME`, `MODIFIEDTIME` and `CREATORID`.
+Keep the source PK (`CaseMasterID`) as a unique-indexed **business key** and join on it. Use
+`ROWID` only internally.
+
+### Querying
+
+Use **ZCQL** through the Node or Python SDK. Prefer parametrized, whitelisted queries — the
+assistant must never be able to run arbitrary SQL. Index the hot columns:
+
+```
+CaseMaster(CrimeRegisteredDate, PoliceStationID, CrimeMajorHeadID, CaseStatusID)
+Accused(CaseMasterID, AccusedName)
+ArrestSurrender(AccusedMasterID)
+LinkEdge(srcId, dstId, edgeType)
+```
+
+### Import order
+
+Generate one CSV per table → upload to a **Stratus** bucket → bulk-write into Data Store.
+Respect FK order or the import fails halfway and leaves you with a partial table:
+
+1. Lookup and master tables (State, District, Unit, Rank, Act, Section, CrimeHead…)
+2. `CaseMaster`
+3. Child tables (Victim, Accused, ArrestSurrender, ActSectionAssociation, Chargesheet…)
+
+Derived tables are **populated by the pipeline**, never imported. Details in
+[06_SYNTHETIC_DATA_SPEC.md](06_SYNTHETIC_DATA_SPEC.md).
+
+### Where the graph actually lives
+
+The original plan was to mirror the derived graph into **NoSQL** for fast ego-graph reads.
+You did not do that, and the reason is worth remembering: the read-model ships **inside the
+function bundle** as interned JSON, which is faster still and has no extra service
+dependency. A 121 MB naive bundle broke the deployed function outright; interning brought it
+to 12.1 MB with identical evidence text.
+
+**Cache** was intended for dashboard aggregates. The adapter is written and the segment is
+provisioned, but writes from inside a deployed function return `401 PERMISSION_NEEDED`. The
+KPI query recomputes in about a millisecond, so the miss costs nothing — the adapter is a
+no-op until the permission is sorted. See [08_CATALYST_LIVE.md](08_CATALYST_LIVE.md).

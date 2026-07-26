@@ -10,12 +10,14 @@
 Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
 
 [![Live on Catalyst](https://img.shields.io/badge/Live-Catalyst-1A6FC4?style=for-the-badge)](https://kadilabs-60078029367.development.catalystserverless.in/app/)
+[![Demo video](https://img.shields.io/badge/Demo-Video-E8871E?style=for-the-badge)](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing)
 [![Platform](https://img.shields.io/badge/Zoho_Catalyst-8_services-0F2F44?style=for-the-badge)](https://catalyst.zoho.com/)
 [![Tests](https://img.shields.io/badge/tests-19%2F19_passing-2FA8A0?style=for-the-badge)](#testing)
 [![Recovery](https://img.shields.io/badge/ground_truth-100%25-2FA8A0?style=for-the-badge)](#evaluation--benchmarks)
 [![Fairness](https://img.shields.io/badge/protected_attributes-excluded-E8871E?style=for-the-badge)](#fairness-by-construction)
 
 **[Live Application](https://kadilabs-60078029367.development.catalystserverless.in/app/)** ·
+**[Demo Video](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing)** ·
 **[Analytics API](https://kadi-appsail-50043957273.development.catalystappsail.in/analytics/socio)** ·
 **[Documentation](docs/)**
 
@@ -25,10 +27,24 @@ Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
 
 ---
 
+<div align="center">
+
+| | | | | | |
+|:--:|:--:|:--:|:--:|:--:|:--:|
+| **40,836** | **300** | **68,808** | **100%** | **3.9%** | **8** |
+| FIRs analysed | offenders resolved<br/>from 36,289 records | typed evidence links | ground-truth<br/>recovery | forecast MAPE<br/>(hold-out) | Catalyst services |
+
+*Every figure on this page is read live from the deployed API. Nothing is illustrative.*
+
+</div>
+
+---
+
 ## Table of Contents
 
 - [The Problem](#the-problem)
 - [What KADI Does](#what-kadi-does)
+- [A Five-Minute Tour](#a-five-minute-tour)
 - [Screens](#screens)
 - [The Headline Finding](#the-headline-finding)
 - [Architecture](#architecture)
@@ -43,6 +59,8 @@ Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
 - [Testing](#testing)
 - [Known Limitations](#known-limitations)
 - [Roadmap](#roadmap)
+- [Documentation](#documentation)
+- [Submission Artefacts](#submission-artefacts)
 
 ---
 
@@ -112,6 +130,35 @@ Sensitive reads are audited.
 
 </td></tr>
 </table>
+
+---
+
+## A Five-Minute Tour
+
+The fastest way to understand KADI is to walk the path an investigator actually walks.
+Open the [live application](https://kadilabs-60078029367.development.catalystserverless.in/app/),
+sign in as **SCRB Analyst**, and follow along.
+
+```mermaid
+flowchart LR
+    H["<b>1 · Home</b><br/>40,836 FIRs<br/>the scale of the problem"]
+    I["<b>2 · Intelligence</b><br/>Kodagu 30th by count<br/><b>6th per capita</b>"]
+    G["<b>3 · Graph</b><br/>click an edge →<br/><i>why</i> two cases link"]
+    M["<b>4 · Map</b><br/>hotspots where<br/>rate, not volume, is high"]
+    A["<b>5 · Assistant</b><br/>ask in ಕನ್ನಡ →<br/>answer cites real FIRs"]
+    H --> I --> G --> M --> A
+```
+
+| Stop | What to look at | Why it matters |
+|---|---|---|
+| **1 · Home** | The disposal funnel and the hour × weekday heatmap | Establishes scale and shows the data is real, not a handful of demo rows |
+| **2 · Intelligence** | The rank-shift bars — Kodagu moves 30th → 6th | The whole argument for per-capita analysis, in one chart |
+| **3 · Graph** | Click any **edge**, not just a node | The "why linked" panel names the matched attribute and the source FIRs. This is the difference between a dashboard and evidence |
+| **4 · Map** | Toggle DBSCAN hotspots, then the time-of-day filter | Spatial and temporal patterns that a count map flattens |
+| **5 · Assistant** | Ask *"ಈ ಆರೋಪಿಯ ಹಿಂದಿನ ಪ್ರಕರಣಗಳು?"* | Bilingual, grounded, and every answer carries FIR citations |
+
+> **The one thing to click:** an edge in the linkage graph. Everything else is a chart —
+> that panel is the product.
 
 ---
 
@@ -669,14 +716,62 @@ Stated plainly — every one is verifiable on the live URL.
 
 ---
 
+## Documentation
+
+Eight documents in [`docs/`](docs/), written as a build guide rather than a spec archive.
+If you are picking this up cold, read them in order — or jump to what you need.
+
+| # | Document | What it covers |
+|---|---|---|
+| 01 | [What you are building, and why](docs/01_PRD.md) | The problem, the personas, every feature with its shipped status, the access matrix |
+| 02 | [How it is wired](docs/02_TRD.md) | Architecture, the eight Catalyst services, the API surface, the pipeline, the performance work |
+| 03 | [The data contract](docs/03_DATABASE_SCHEMA.md) | The KSP source schema verbatim, the tables KADI adds, Catalyst type mapping and traps |
+| 04 | [How it should look and feel](docs/04_UI_UX_GUIDELINES.md) | Design tokens, the shell, every screen, accessibility, demo readiness |
+| 05 | [App flow and the build order](docs/05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md) | Sitemap, user journeys, sequences, the phased build with a definition of done |
+| 06 | [The synthetic corpus](docs/06_SYNTHETIC_DATA_SPEC.md) | Generator design, volumes, the seven planted patterns, honest fidelity notes |
+| 07 | [Catalyst setup runbook](docs/07_CATALYST_SETUP.md) | From clone to live URL, the real `catalyst.json` schema, six traps that cost real time |
+| 08 | [What is live right now](docs/08_CATALYST_LIVE.md) | Verified deployment state, table IDs, and the eight things **not** wired, each diagnosed |
+
+> **Start with [08](docs/08_CATALYST_LIVE.md) before any demo.** It is the honest inventory of
+> what works and what does not — everything in it is something an evaluator could find on
+> their own, so it is better said first.
+
+---
+
+## Submission Artefacts
+
+| Artefact | Location | Notes |
+|---|---|---|
+| **Deck** | [`deck/KADI_KSP_Datathon_2026_Submission.pptx`](deck/) | 19 slides on the official template. Rebuild with `node build.js` |
+| **Prototype brief** | [`deck/PROTOTYPE_BRIEF.txt`](deck/PROTOTYPE_BRIEF.txt) | 972 / 1024 characters, ready to paste |
+| **Demo video** | [Google Drive](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing) | Problem overview · working prototype · key workflows |
+| **Live deployment** | [Catalyst](https://kadilabs-60078029367.development.catalystserverless.in/app/) | Sign in by role, no password needed |
+
+The deck is generated, not hand-placed — every figure in it is read from `deck/data/*.json`,
+captured live from the deployed API.
+
+```bash
+cd deck
+node build.js          # rebuild the .pptx from live data
+python3 check.py       # fail on any shape off-canvas or text overflowing its box
+python3 preview.py     # render to HTML for visual review without PowerPoint
+```
+
+---
+
 <div align="center">
 
 **Built for the Karnataka State Police · KSP Datathon 2026 · Challenge 02**
 
+*ಒಳನೋಟಗಳು ಸಾಕ್ಷ್ಯ ಮತ್ತು ವರ್ತನೆಯನ್ನು ಮಾತ್ರ ಬಳಸುತ್ತವೆ — ಜಾತಿ, ಧರ್ಮ ಅಥವಾ ಉದ್ಯೋಗವನ್ನು ಎಂದಿಗೂ ಅಲ್ಲ.*
 *Insights use evidence and behaviour only — never caste, religion, or occupation.*
 
 [Live Application](https://kadilabs-60078029367.development.catalystserverless.in/app/) ·
+[Demo Video](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing) ·
 [Documentation](docs/) ·
-[Catalyst Setup](docs/07_CATALYST_SETUP.md)
+[Catalyst Setup](docs/07_CATALYST_SETUP.md) ·
+[Live State](docs/08_CATALYST_LIVE.md)
+
+<sub>Team KadiLabs · Adarsh Dwivedi</sub>
 
 </div>

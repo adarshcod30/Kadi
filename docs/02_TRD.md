@@ -1,211 +1,283 @@
-# 02 — Technical Requirements Document (TRD)
-### KADI — Architecture, Services & Implementation Contract
-**Deploy target:** Zoho Catalyst · **Stack:** React + Node Functions + Python AppSail/Jobs
+# 02 — How it is wired
+
+### Architecture, services and the constraints that produced them
+**Deploy target:** Zoho Catalyst · **Stack:** React SPA + Node Function + Python AppSail / Job
+
+> This is the architecture you actually shipped, not the one you sketched on day one. Where
+> the two differ, the reason is recorded — usually a platform limit you hit at 2am. Read
+> §10 before you change anything structural.
 
 ---
 
-## 1. Architecture overview
+## 1. The shape of it
 
 ```
-                         ┌──────────────────────────────────────────┐
-                         │        React SPA (Catalyst Slate)          │
-                         │  Dashboard · Graph · Cockpit · Map · Chat  │
-                         └───────────────┬────────────────────────────┘
-                                         │ HTTPS (JWT from Catalyst Auth)
-                                ┌────────▼─────────┐
-                                │  Catalyst API     │  routing / throttle / auth
-                                │  Gateway          │
-                                └────────┬─────────┘
-                                         │
-                        ┌────────────────▼───────────────────┐
-                        │  Node Advanced-I/O Functions (API)   │  <30s, READ-ONLY heavy
-                        │  /cases /graph /offenders /health    │
-                        │  /assistant /geo /audit              │
-                        └───┬───────────┬───────────┬──────────┘
-             read graph/    │           │ LLM/RAG   │ read/write
-             scores         │           │           │
-              ┌─────────────▼──┐  ┌─────▼──────┐  ┌─▼──────────────┐
-              │ NoSQL + Cache  │  │ QuickML    │  │ Data Store      │  (relational, ZCQL)
-              │ (graph, scores)│  │ LLM GLM-4.7│  │ FIR + KADI tbls │
-              └─────────▲──────┘  │ + RAG      │  └─▲──────────────┘
-                        │         └─────┬──────┘    │
-        writes derived  │               │ Zia       │ source of truth
-        graph + metrics │        ┌──────▼──────┐    │
-              ┌─────────┴────────┤ Zia Services │    │
-              │ AppSail (Python) │ OCR/STT/TTS  │    │
-              │ + Catalyst Jobs  │ /translation │    │
-              │ graph build, ER, │ └────────────┘    │
-              │ ML, metrics      ├───────────────────┘
-              └───────▲──────────┘
-                      │ triggered by
-        ┌─────────────┴───────────────┐
-        │ Cron (nightly recompute)     │
-        │ Signals + Event Fn (new FIR) │
-        └──────────────────────────────┘
-
-  Files/exports → Stratus (blob)   |   PDF/report render → SmartBrowz   |   CI/CD → Pipelines (GitHub)
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ZOHO CATALYST — one project, one origin, no third-party runtime             │
+│                                                                              │
+│  PRESENTATION   ┌────────────────┐ ┌────────────────┐ ┌──────────────────┐   │
+│  what the       │ React 18 + TS  │ │ Graph · Map    │ │ EN / ಕನ್ನಡ + voice │   │
+│  officer sees   │ Web Client     │ │ Cytoscape,     │ │ Web Speech API,  │   │
+│                 │ Hosting · /app │ │ MapLibre,      │ │ client-side      │   │
+│                 └───────┬────────┘ └───────┬────────┘ └────────┬─────────┘   │
+│                         ▼                  ▼                   ▼             │
+│  API            ┌────────────────┐ ┌────────────────┐ ┌──────────────────┐   │
+│  read-only,     │ 21 REST        │ │ RBAC on every  │ │ Audit + grounded │   │
+│  rank-scoped    │ endpoints      │ │ query          │ │ assistant        │   │
+│                 │ Node 20·512MB  │ │ server-side    │ │ cites FIR nos.   │   │
+│                 └───────┬────────┘ └───────┬────────┘ └────────┬─────────┘   │
+│                         ▼                  ▼                   ▼             │
+│  COMPUTE        ┌────────────────┐ ┌────────────────┐ ┌──────────────────┐   │
+│  heavy work     │ AppSail        │ │ Job — full     │ │ Cron 02:00 IST   │   │
+│  lives here     │ Python ~135ms  │ │ pipeline 15min │ │ full recompute   │   │
+│                 └───────┬────────┘ └───────┬────────┘ └────────┬─────────┘   │
+│                         ▼                  ▼                   ▼             │
+│  DATA           ┌────────────────┐ ┌────────────────┐ ┌──────────────────┐   │
+│  one source     │ Data Store     │ │ Stratus bucket │ │ Cache — KPI      │   │
+│  of record      │ 11 tbl·40,836  │ │ import objects │ │ segment (see §9) │   │
+│                 └────────────────┘ └────────────────┘ └──────────────────┘   │
+│                                                                              │
+│  PLATFORM        Authentication · Connections (OAuth) · Catalyst CLI 1.27.0  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Golden rule:** the SPA and Node Functions **only read** precomputed graph/scores. All expensive computation is produced asynchronously by **AppSail/Jobs** and stored in **NoSQL/Cache/Data Store**.
+**The golden rule, and the only one that matters:** the SPA and the API **only read**
+precomputed results. Everything expensive is produced asynchronously by the Job and written
+down before any user asks for it. §10 explains why you have no choice.
 
-## 2. Catalyst service map (what we use and how)
+## 2. Catalyst services — what you wired, and what you did not
 
-| # | Capability in KADI | Catalyst service | How we use it |
-|---|---|---|---|
-| 1 | Relational FIR + KADI tables | **Data Store** | Source of truth. Query via **ZCQL**. Import synthetic CSVs via CLI/Stratus. |
-| 2 | Graph adjacency, offender scores, metrics | **NoSQL** | Precomputed node/edge docs + score docs for instant reads. |
-| 3 | Hot reads (dashboard KPIs, graph frames) | **Cache** | Cache expensive read aggregations with TTL. |
-| 4 | API / backend logic (fast) | **Serverless Functions** (Advanced I/O, Node) | REST endpoints; read-only heavy; ≤30s. |
-| 5 | Graph build, entity resolution, ML training | **AppSail** (Python managed runtime) + **Jobs** | Long-running compute; Jobs for scheduled batch (15-min limit). |
-| 6 | NL Q&A over structured data + docs | **QuickML** (LLM Serving GLM-4.7 + RAG) | LLM answers over DB (via ZCQL tool) and RAG over legal docs. |
-| 7 | Custom risk/anomaly models (tabular) | **QuickML pipelines** / **Zia AutoML** | Offender risk + case anomaly models. |
-| 8 | OCR, speech-to-text, text-to-speech, translation | **Zia Services** | Voice assistant pipeline; OCR scanned FIRs (stretch). |
-| 9 | Login + RBAC | **Authentication** | Embedded auth; roles; table permission scopes. |
-| 10 | Routing/throttling/auth in front of Functions | **API Gateway** | Single API surface; rate limiting. |
-| 11 | OAuth to QuickML/Zia | **Connections** | Scope e.g. `quickml.deployment.read`. |
-| 12 | File & export storage | **Stratus** | Store generated PDFs, uploaded docs, data import buckets. |
-| 13 | PDF/report generation, screenshots | **SmartBrowz** | Render conversation/briefing to PDF. |
-| 14 | Nightly graph/metric recompute | **Cron (Cloud Scale)** | Rebuild graph & scores on schedule. |
-| 15 | React to new FIR inserts | **Signals + Event Functions** | Incrementally update graph/metrics on insert. |
-| 16 | CI/CD from GitHub | **Pipelines** | Auto-deploy client/functions/appsail. |
+Eight services are live. Be precise about this in the pitch; a judge will check.
 
-> **User-intervention items** (Claude Code must ask Adarsh): project/org/env IDs, enabling each service, Connections + OAuth scopes, QuickML deployment IDs + endpoint URLs, RAG document IDs, credits. See `CLAUDE.md` → "When to STOP and ask".
+| Capability in KADI | Catalyst service | How you use it |
+|---|---|---|
+| SPA hosting | **Web Client Hosting** | Serves `/app`. Same origin as the API, so no CORS dance. |
+| REST API + nightly Job | **Serverless Functions** | Advanced I/O accepts an Express app. Raised to 512 MB for the read-model. |
+| Python analytics | **AppSail** | Per-capita + forecast in ~135 ms. **Stdlib-only** — see §10. |
+| Relational store | **Data Store** | 11 tables, 40,836 FIRs, queried with ZCQL. |
+| Object storage | **Stratus** | Source objects for Data Store bulk-write. |
+| Scheduled recompute | **Job Scheduling + Cron** | Nightly at 02:00 IST. Only Jobs get 15 minutes. |
+| OAuth to QuickML | **Connections** | `deployment.READ` scope. QuickML refuses anonymous calls. |
+| Sign-in + role model | **Authentication** | Provisioned. See §8 for the honest caveat. |
 
-## 3. Tech stack & versions
-**Frontend (`/client`)** — deploy to Slate
-- React 18, Vite, TypeScript, TailwindCSS.
-- Graph: **Cytoscape.js** (+ `cytoscape-fcose` / `cytoscape-cola` layout). Maps: **MapLibre GL JS**. Charts: **Recharts**.
-- Data fetching: **TanStack Query**. Routing: React Router v6. State: Zustand (light).
-- Catalyst **Web SDK** for auth + client calls.
+**Not wired — and you should say so before anyone asks.** Full diagnosis in
+[08_CATALYST_LIVE.md](08_CATALYST_LIVE.md):
 
-**API (`/functions`)** — Catalyst Advanced I/O Functions (Node 20)
-- Express-style handler; `zcatalyst-sdk-node` for Data Store/ZCQL/NoSQL/Cache/Stratus.
-- Thin controllers → services; all responses typed; consistent error envelope.
+| Service | Status |
+|---|---|
+| **Cache** | Adapter written, segment provisioned. Writes from a deployed function return `401 PERMISSION_NEEDED`. Ruled out: segment id, SDK version, scope API, table permissions. Zero user impact — the KPI query recomputes in ~1 ms. |
+| **QuickML** (GLM-4.7 + RAG) | Endpoint, model id, org header and a valid OAuth token all in place; the endpoint rejects the request body with `400 PATTERN_NOT_MATCHED`. Gated off behind `QUICKML_ENABLED`. |
+| **Zia** (STT / TTS / translate) | Not enabled on the project. Voice runs on the browser Web Speech API instead. |
+| **NoSQL / SmartBrowz** | Read-model ships inside the function bundle; briefing export returns print-ready HTML, not a PDF. |
+| **API Gateway** | Enabled once, then disabled — with no routes configured it intercepted all traffic and the site returned `INVALID_URL`. |
+| **Signals / Pipelines** | Not wired. Deploys are CLI-driven. |
 
-**Compute/ML (`/appsail`)** — Catalyst AppSail (Python 3.11) + Jobs
-- `pandas`, `numpy`, `networkx`, `scikit-learn`, `rapidfuzz` (fuzzy match), `sentence-transformers` (MO embeddings), `python-louvain` (community detection), `hdbscan`/`scikit` DBSCAN (spatial), `zcatalyst-sdk-python`.
-- Exposes internal endpoints (called by Jobs/Functions) + batch jobs.
+## 3. Stack
 
-**Data (`/data`)** — generator (Python + Faker) → CSVs → Data Store import.
+**Frontend — `client/`**
+React 18 · TypeScript · Vite · Tailwind (KSP palette) · React Router v6 · TanStack Query.
+Cytoscape.js + fcose for the graph, MapLibre GL for maps, Recharts for charts, Framer
+Motion for interaction.
 
-## 4. Repository structure
+**API — `functions/api/`** (Advanced I/O Function, Node 20)
+Express app wrapped for Catalyst. Thin routes → services. Every response uses one envelope;
+every insight endpoint carries an `explanation` payload.
+
+**Compute — `appsail/`** (Python 3.11)
+`pandas`, `numpy`, `networkx`, `scikit-learn`, `rapidfuzz`, `shapely`, `scipy`.
+
+> **Two traps here.** MO similarity uses **TF-IDF + NearestNeighbors**, *not*
+> `sentence-transformers` — the transformer blew the memory budget for no measurable gain.
+> And the deployed AppSail service is **stdlib-only**: packages in `requirements.txt` do not
+> install in the container. Heavy libraries are for the Job and for local runs
+> (`requirements-dev.txt`), never for the AppSail request path.
+
+**Data — `data/`** — generator (Python) → CSVs → Stratus → Data Store bulk-write.
+
+## 4. Repository layout
+
 ```
+client/                       React SPA
+  src/{pages,components,api,lib,styles}
 functions/
-  api/                     # one Advanced I/O function (single deployable) OR split by domain
-    index.js               # router
-    routes/
-      cases.js  graph.js  offenders.js  health.js  geo.js  assistant.js  audit.js  auth.js
+  api/
+    index.js                  Catalyst entry — wraps app.js
+    app.js                    all 21 routes
+    lib/envelope.js           one response shape, one error shape
     services/
-      datastore.js  nosql.js  cache.js  quickml.js  zia.js  rbac.js
-    lib/ (zcql builders, error envelope, validators)
-  catalyst-config.json     # env vars, memory (bump to 512MB)
+      queries.js              every read; the heart of the API
+      rbac.js                 role → scope, enforced per query
+      assistant.js            grounded intent engine
+      audit.js                in-memory ring buffer (see §8)
+      cache.js  quickml.js  zia.js  store.mock.js
+    data/derived/*.json       the precomputed read-model
+    catalyst-config.json      memory + env; MUST be committed
+  refreshanalytics/
+    index.js                  the Cron Job — MUST be named index.js
+  test/api.test.js            8 Node tests
 appsail/
-  app.py                   # AppSail entry (Flask/FastAPI managed runtime)
+  app.py                      stdlib-only analytics service
   pipeline/
+    run_pipeline.py           orchestrates the whole DAG
     entity_resolution.py  graph_build.py  community.py  mo_similarity.py
     risk_score.py  anomaly.py  health_metrics.py  spatial.py
-  jobs/
-    recompute_graph.py  recompute_metrics.py
-client/
-  src/{pages,components,features,api,hooks,styles,lib}
+    socio.py  forecast.py  demographics.py  national.py
+    evaluate.py               scores against planted ground truth
+    build_bundle.py           interns the read-model before shipping
+  jobs/{recompute_graph,recompute_metrics}.py
+  tests/test_pipeline.py      11 Python tests
 data/
-  generator/generate.py  patterns.py  karnataka.py
-  output/*.csv
+  generator/                  generate.py, patterns.py, karnataka.py
+  output/*.csv                29 tables (gitignored — regenerate)
+deck/                         submission deck + build/QA tooling
 ```
 
-## 5. API design (REST, behind API Gateway)
-All routes require a valid Catalyst Auth JWT; RBAC applied server-side. JSON in/out. Standard error envelope: `{ ok:false, error:{code,message} }`.
+## 5. API surface
 
-| Method | Path | Purpose | Notes |
-|---|---|---|---|
-| GET | `/cases` | List/search FIRs (filters, pagination) | RBAC-scoped |
-| GET | `/cases/:id` | FIR detail (parties, acts, status, timeline) | |
-| GET | `/graph/case/:id` | Ego-graph around an FIR (nodes/edges + why) | reads NoSQL |
-| GET | `/graph/cluster/:clusterId` | Full gang/community subgraph | |
-| GET | `/graph/search` | Graph by filters (crime head, district, date) | |
-| GET | `/offenders/:id` | Resolved offender profile + risk breakdown | |
-| GET | `/offenders` | Watchlist / ranked offenders | RBAC-scoped |
-| GET | `/health/cases` | Investigation-health worklist + flags | |
-| GET | `/health/summary` | Cockpit KPIs (by station/subdivision) | |
-| GET | `/geo/points` | Map points (bbox, filters) | |
-| GET | `/geo/hotspots` | Precomputed clusters | |
-| GET | `/analytics/vulnerability` | Victim-vulnerability aggregates | Analyst/ACP only |
-| POST | `/assistant/query` | NL query (text) → grounded answer + citations | calls QuickML LLM/RAG |
-| POST | `/assistant/voice` | audio → STT → answer → TTS | calls Zia |
-| POST | `/assistant/export` | Render conversation/briefing → PDF (Stratus URL) | SmartBrowz |
-| GET | `/audit` | Audit log (RBAC) | ACP/Admin |
-| GET | `/me` | Current user + role + scope | |
-| Admin | `/admin/users` … | User/role management | Admin only |
+21 endpoints. RBAC applied server-side on every one. Error envelope:
+`{ ok:false, error:{ code, message } }`.
 
-**Every insight endpoint returns an `explanation` object** (inputs used, matching attributes, source FIR IDs) to power the "Why" UI and satisfy explainability ACs.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Liveness |
+| GET | `/me` | Current user, role, scope, capabilities |
+| GET | `/lookups` | Districts, units, crime heads, statuses |
+| GET | `/stats` | Dashboard KPIs (RBAC-scoped) |
+| GET | `/alerts` | Recent alerts |
+| GET | `/eval` | Ground-truth recovery report |
+| GET | `/clusters` | Community list |
+| GET | `/cases` · `/cases/:id` | FIR list and detail (audited) |
+| GET | `/graph/case/:id` | Ego-network + why-linked evidence (audited) |
+| GET | `/graph/featured` · `/graph/cluster/:id` · `/graph/search` | Networks |
+| GET | `/offenders` · `/offenders/:id` | Watchlist and profile (audited) |
+| GET | `/health/cases` · `/health/summary` | Investigation health |
+| GET | `/geo/points` · `/geo/grid` · `/geo/hotspots` · `/geo/districts` · `/geo/national` | Map layers |
+| GET | `/analytics/vulnerability` · `/analytics/socio` · `/analytics/forecast` | Analytics |
+| POST | `/assistant/query` · `/assistant/voice` · `/assistant/export` | Assistant |
+| GET | `/audit` | Audit log — ACP / Admin only |
+| GET | `/ai/status` | Whether QuickML and Zia are genuinely wired |
 
-## 6. Data model (summary — full detail in `03_DATABASE_SCHEMA.md`)
-- **Source tables** = the provided FIR schema (CaseMaster, ComplainantDetails, Victim, Accused, ArrestSurrender, Act/Section, CrimeHead/SubHead, master/lookup, ChargesheetDetails, etc.).
-- **KADI-added tables:** `AppUser`, `Role`, `AuditLog`, `Conversation`, `SavedView`, `Alert`, and **derived/materialized**: `OffenderIdentity` (entity-resolved), `OffenderIdentityMap` (accused→identity), `LinkEdge` (FIR/entity edges + type + strength + evidence), `CaseHealthMetric`, `OffenderRisk`, `HotspotCell`.
-- Derived tables are **rebuilt by AppSail/Jobs**; the API reads them (or their NoSQL mirror).
+`/ai/status` exists so you never have to *claim* an AI service is on. Point at it instead.
 
-## 7. ML / analytics pipeline (in AppSail/Jobs)
-Runs as a DAG; nightly full rebuild + incremental on new-FIR Signal.
+## 6. Data model
 
-1. **Entity resolution** (`entity_resolution.py`): cluster Accused rows into `OffenderIdentity` using blocking (name soundex + district) then `rapidfuzz` name similarity + shared signals (co-accused, section, location, phone if present). Output confidence per merge. **No protected attributes used.**
-2. **Graph build** (`graph_build.py`): build `networkx` multigraph. Node types: Case, Offender, Victim, Location(cell), Act/Section. Edge types + strength:
-   - shared offender identity (weight high), co-accused, same location cell (geohash ~≤X km), overlapping time window, MO similarity ≥ threshold, shared act/section.
-   - Persist edges → `LinkEdge` (+ evidence JSON) → mirror to NoSQL.
-3. **Community detection** (`community.py`): Louvain on the offender/case projection → gang clusters → tag nodes with `clusterId`.
-4. **MO similarity** (`mo_similarity.py`): embed `BriefFacts` with `sentence-transformers`; cosine similarity within candidate blocks; store top-k similar case pairs.
-5. **Offender risk** (`risk_score.py`): features = prior FIR count, gravity mix, recency, arrest/bail history, network centrality (degree/betweenness), distinct districts. Model via **Zia AutoML**/QuickML or transparent gradient-boosting; output score + SHAP-style factor breakdown. **Protected attributes excluded and asserted in output metadata.**
-6. **Anomaly detection** (`anomaly.py`): IsolationForest per crime head/area on case features → flag outliers.
-7. **Health metrics** (`health_metrics.py`): deterministic — reporting delay, ageing vs peer median, pendency, undetected/false-case flags, IO workload.
-8. **Spatial** (`spatial.py`): DBSCAN on lat/long per crime head + time bucket → `HotspotCell`; baseline vs current for emerging-trend flags.
+Source tables are the KSP FIR schema exactly as given — do not rename columns. KADI adds
+`AppUser`, `AuditLog`, `Alert`, and the derived tables the pipeline writes:
+`OffenderIdentity`, `OffenderIdentityMap`, `LinkEdge`, `CaseHealthMetric`, `OffenderRisk`,
+`HotspotCell`. Full detail in [03_DATABASE_SCHEMA.md](03_DATABASE_SCHEMA.md).
 
-Each stage writes an **explanation payload** alongside results.
+Derived tables are rebuilt by the Job. The API reads them, never recomputes them.
 
-## 8. AI integration
-**LLM over structured DB (text-to-insight):**
-- System prompt: "You are KADI, an assistant for a police crime-records system. Answer only from provided data. Always cite FIR numbers. Never infer or use caste/religion/occupation for any judgment."
-- Pattern: API receives NL query → generates a **constrained ZCQL** query (whitelisted tables/columns, RBAC-scoped) OR uses a set of safe parametrized query "tools" → runs on Data Store → passes rows to GLM-4.7 for natural-language summarization with citations. (Prefer tool/parametrized queries over free-form SQL generation for safety.)
-**RAG over documents:**
-- Upload IPC/BNS sections, KSP SOPs to a QuickML **RAG knowledge base**; assistant answers legal/procedural questions with document citations. RAG document IDs come from the console (**ask Adarsh**).
-**Voice (Zia):** audio → **STT** → (if Kannada) **translation** → LLM → answer → **translation back** → **TTS**. *Verify Kannada STT/TTS coverage in Zia; fallback = Kannada handled as text by the LLM + Zia translation.*
-**PDF export:** assistant/briefing HTML → **SmartBrowz** → PDF → store in **Stratus** → return signed URL.
+## 7. The analytics pipeline
 
-## 9. Auth, RBAC & security
-- **Catalyst Authentication** (embedded) issues JWT; Web SDK on client.
-- Server derives user → `AppUser.role` + scope (`UnitID`/`DistrictID`).
-- **Data Store permission scopes** set per role (application-user select-only on case tables; write restricted). API adds a second RBAC layer (defense in depth).
-- **Audit:** every read of sensitive data and every AI query writes an `AuditLog` row (userId, action, target, timestamp, ip).
-- **CORS/whitelisting:** register the Slate front-end domain under Cloud Scale → Authentication → whitelisting (the #1 integration gotcha from Zoho's session).
-- Secrets (client secret, connection tokens) live in Catalyst config/env, never in git.
+`appsail/pipeline/run_pipeline.py` runs the DAG. Full rebuild takes **24.6 s** and peaks at
+**738 MB**.
 
-## 10. Handling the 30-second Function limit (critical)
-- Functions do **reads and light orchestration only**.
-- Graph build, ER, ML, metric recompute → **AppSail endpoints** and/or **Catalyst Jobs** (15-min limit), triggered by **Cron** (nightly) and **Signals/Event Functions** (on new FIR insert).
-- The assistant's LLM call stays within 30s; if a query is heavy, precompute or stream a "working…" state and complete via a job + notification.
+1. **Entity resolution** — block on name key + district, then `rapidfuzz` similarity with
+   **rarity-aware distinctiveness** (a rare surname match counts for far more than a common
+   one), plus shared co-accused / section / location signals. Union-find merges the
+   clusters. 36,289 accused rows → 300 identities, each with a confidence. **No protected
+   attributes.**
+2. **Graph build** — a `networkx` multigraph. Edge types: shared offender, co-accused, same
+   location cell, overlapping time window, MO similarity, shared act & section. Every edge
+   carries an evidence payload naming what matched.
+3. **Communities** — Louvain over the case projection → 117 networks, 7 cross-district.
+4. **MO similarity** — TF-IDF over `BriefFacts`, then `NearestNeighbors` cosine within
+   candidate blocks.
+5. **Offender risk** — prior count, gravity mix, recency, arrest/bail history, network
+   centrality, distinct districts. Transparent scoring with a factor breakdown. Protected
+   attributes excluded, and asserted in the output metadata.
+6. **Anomaly detection** — per crime head and area, flag outliers.
+7. **Health metrics** — deterministic: reporting delay, ageing vs peer median, pendency,
+   undetected risk, false-case pattern. 19,006 cases flagged.
+8. **Spatial** — DBSCAN per crime head and time bucket → hotspots; baseline vs current for
+   emerging trends.
+9. **Socio + forecast** — per-capita rates against Census indicators; linear trend ×
+   multiplicative month-of-year seasonality, partial months excluded.
+10. **Evaluate** — score the recovered clusters against the planted ground truth.
+11. **Bundle** — `build_bundle.py` interns the read-model before it ships.
 
-## 11. Deployment
-1. `npm i -g zcatalyst-cli`; `catalyst init` (select Functions + Slate; add AppSail).
-2. Local dev: `catalyst serve` (functions), `vite` (client).
-3. Import data: upload CSVs to a **Stratus** bucket → `catalyst data-store import` (config JSON per table) — see `06_SYNTHETIC_DATA_SPEC.md`.
-4. Configure **Connections** (QuickML/Zia scopes), env vars in `catalyst-config.json` (project ID, org ID, endpoint URLs, RAG doc IDs).
-5. `catalyst deploy` (or `--only client|functions|appsail`).
-6. Whitelist front-end domain + enable CORS.
-7. Wire **Pipelines** to the GitHub repo for CI/CD (optional but a scoring plus).
+Every stage writes an explanation payload alongside its results. That is what makes the
+"why" panels possible.
+
+## 8. Auth, RBAC and audit
+
+- Catalyst Authentication is provisioned. **The API currently trusts a role header rather
+  than a verified JWT**, so the sign-in screen is a role chooser. The login page says this
+  in plain language — keep it that way. Binding it properly means changing
+  `userFromRequest` in `rbac.js` to read the Catalyst token and map it to the officer's
+  rank; nothing else changes.
+- The API is the enforcement point: every query is filtered by the caller's unit, district
+  or state, and an out-of-scope read is **refused**.
+- Sensitive reads and every assistant query write an audit row. The buffer is **in-memory**
+  today — it does not survive a cold start. Moving it to a Data Store table is a small,
+  honest next step, not a rewrite.
+- Secrets live in Catalyst env config, never in git. `catalyst-config.json` files are deploy
+  manifests and **must** be committed; just keep real values out of them.
+
+## 9. Performance work worth knowing
+
+Three optimisations you should be able to explain, because they are the interesting part:
+
+- **sklearn `working_memory`.** Peak RSS was 1,770 MB — over the 512 MB Job ceiling. Setting
+  `config_context(working_memory=32)` cut it to **738 MB with byte-identical output**. The
+  default is 1 GiB, which nobody expects.
+- **String interning.** The graph adjacency payload was 54.9 MB, and a 121 MB read-model
+  broke the deployed function outright. Interning the repeated edge-reason strings brings it
+  to **12.1 MB** with identical evidence text. A JS `Proxy` rehydrates it lazily on read.
+- **JSON integer precision.** Catalyst's 17-digit IDs exceed `Number.MAX_SAFE_INTEGER` and
+  corrupt silently through `JSON.parse`. Store them as **strings**. This one cost you a
+  deploy: `...013048` became `...013050` and nothing errored.
+
+## 10. The 30-second cap — the constraint behind everything
+
+Both Functions **and** AppSail cap a request at 30 seconds. This was confirmed by the Zoho
+team in the workshop Q&A and it is not raisable. Only **Jobs** get 15 minutes.
+
+The pipeline needs ~25 s and ~740 MB. That is uncomfortably close to the cap even when it
+fits, so:
+
+- Functions do reads and light orchestration. Nothing else.
+- Entity resolution, graph build, ML and metric recompute run in the **Job**, triggered by
+  **Cron**.
+- The web tier reads only what the Job has already written.
+
+That single limit is why every screen loads instantly instead of waiting on a model. When
+you present the architecture, lead with the constraint — it makes the design look inevitable
+rather than arbitrary.
+
+Two smaller traps in the same family: a Job function **must** be named `index.js`
+(`main.js` fails silently, with no logs), and Jobs cap memory at 512 MB.
+
+## 11. Deploying
+
+```bash
+npm i -g zcatalyst-cli && catalyst login
+catalyst project:use            # binds .catalystrc — IDs stored as strings
+cd client && npm run build      # emits dist/ + a 404.html copy for SPA deep links
+catalyst deploy                 # or --only client|functions|appsail
+```
+
+Full runbook, including data import, in [07_CATALYST_SETUP.md](07_CATALYST_SETUP.md).
 
 ## 12. Non-functionals
-- **Performance:** graph/dashboard reads <1.5s (precomputed + cached). Assistant <10s typical.
-- **Scale:** synthetic ~50–100k FIRs; design so ingesting real 1,100-station data needs no code change (only more compute in jobs).
-- **Reliability:** idempotent recompute jobs; incremental updates safe to re-run.
-- **Observability:** structured logs; a `/health` diagnostic endpoint; job run status in `PROGRESS.md` during build.
-- **Accessibility:** WCAG AA (see UI doc).
 
-## 13. Testing
-- Unit tests for ZCQL builders, RBAC scoping, entity-resolution matching, health-metric math.
-- **Ground-truth eval:** since synthetic data has planted gangs/serial chains, add a test asserting the pipeline recovers ≥90% of them (precision/recall on links). This doubles as a killer demo slide.
-- API contract tests for each endpoint; RBAC tests per role.
-- Frontend: smoke tests on the demo path.
+- **Performance** — dashboard and graph reads well under 1.5 s, because they are
+  precomputed. AppSail analytics ~135 ms against a 30 s cap.
+- **Scale** — designed so that ingesting the real register (~800,000 FIRs/year) needs more
+  compute in the Job, not a code change.
+- **Reliability** — the recompute Job is idempotent and safe to re-run.
+- **Observability** — `/health` and `/ai/status` endpoints; structured logs; Cron run status
+  in the console.
+- **Accessibility** — WCAG AA, see [04_UI_UX_GUIDELINES.md](04_UI_UX_GUIDELINES.md).
 
-## 14. Open items to confirm with Catalyst / Adarsh
-- Exact **QuickML** model deployment IDs + endpoint URLs; RAG document IDs.
-- **Zia** Kannada STT/TTS availability (else translation fallback).
-- Data Store **column type** limits and max rows per import batch.
-- Whether **AppSail** managed runtime Python version = 3.11 (adjust libs if not).
+## 13. Tests — 19, all green
+
+```bash
+cd functions && npm test        # 8 Node: envelope, RBAC scoping, endpoints
+pytest appsail/tests            # 11 Python: ER, health math, ground-truth recovery
+```
+
+The one that matters most: **a test fails the build if `CasteID`, `ReligionID` or
+`OccupationID` appears in any model's feature set.** That is what turns the fairness claim
+from editorial into executable. Never delete it, and never let it be skipped.

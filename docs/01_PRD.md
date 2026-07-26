@@ -1,159 +1,215 @@
-# 01 — Product Requirements Document (PRD)
+# 01 — What you are building, and why
+
 ### KADI — AI-Driven Crime Analytics & Visualization Platform
 **Program:** Datathon 2026 · Karnataka State Police × Hack2Skill · **Challenge 02**
-**Deploy target:** Zoho Catalyst (mandatory)
-**Status:** v1 for build
+**Deploy target:** Zoho Catalyst (mandatory — see [07](07_CATALYST_SETUP.md))
+**Status:** shipped and live. Every requirement below is marked with what you actually built.
+
+> These docs are written to you, as build instructions. Read 01 for *what* and *why*,
+> [02](02_TRD.md) for *how it is wired*, [03](03_DATABASE_SCHEMA.md) for the data contract,
+> and [05](05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md) for the order you built it in.
+> If you are rebuilding from scratch, follow 05.
 
 ---
 
-## 1. Vision
-Give every KSP investigator and supervisor a single pane of glass that **connects fragmented FIRs into intelligence** — exposing serial crimes, offender networks, and slipping investigations — in a way that is **explainable, fair, and operationally actionable**. Move KSP from reactive, Excel-bound reporting to proactive, evidence-based policing without ever profiling communities.
+## 1. The one-sentence pitch
 
-## 2. The problem (as stated by KSP + observed in the data)
-- **Data silos.** FIRs are registered per station and live in isolation. A gang operating across stations/districts appears as many unrelated petty crimes. Cross-jurisdiction connections are invisible.
-- **Reactive policing.** No systematic early warning: cases drift past detection timelines, pile up as "undetected," or close as "false" with no supervisory signal.
-- **Analytics gap.** Where analytics exist, they are static dashboards; deeper behavioral, relational, and network patterns go undiscovered.
-- **Fairness risk.** Naive predictive policing in India is criticized for discriminating against caste/religion minorities. The dataset contains these fields — a credible solution must *refuse* to use them for prediction and prove it.
+You are turning 40,836 siloed Karnataka FIRs into **one connected, explainable intelligence
+picture** — one that exposes serial offenders, cross-district networks and slipping
+investigations, without ever profiling a community.
 
-## 3. Goals & non-goals
-**Goals**
-1. Automatically **link a new/selected FIR to related cases** (same accused, co-accused, location, time window, MO) across stations and districts.
-2. Surface **repeat/habitual offenders and organized-crime clusters** as an interactive network.
-3. Provide an **Investigation-Health cockpit** that flags at-risk cases and recommends the next action.
-4. Deliver **explainable** outputs (evidence trail on every insight) and a **fairness guardrail** that excludes protected attributes.
-5. Offer a **natural-language + Kannada voice assistant** to query everything and export briefings to PDF.
-6. Enforce **role-based access** mirroring the police hierarchy, with full audit logging.
-7. Run **entirely on Catalyst** and be demo-ready in a 7-minute pitch.
+Hold on to that sentence. Every feature below either serves it or gets cut.
 
-**Non-goals (explicitly out of scope for the hackathon build)**
-- Real/live KSP data integration (we use a schema-faithful **synthetic** dataset; the pipeline ingests real data unchanged).
-- Facial recognition, biometric matching, phone-tap/CDR ingestion.
-- Any predictive use of caste, religion, or occupation.
-- Native mobile apps (responsive web only).
-- Full case-management / e-FIR filing workflow (we *read* FIRs; we are an intelligence layer, not the system of record).
+## 2. The problem you are solving
 
-## 4. Users & personas
-| Persona | Role in KSP | Primary need in KADI |
+Four things are broken, and you should be able to say all four from memory:
+
+- **Data silos.** FIRs are registered per station and stay there. A gang working across
+  three districts shows up as many unrelated petty crimes. Nobody can see the connection
+  because nobody holds all the registers at once.
+- **Reactive policing.** Cases drift past their detection timelines, pile up as
+  "undetected", or close as "false" — and no supervisor gets a signal until it is too late.
+- **Analytics gap.** Where analytics exist at all, they are static count dashboards.
+  Relational and behavioural patterns go undiscovered entirely.
+- **Fairness risk.** Predictive policing in India is rightly criticised for discriminating
+  against caste and religious minorities. The KSP schema *contains* those fields. A
+  credible solution must refuse to use them — and be able to prove the refusal.
+
+That last point is not a disclaimer you bolt on at the end. It is a design constraint that
+shapes the feature set, so treat it as one.
+
+## 3. Goals
+
+1. Link any FIR to related cases — same accused, co-accused, location, time window, MO,
+   act & section — **across stations and districts**.
+2. Surface repeat offenders and organised-crime clusters as an interactive network.
+3. Give supervisors an investigation-health cockpit that flags at-risk cases *with reasons*.
+4. Make every output explainable: an evidence trail on every single insight.
+5. Offer a bilingual (English / ಕನ್ನಡ) assistant, by text or voice, that cites real FIRs.
+6. Enforce role-based access mirroring the police hierarchy, with an audit trail.
+7. Run **entirely on Catalyst**.
+
+### Non-goals — say no to these
+
+Writing these down is what keeps the scope survivable. You are not building:
+
+- Real KSP data integration. You use a schema-faithful **synthetic** corpus; the pipeline
+  ingests real data unchanged. See [06](06_SYNTHETIC_DATA_SPEC.md).
+- Facial recognition, biometrics, or CDR / phone-tap ingestion.
+- **Any** predictive use of caste, religion or occupation.
+- Native mobile apps. Responsive web only.
+- Case management or e-FIR filing. You *read* FIRs. You are an intelligence layer, not the
+  system of record.
+
+## 4. Who uses it
+
+| Persona | Role in KSP | What they need from KADI |
 |---|---|---|
-| **Sub-Inspector (SI) / IO** | Investigating officer | "Is this FIR connected to anything? Who is this accused, really? What's my next lead?" |
-| **Inspector / SHO** | Station head | Station-level linkage, offender watchlist, case health of the station. |
-| **ACP / DySP** | Sub-division command | Cross-station patterns, resource/attention allocation, supervisory early warning. |
-| **SCRB Analyst** | State Crime Records Bureau | State-wide trends, network analysis, socio-demographic (vulnerability) insight, reports. |
-| **Admin** | System admin | User/role management, audit review, data ingestion. |
+| **Sub-Inspector / IO** | Investigating officer | "Is this FIR connected to anything? Who is this accused, really? What is my next lead?" |
+| **Inspector / SHO** | Station head | Station linkage, offender watchlist, case health for the unit |
+| **ACP / DySP** | Sub-division command | Cross-station patterns, where to put attention, supervisory early warning |
+| **SCRB Analyst** | State Crime Records Bureau | State-wide trends, network analysis, per-capita insight, forecasting |
+| **Administrator** | System admin | Roles, audit review, pipeline status, fairness report |
 
-### Role-based access matrix (enforced in Data Store scopes + API)
-| Capability | SI/IO | Inspector | ACP | Analyst | Admin |
+### The access matrix you implemented
+
+Scoping runs off `UnitID` (police station), `DistrictID` and role rank. It is enforced
+**server-side on every query** in `functions/api/services/rbac.js` — an out-of-scope read is
+refused, not merely hidden in the UI. Verify that claim before you present it.
+
+| Capability | SI | Inspector | ACP | Analyst | Admin |
 |---|---|---|---|---|---|
-| View own/station FIRs | ✅ own+station | ✅ station | ✅ subdivision | ✅ state (read) | ✅ |
-| Case-linkage graph | ✅ scoped | ✅ scoped | ✅ subdivision | ✅ state | ✅ |
-| Offender profiles | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Investigation Health cockpit | own cases | station | subdivision | state | ✅ |
-| Socio/vulnerability analytics | ❌ | limited | ✅ | ✅ | ✅ |
-| Export PDF briefings | ✅ | ✅ | ✅ | ✅ | ✅ |
-| User & role management | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Audit log review | ❌ | ❌ | ✅ (own subdiv) | ❌ | ✅ |
+| FIRs at own station | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Every FIR in the district | — | — | ✅ | ✅ | ✅ |
+| All 40,836 FIRs, state-wide | — | — | — | ✅ | ✅ |
+| Case-linkage graph + why-linked evidence | ✅ scoped | ✅ scoped | ✅ district | ✅ state | ✅ |
+| Arrest & chargesheet detail | — | ✅ | ✅ | ✅ | ✅ |
+| Per-capita analytics, forecasting, anomalies | — | — | — | ✅ | ✅ |
+| Audit log | — | — | ✅ | — | ✅ |
+| Fairness report & pipeline status | — | — | — | ✅ | ✅ |
 
-*Scoping uses `Unit` (police station), `District`, and role hierarchy. Analysts get state-wide **read**; they cannot alter case data.*
+## 5. Features, and what each one actually became
 
-## 5. Features & requirements
-Each feature lists user stories and **acceptance criteria (AC)**. Priority: **P0** = demo-critical (build first), **P1** = strong differentiator, **P2** = nice-to-have.
+Priority: **P0** = demo-critical, **P1** = differentiator. All of the below ship in the
+deployed build.
 
-### F1. Case-Linkage Graph — **P0 (the hero)**
-> As an IO, when I open an FIR, I want to see every related case and how they connect, so I can identify serial crimes and gangs I'd otherwise miss.
+### F1 · Case-Linkage Graph — P0, the hero
+> As an IO, when I open an FIR I want to see every related case and how they connect.
 
-- **AC1:** Selecting any FIR renders an interactive node-link graph centered on it, with connected FIRs, accused, victims, and locations as nodes.
-- **AC2:** Edges are typed and labeled: *shared accused*, *co-accused*, *same location (≤X km)*, *same time window*, *similar MO*, *same act/section*.
-- **AC3:** Every edge is **click-through** to a "Why linked" panel listing the exact matching attributes and source FIR numbers.
-- **AC4:** Offender/gang **clusters** (community detection) are visually grouped and can be expanded/collapsed.
-- **AC5:** Filters: crime head, date range, district, edge type, minimum link strength.
-- **AC6:** Links span **across stations and districts** (cross-silo) — demonstrably, using planted synthetic gangs.
-- **AC7:** Graph reads are **fast** (<1.5s) because they come from precomputed data (NoSQL/Cache), never live compute.
+- Selecting any FIR renders an interactive ego-network centred on it — connected FIRs and
+  offenders as nodes.
+- Edges are **typed and labelled**: shared offender, co-accused, similar MO, same location,
+  same time window, same act & section.
+- Every edge is click-through to a **"why linked"** panel naming the exact matching
+  attributes and the source FIR numbers. This is the feature that separates you from a
+  dashboard — make sure it is the first thing you demo.
+- Communities (Louvain) are grouped and expandable. 117 active networks, 7 of them
+  cross-district.
+- Filters: crime head, date range, district, edge type, minimum link strength.
+- Reads are fast because they come from a **precomputed read-model**, never live compute.
 
-### F2. Repeat / Habitual Offender Profiles — **P0**
-> As an Inspector, I want a single profile per offender linking all their cases and behavior, so I can prioritize watchlists.
+### F2 · Repeat / habitual offender profiles — P0
+- One profile per resolved identity, with name variants merged by entity resolution:
+  **36,289 accused records fold into 300 real people**.
+- A behaviour-based risk score (0–100) with a visible factor breakdown — prior count,
+  gravity mix, recency, network centrality. **No protected attributes.** If you cannot show
+  the breakdown, do not show the score.
+- "Also appears in" links straight back into the graph.
+- Entity-resolution confidence is displayed. Low-confidence merges are flagged, not hidden.
 
-- **AC1:** Offender page aggregates all FIRs for a resolved identity (name variants merged via entity resolution), with MO signature, jurisdictions touched, arrest/surrender & bail history, co-offenders.
-- **AC2:** A **behavior-based risk score** (0–100) with a breakdown of contributing factors (prior count, gravity mix, recency, network centrality) — **no protected attributes**.
-- **AC3:** "Also appears in" list linking to the graph.
-- **AC4:** Entity-resolution confidence is shown; low-confidence merges are flagged, not hidden.
+### F3 · Investigation health & early warning — P0
+- A worklist of flagged cases: reporting delay, investigation ageing against the peer
+  median, pendency, undetected risk, false-case pattern. **19,006 cases** carry at least one
+  flag on the current corpus.
+- Each flag states *why* and recommends a next action.
+- Sort and filter by IO, station, gravity, age.
+- Every metric here is deterministic and auditable. Operational numbers do not get a black
+  box.
 
-### F3. Investigation-Health & Early Warning — **P0 (secondary hero)**
-> As an ACP, I want to know which cases are slipping before they become failures, so I can intervene.
+### F4 · Spatiotemporal intelligence — P1
+- Satellite basemap, district choropleth, point and heat layers from real lat/long.
+- Hour × weekday layering; DBSCAN hotspot clusters per crime head.
+- Clicking a cluster reveals its FIRs and offers "open in linkage graph".
 
-- **AC1:** Cockpit lists cases with health flags: **reporting delay** (IncidentFromDate → InfoReceivedPSDate), **investigation ageing** (CrimeRegisteredDate → today vs. peer median), **pendency**, **undetected risk**, **false-case pattern**.
-- **AC2:** Each flagged case shows *why* it's flagged and a **recommended next action** (e.g., "3 linked cases share accused A2 — consolidate investigation").
-- **AC3:** Anomaly detection highlights cases deviating from norms for their crime type/area.
-- **AC4:** Sort/filter by IO, station, gravity, age; export the worklist.
-- **AC5:** Metrics are deterministic and auditable (no black box on operational numbers).
+### F5 · Socio-economic analytics — P1, fairness-forward
+- Rates **per 100,000 residents**, not raw counts. This is where the headline finding comes
+  from: Kodagu is 30th by count and 6th per capita.
+- Correlations against area-level indicators with p-values — urbanisation r=+0.878,
+  literacy r=+0.538, population density r=+0.889 across n=31 districts.
+- **Hard guardrail:** these are *area-level* indicators only. They are never joined to an
+  individual and never used as a feature in any person-level score.
+- Three-month district forecast with a 95% interval, backtested to **3.9% MAPE**.
 
-### F4. Spatiotemporal Intelligence — **P1 (supporting, not the star)**
-> As an analyst, I want to see where and when clusters form, to support linkage and deployment.
+### F6 · Explainability & audit — P0, the trust layer
+- Every edge, score and answer exposes how it was produced.
+- A visible fairness statement listing what is excluded.
+- Sensitive reads (case detail, offender detail, graph, assistant queries) are written to an
+  audit trail.
 
-- **AC1:** District-level choropleth + point/heat map from `latitude`/`longitude`.
-- **AC2:** Time-of-day × day-of-week heat layer; hotspot clusters (DBSCAN) per crime head.
-- **AC3:** Clicking a cluster reveals its FIRs and offers "open in linkage graph."
-- **AC4:** Emerging-trend flag when a crime head spikes vs. its historical baseline in an area.
+### F7 · Bilingual assistant — P1
+- Grounded Q&A over the records in English and ಕನ್ನಡ, by text or voice.
+- Every answer cites the FIR numbers it drew from.
+- Export the conversation as a print-ready briefing.
+- **Be honest about this one.** It runs a deterministic intent engine over the case
+  database, not an LLM — see [08](08_CATALYST_LIVE.md) for why QuickML is not wired. The
+  upside is real: it cannot hallucinate an FIR number.
 
-### F5. Sociological / Vulnerability Insight — **P1 (fairness-forward)**
-> As an analyst, I want to understand victim vulnerability and social context to guide prevention — never to profile suspects.
+### F8 · Auth & RBAC — P0
+- Catalyst Authentication is provisioned. The demo build presents a **role chooser** so an
+  evaluator can exercise all five scopes without five accounts.
+- The API still trusts a role header rather than a verified JWT. **Say this out loud** —
+  the login screen says it too. Binding it properly is one function; see
+  [05](05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md) §Next.
 
-- **AC1:** Analytics on **victim/complainant** attributes (age band, gender, occupation) and crime type — framed as *vulnerability & victim-support*, not suspect prediction.
-- **AC2:** Correlations with area-level socio-economic context (urbanization proxy) for prevention planning.
-- **AC3:** **Hard guardrail:** caste/religion never feed any model or offender-facing view; if shown at all, only as aggregate victim-support context with an explicit disclaimer.
+### F9 · Home dashboard — P0
+- Role-aware landing page: KPI cards, monthly trend, hour × weekday heatmap, disposal
+  funnel, and the rank-shift finding.
 
-### F6. Explainability & Audit Trail — **P0 (trust layer)**
-- **AC1:** Every edge, score, and AI answer exposes "How was this produced?" with sources.
-- **AC2:** A visible **fairness panel**: lists inputs used and explicitly states protected attributes are excluded.
-- **AC3:** All user queries and AI responses are written to an **AuditLog** (who, what, when).
+## 6. What "good" looks like
 
-### F7. Conversational + Kannada Voice Assistant — **P1 (borrowed wow)**
-> As any user, I want to ask questions in English or Kannada, by text or voice, and get grounded answers.
+You should be able to demonstrate all six of these live:
 
-- **AC1:** Text chat answers over the **structured DB** (LLM + ZCQL) — e.g., "show cyber-crime FIRs in Bengaluru this quarter."
-- **AC2:** Answers over **documents** (IPC/BNS sections, SOPs) via **RAG**.
-- **AC3:** **Voice** input/output; **Kannada** supported (via Zia STT/translation/TTS — *verify Kannada coverage with Catalyst; fallback: LLM handles Kannada text + Zia translation*).
-- **AC4:** Every answer cites source FIRs/documents; **export conversation to PDF**.
-- **AC5:** Assistant can deep-link into the graph/cockpit ("show me on the graph").
+- The graph reconstructs the planted gangs and serial chains — **100% ground-truth
+  recovery**, recomputed on every pipeline run, never hand-entered.
+- Investigation health flags the planted slipping cases with correct reasons.
+- A cross-silo link spans ≥2 districts and ≥3 stations, on stage.
+- The assistant answers an English *and* a Kannada question with citations.
+- You can answer "how do you avoid discrimination?" in one confident sentence, and then
+  show the test that enforces it.
+- Everything runs from the deployed Catalyst URL.
 
-### F8. Auth & Role-Based Access — **P0**
-- **AC1:** Catalyst Authentication login (embedded); optional social login.
-- **AC2:** Role assigned per user; data + views scoped per §4 matrix; enforced in API and Data Store scopes.
-- **AC3:** Session handling, sign-out, and unauthorized-access handling.
+## 7. Submission checklist
 
-### F9. Home Dashboard — **P0**
-- **AC1:** Role-aware landing page: KPI cards (open cases, flagged cases, active offender networks, new links today), recent alerts, quick search, jump-in to graph/cockpit.
+- [x] Live solution deployed **on Catalyst**
+- [x] Public GitHub repo with README and setup steps
+- [x] Demo video (problem → prototype → workflows)
+- [x] Prototype brief, ≤1024 characters — `deck/PROTOTYPE_BRIEF.txt`
+- [x] Official PPT template filled — `deck/`, built by `node build.js`
+- [x] All links tested and public
 
-## 6. Success metrics (what "good" looks like in the demo)
-- On planted data, the graph **correctly reconstructs ≥90%** of injected gangs/serial chains (measurable against ground truth).
-- Investigation-Health flags the **planted slipping cases** with correct reasons.
-- Cross-silo link demonstrably spans **≥2 districts and ≥3 stations** in the live demo.
-- Assistant answers an English **and** a Kannada question correctly on stage, with citations + PDF export.
-- Fairness panel is shown; team can answer "how do you avoid discrimination?" in one confident sentence.
-- Everything runs from the **deployed Catalyst URL**.
+## 8. Assumptions you are working under
 
-## 7. Hackathon compliance (must all be true at submission)
-- [ ] Live solution deployed **on Catalyst**.
-- [ ] Public **GitHub** repo + README + setup/run steps.
-- [ ] Public **demo video** (problem → prototype → workflows).
-- [ ] **Prototype brief** (problem, features, stack, impact).
-- [ ] Official **PPT template** filled, exported to PDF (≤5 MB).
-- [ ] All links tested and public.
+- Synthetic data is acceptable and expected; real FIR data is confidential.
+- Catalyst free credits cover the build.
+- Deployment is **exclusively** on Catalyst. Substituting a third-party host may invalidate
+  the submission — do not be tempted, however convenient the alternative looks.
 
-## 8. Assumptions
-- Synthetic data is acceptable and expected (real FIR data is confidential).
-- Catalyst free credits cover the build (per Zoho session, they are "more than sufficient").
-- Kannada voice is achievable via Zia; if a specific model is missing, text-Kannada + translation is the fallback.
+## 9. Risks, and what you did about each
 
-## 9. Key risks → mitigations
-- *Function 30s timeout* → all heavy compute in AppSail/Jobs; app reads precomputed results.
-- *Scope creep* → F1/F2/F3/F6/F8/F9 are P0; ship those first; F4/F5/F7 layered after.
-- *Data realism* → plant explicit ground-truth patterns; label data synthetic.
-- *Fairness backfire* → protected attributes excluded by design and shown as excluded.
-- *Presentation neglect* (~50% of score) → deck + demo video owned from day 1.
+| Risk | What you did |
+|---|---|
+| 30 s request cap on Functions **and** AppSail | All heavy compute moved to a Job (15-min budget). The web tier only reads precomputed results. This one constraint shaped the whole architecture. |
+| Scope creep | F1/F2/F3/F6/F8/F9 shipped first; F4/F5/F7 layered after. |
+| Data realism | Ground-truth patterns planted explicitly and scored every run; data labelled synthetic everywhere it appears. |
+| Fairness backfire | Protected attributes excluded by construction, and a unit test fails the build if one appears in a feature set. |
+| Presentation neglect (~half the score) | Deck and video owned from day one, not the final night. |
 
-## 10. Milestones (see `05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md` for the detailed plan)
-1. Skeleton deployed on Catalyst reading one real query (week 1).
-2. Case-Linkage Graph + offender profiles (week 2).
-3. Investigation Health + spatiotemporal + fairness/audit (week 3).
-4. Assistant + Kannada voice + PDF export (week 3–4).
-5. Harden, seed demo path, deck + video + rehearsal (final week).
+## 10. Where to go next
+
+- **How it is wired** → [02_TRD.md](02_TRD.md)
+- **The data contract** → [03_DATABASE_SCHEMA.md](03_DATABASE_SCHEMA.md)
+- **How it should look** → [04_UI_UX_GUIDELINES.md](04_UI_UX_GUIDELINES.md)
+- **The build order** → [05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md](05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md)
+- **How the corpus is generated** → [06_SYNTHETIC_DATA_SPEC.md](06_SYNTHETIC_DATA_SPEC.md)
+- **Getting it onto Catalyst** → [07_CATALYST_SETUP.md](07_CATALYST_SETUP.md)
+- **What is live right now** → [08_CATALYST_LIVE.md](08_CATALYST_LIVE.md)

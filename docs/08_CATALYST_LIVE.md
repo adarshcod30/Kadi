@@ -1,9 +1,10 @@
-# 08 — Live Catalyst Deployment State
+# 08 — What is live right now
 
-What is actually provisioned in the **KadiLabs** Catalyst project, verified by API call.
-Everything below was created programmatically through the Catalyst REST API — no console
-clicking — which supersedes the "Data Store tables can only be created from the console"
-limitation recorded in [07_CATALYST_SETUP.md](07_CATALYST_SETUP.md).
+The honest state of the **KadiLabs** Catalyst project, verified by API call rather than
+recalled from memory. Last verified **2026-07-26**.
+
+Read this before any demo or interview. Everything in the "not real yet" section is
+something a judge could discover on their own — you want to have said it first.
 
 | | |
 |---|---|
@@ -11,13 +12,32 @@ limitation recorded in [07_CATALYST_SETUP.md](07_CATALYST_SETUP.md).
 | Org | `60078029367` |
 | Environment | Development · `55468000000013065` |
 | Data centre | IN (`console.catalyst.zoho.in`) |
-| App URL | https://kadilabs-60078029367.development.catalystserverless.in |
+| App URL | https://kadilabs-60078029367.development.catalystserverless.in/app/ |
 
-> **Note on the project id.** The API returns it as the **string** `"55468000000013048"`.
-> It exceeds JS `MAX_SAFE_INTEGER`, so any JSON round-trip that treats it as a number
-> corrupts it to `...013050`. Never store it unquoted.
+> **The project id is a string.** The API returns `"55468000000013048"`. It exceeds JS
+> `MAX_SAFE_INTEGER`, so any JSON round-trip that treats it as a number silently corrupts it
+> to `...013050`. Never store it unquoted.
 
-## Data Store — 11 tables live
+Everything below was created **programmatically through the Catalyst REST API** — no console
+clicking. That supersedes the "Data Store tables can only be created from the console"
+limitation you will find in older notes and in some Zoho documentation.
+
+---
+
+## Running on Catalyst — eight services
+
+| Service | What it runs |
+|---|---|
+| **Web Client Hosting** | The React SPA at `/app` |
+| **Serverless Functions** | `api` (21 endpoints) + `refreshanalytics` (the nightly Job) |
+| **AppSail** | `kadi-appsail` — Python analytics, ~135 ms per call |
+| **Data Store** | 11 tables, 40,836 FIRs, live ZCQL |
+| **Stratus** | Bulk-import objects |
+| **Job Scheduling + Cron** | Nightly recompute, 02:00 IST, last run SUCCESS |
+| **Connections** | `kadi_quickml` OAuth, scope `deployment.READ` |
+| **Authentication** | Provisioned; role model surfaced at sign-in |
+
+## Data Store — 11 tables
 
 | Table | table_id | Purpose |
 |---|---|---|
@@ -26,85 +46,116 @@ limitation recorded in [07_CATALYST_SETUP.md](07_CATALYST_SETUP.md).
 | CrimeHead | 55468000000030001 | Crime groups |
 | CrimeSubHead | 55468000000031001 | Crime sub-heads |
 | CaseStatusMaster | 55468000000032001 | Investigation status |
-| CaseMaster | 55468000000033001 | FIRs (21 columns, full KSP schema) |
+| CaseMaster | 55468000000033001 | FIRs — 21 columns, full KSP schema |
 | Accused | 55468000000032360 | Accused persons per FIR |
 | OffenderIdentity | 55468000000034001 | Entity-resolved offenders + risk |
 | DistrictInsight | 55468000000035001 | Per-capita rates + socio-economic |
-| CrimeForecast | 55468000000026360 | 3-month district projections |
+| CrimeForecast | 55468000000026360 | Three-month district projections |
 | Hotspot | 55468000000036001 | Spatial clusters |
 
-### Data loaded
+### The ZCQL worth showing
 
-| Table | Rows |
-|---|---|
-| District | 31 |
-| DistrictInsight | 31 |
-| CrimeHead | 8 |
-| CaseStatusMaster | 4 |
-
-### Showcase ZCQL
-
-The problem statement asks for "the *why* behind the *where*". This runs live:
+The problem statement asks for "the *why* behind the *where*". This runs live against Data
+Store:
 
 ```sql
 SELECT DistrictName, TotalCases, RatePer100k, RankByCount, RankByRate, RankShift
 FROM DistrictInsight WHERE RankShift > 5 ORDER BY RankShift DESC LIMIT 5
 ```
 
-Returns the districts that raw counts hide — Kodagu is **30th by count but 6th per
-100k residents**, Dharwad 23rd → 7th. That is the argument for per-capita analysis,
-answered in the database rather than asserted in a slide.
-
-## Other services
-
-| Service | State |
-|---|---|
-| **API Gateway** | ENABLED (`catalyst apig:enable`) |
-| **Cache** | segment `kadi-kpi` · `55468000000036360` |
-| **Stratus** | ⚠️ blocked — see below |
-
-## ⚠️ Still needs Adarsh
-
-1. **Stratus** returns `OPERATION_NOT_ALLOWED: User needs to be in session when accessing
-   Stratus for the first time`. Open Cloud Scale → Stratus in the console **once**; the API
-   works afterwards. This blocks the bulk CSV load path for CaseMaster.
-2. **CaseMaster bulk load (40,836 rows).** Row-by-row inserts are impractical at this
-   volume; the supported path is Stratus upload + `Create_Bulk_Write_Job`, which is gated
-   on (1).
-3. **QuickML** — GLM-4.7 deployment id + endpoint, Connection with scope
-   `quickml.deployment.read`, RAG document ids.
-4. **Zia** — enable, confirm Kannada STT/TTS.
-5. **CORS** — whitelist the client domain after the first deploy.
-6. **Deploy** — `catalyst deploy` publishes to your account; needs your explicit go-ahead.
-
-## Column-creation gotcha
-
-`Create_Column` rejects non-ASCII punctuation in `description` with
-`PATTERN_NOT_MATCHED` — an em-dash is enough to fail the whole batch. Keep descriptions
-plain ASCII. Also note `decimal_digits` is capped: requesting 6 on a double silently
-yields 4 (~11 m of positional precision, which is fine for incident mapping).
-
+It returns the districts raw counts hide — Kodagu **30th by count, 6th per 100,000
+residents**; Dharwad 23rd → 7th. That is the argument for per-capita analysis answered *in
+the database*, not asserted on a slide. If you only get to run one query in front of a judge,
+run this one.
 
 ---
 
-## What is real vs mocked (2026-07-25, all verified live)
+## Not real yet — do not claim these
 
-**Running on Catalyst:** Web Client Hosting · Serverless Functions (`api` + `refreshanalytics`
-job) · AppSail (`kadi-appsail`) · Data Store (40,836 FIRs, ZCQL) · Stratus · Job Scheduling +
-Cron (nightly 02:00 IST) · Connections (`kadi_quickml`).
+Eight things. Each has a diagnosis, because "it does not work" is not an engineering answer.
 
-**Not real yet — do not claim these:**
+**1 · Authentication is provisioned, but identity is not bound.**
+The app presents a **role chooser**, not a password gate, and the login page says so in plain
+language. `rbac.js` trusts an `x-kadi-role` header instead of a verified JWT.
 
-1. **Authentication** is enabled as a service but the app has **no login** and the API is
-   **open**. `rbac.js` trusts an `x-kadi-role` header. The RBAC scoping logic is genuinely
-   enforced server-side; only the identity binding is mocked.
-2. **The deployed API reads bundled files, not Data Store.** The 40,836 rows are really in
-   Data Store and really queryable via ZCQL, but the UI does not read from them.
-3. **Audit log** is an in-memory ring buffer, lost on cold start.
-4. **PDF export** returns HTML; SmartBrowz is not wired.
-5. **Cache** writes fail 401 from inside a function.
-6. **QuickML** rejects our request body (400 PATTERN_NOT_MATCHED); gated off.
-7. **Zia** is not enabled; voice is the browser Web Speech API.
-8. **API Gateway** is off by design - enabling it without routes took the site down.
+The scoping itself is genuinely real and enforced server-side — an out-of-scope read is
+refused, not hidden. Only the identity check is outstanding. Fix: read the Catalyst token in
+`userFromRequest` and map it to the officer's rank. One function.
 
-See PROGRESS.md for the full table and the correlation caveat.
+**2 · The deployed API reads bundled files, not Data Store.**
+The 40,836 rows really are in Data Store and really are queryable by ZCQL — you can
+demonstrate that. But the UI reads a precomputed read-model shipped inside the function
+bundle. The seam to implement against is `functions/api/services/store.mock.js`.
+
+**3 · The audit trail is in-memory.**
+A ring buffer in `services/audit.js`. It is lost on cold start. Moving it to a Data Store
+table is small and worth doing before anyone relies on it for accountability.
+
+**4 · Export returns HTML, not PDF.**
+Call it a **print-ready briefing**. SmartBrowz is not wired. Do not describe it as a PDF
+pipeline.
+
+**5 · Cache writes return 401.**
+`PERMISSION_NEEDED` from inside a deployed function. Ruled out: segment id, SDK version, the
+scope API, and table permissions (App User write was granted, tested via `CREATEDTIME`, then
+reverted). It looks platform-level and is unresolved.
+
+Zero user impact — the KPI query recomputes in about a millisecond, so every call is simply a
+miss that falls through to compute. The adapter is a no-op until the permission is sorted.
+
+**6 · QuickML rejects the request body.**
+`400 PATTERN_NOT_MATCHED` mentioning `zoho-inputstream`. The endpoint, model id
+(`crm-di-glm47b-30b-it`), org header and a valid OAuth token are all in place. Ruled out:
+non-ASCII content, `Content-Length`, missing token, auth prefix. Gated off behind
+`QUICKML_ENABLED`.
+
+The assistant runs a deterministic intent engine instead — which has a real upside worth
+stating: **it cannot hallucinate an FIR number.**
+
+**7 · Zia is not enabled on the project.**
+Voice runs on the browser Web Speech API, client-side. The adapter includes the recommended
+degradation path (translate → English → speak) for when Zia is switched on.
+
+**8 · API Gateway is off, deliberately.**
+It was enabled once. With no routes configured it intercepted all traffic and the entire site
+returned `INVALID_URL`. It needs route configuration before it is safe to turn on again.
+Leave it off until then.
+
+---
+
+## Verified numbers
+
+Everything quoted in the deck and README comes from here, captured live from the deployed
+API into `deck/data/*.json`.
+
+| Metric | Value |
+|---|---|
+| FIRs analysed | 40,836 |
+| Accused records → resolved identities | 36,289 → 300 |
+| Active networks / cross-district | 117 / 7 |
+| Cases flagged by investigation health | 19,006 |
+| Ground-truth recovery | 100% (gang, chain, cyber ring, identity ER) |
+| Forecast MAPE | 3.9% — 3-month hold-out backtest |
+| Correlations (n=31) | urbanisation +0.878 · literacy +0.538 · density +0.889 |
+| Pipeline runtime / peak memory | 24.6 s / 738 MB (was 1,770 MB) |
+| AppSail analytics latency | ~135 ms |
+| Graph payload | 54.9 MB → 12.1 MB interned |
+| Tests | 19 / 19 — 8 Node, 11 Python |
+
+## Column-creation gotchas
+
+`Create_Column` rejects non-ASCII punctuation in `description` with `PATTERN_NOT_MATCHED` —
+one em-dash fails the whole batch, and the error names neither the character nor the field.
+
+`decimal_digits` is capped: requesting 6 on a double silently yields 4. That is roughly 11 m
+of positional precision, which is fine for incident mapping — but know that it happened
+rather than wondering later why coordinates look rounded.
+
+## Checking any of this yourself
+
+```bash
+curl -s https://kadilabs-60078029367.development.catalystserverless.in/server/api/health
+curl -s https://kadilabs-60078029367.development.catalystserverless.in/server/api/ai/status
+```
+
+`/ai/status` exists precisely so you never have to claim an AI service is wired. Point at it.

@@ -1,143 +1,200 @@
-# 04 — UI / UX Guidelines
-### KADI — Light, government-grade, trustworthy, effortless
+# 04 — How it should look and feel
 
-**Design north star:** it should feel like an official KSP / Government-of-Karnataka digital service — calm, light, authoritative, and *obvious to use for a non-technical officer* — but with modern, data-dense polish. Think "gov.in portal meets a clean analytics product."
+### Light, government-grade, trustworthy, effortless
+
+**The north star:** it should feel like an official Government-of-Karnataka digital service —
+calm, light, authoritative, and obvious to a non-technical officer — but with modern,
+data-dense polish. "gov.in portal meets a clean analytics product."
+
+If a screen ever makes you feel clever, you have probably made it worse. Optimise for an SI
+understanding it in five seconds.
 
 ---
 
-## 1. Design principles
-1. **Clarity over cleverness.** An SI with no training should understand any screen in 5 seconds.
-2. **Evidence on demand.** Every insight has a visible "Why?" affordance. Nothing is a black box.
-3. **Light & legible.** White/near-white surfaces, strong contrast, generous spacing. No dark theme.
-4. **Trust cues.** KSP-style header, role badge, audit visibility, the fairness banner.
+## 1. Principles
+
+1. **Clarity over cleverness.** No training required to read any screen.
+2. **Evidence on demand.** Every insight has a visible "Why?" affordance. Nothing is a black
+   box. This is the single most important principle in the product.
+3. **Light and legible.** White surfaces, strong contrast, generous spacing. **No dark
+   theme** — it reads as a consumer app, not a government service.
+4. **Trust cues.** KSP header, role badge, audit visibility, the fairness banner.
 5. **Progressive disclosure.** Lead with the answer; details expand on click.
-6. **Accessible (WCAG 2.1 AA).** Contrast ≥4.5:1, keyboard-navigable, focus states, screen-reader labels, English + Kannada.
+6. **Accessible (WCAG 2.1 AA).** Contrast ≥ 4.5:1, keyboard navigation, focus states, screen
+   reader labels, English **and** Kannada.
 
-## 2. Visual language (design tokens)
+## 2. Design tokens
 
-**Color — light government palette**
+**Colour — light government palette**
+
 ```
 --kadi-navy:        #0B3D75   /* primary — headers, primary buttons, brand */
 --kadi-navy-700:    #12305C
---kadi-blue:        #1A6FC4   /* interactive/links, active nav */
---kadi-blue-50:     #EAF3FB   /* selected/hover surfaces */
---kadi-saffron:     #E8871E   /* accent, "flagged"/alert highlight (use sparingly) */
+--kadi-blue:        #1A6FC4   /* interactive, links, active nav */
+--kadi-blue-50:     #EAF3FB   /* selected / hover surfaces */
+--kadi-saffron:     #E8871E   /* accent, flagged / alert highlight — sparingly */
 --kadi-teal:        #2FA8A0   /* graph edges, secondary data */
 --surface:          #FFFFFF
 --surface-2:        #F5F7FA   /* app background */
---surface-3:        #EDF1F6   /* cards/wells */
+--surface-3:        #EDF1F6   /* cards and wells */
 --border:           #D9E1EC
 --text:             #1C2A3A
 --text-muted:       #5B6B7E
-/* semantic */
+
 --success:#1E874B  --warning:#C9820A  --danger:#C0392B  --info:#1A6FC4
-/* gravity/status chips */
 --heinous:#C0392B  --nonheinous:#5B6B7E
---status-open:#1A6FC4 --status-chargesheeted:#1E874B --status-undetected:#C9820A --status-false:#8A94A3
+--status-open:#1A6FC4  --status-chargesheeted:#1E874B
+--status-undetected:#C9820A  --status-false:#8A94A3
 ```
-Use saffron/red **only** for genuine alerts/flags so they carry weight. Base UI is navy + blue on white.
+
+Saffron and red are **only** for genuine alerts and flags. The moment you use red for
+decoration, it stops meaning anything. Base UI is navy and blue on white.
 
 **Typography**
-- Font: **Inter** (UI) with **Noto Sans Kannada** for Kannada. System-font fallback.
-- Scale: Display 28/600, H1 22/600, H2 18/600, Body 14/400, Small 12.5/400, Mono for IDs/CrimeNo.
-- Line-height 1.5 body; tabular-nums for metrics.
 
-**Spacing & shape**
-- 8px spacing grid (4/8/12/16/24/32).
-- Radius: 8px cards, 6px inputs/buttons, 999px chips.
-- Elevation: subtle only — `0 1px 2px rgba(16,40,70,.06)`, hover `0 4px 12px rgba(16,40,70,.10)`.
+- **Inter** for UI, **Noto Sans Kannada** for Kannada, system-font fallback.
+- Display 28/600 · H1 22/600 · H2 18/600 · Body 14/400 · Small 12.5/400 · mono for IDs and
+  CrimeNo.
+- Line-height 1.5 on body. `tabular-nums` on every metric, or your KPI cards will jitter as
+  numbers change.
 
-**Iconography:** Lucide (line icons), 1.75px stroke. Consistent 20px in nav, 16px inline.
+**Spacing and shape**
 
-## 3. Layout shell
+- 8px grid (4 / 8 / 12 / 16 / 24 / 32).
+- Radius: 8px cards, 6px inputs and buttons, 999px chips.
+- Elevation stays subtle: `0 1px 2px rgba(16,40,70,.06)`, hover `0 4px 12px rgba(16,40,70,.10)`.
+
+**Icons:** Lucide line icons, 1.75px stroke. 20px in nav, 16px inline.
+
+## 3. The shell
+
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ TOPBAR: [KADI logo] Karnataka State Police — Crime Intelligence      │
-│         [ Global search ⌘K ]           [Kn/En] [🔔 alerts] [Role ▾]  │
+│ TOPBAR  [KADI]  Karnataka State Police — Crime Intelligence         │
+│         [ Search cases, offenders… ]    [ಕನ್ನಡ] [🔔] [Role ▾]        │
 ├──────────┬─────────────────────────────────────────────────────────┤
-│ SIDEBAR  │  FAIRNESS BANNER (thin, dismissible per session):         │
-│ ▸ Home   │  "Insights use evidence & behavior only — never caste,   │
-│ ▸ Graph  │   religion, or occupation."                    [Learn ▸]  │
-│ ▸ Cases  │ ┌─────────────────────────────────────────────────────┐  │
-│ ▸ Offend.│ │                                                     │  │
-│ ▸ Health │ │   PAGE CONTENT                                       │  │
-│ ▸ Map    │ │                                                     │  │
-│ ▸ Assist │ │                                                     │  │
-│ ▸ Audit* │ └─────────────────────────────────────────────────────┘  │
-│ ▸ Admin* │  * = role-gated                                           │
+│ SIDEBAR  │  FAIRNESS BANNER (thin, dismissible per session)         │
+│ ▸ About  │  "Insights use evidence & behaviour only — never caste,  │
+│ ▸ Home   │   religion, or occupation."                              │
+│ ▸ Graph  │ ┌─────────────────────────────────────────────────────┐ │
+│ ▸ Cases  │ │                                                     │ │
+│ ▸ Offend.│ │   PAGE CONTENT                                      │ │
+│ ▸ Health │ │                                                     │ │
+│ ▸ Map    │ │                                                     │ │
+│ ▸ Intel. │ │                                                     │ │
+│ ▸ Assist │ └─────────────────────────────────────────────────────┘ │
 └──────────┴─────────────────────────────────────────────────────────┘
 ```
-- Left sidebar (collapsible, icon+label), top bar with global search (⌘K), language toggle (En/ಕನ್ನಡ), alerts bell, role/profile menu.
-- Persistent **fairness banner** (thin) on analytics pages — a trust cue judges will notice.
-- Breadcrumbs under top bar on detail pages.
 
-## 4. Core components
-- **KPI card:** big tabular number, label, delta vs baseline (arrow + %), sparkline optional.
-- **Data table:** sticky header, sortable, filter chips row, row-click → detail, density toggle; status/gravity **chips** color-coded.
-- **Chips/badges:** CaseCategory, Gravity (Heinous red), CaseStatus, edge-type.
-- **Graph canvas (hero):** Cytoscape; node shapes by type (Case=rounded square, Offender=circle, Victim=diamond, Location=pin), size by importance, color by cluster; edge thickness = strength, color = type; hover tooltip; click → side "Why linked" panel; legend; controls (zoom, fit, expand cluster, filter, timeline scrubber). Smooth animated layout on load (the demo "snap-together" moment).
-- **"Why?" side panel:** lists matched attributes + source FIR numbers (clickable), model factors for scores.
-- **Map:** MapLibre, light basemap; district choropleth + points/heat; cluster popovers; layer switch (crime head, time).
-- **Assistant panel:** chat bubbles with citation chips; mic button (push-to-talk), language toggle, "Export PDF" button; suggested prompts.
-- **Alert item:** severity dot, title, reason, time, "view" action.
-- **Empty/loading/error states:** skeletons for tables/graph; friendly empty copy ("No linked cases found for this FIR"); retry on error.
+Collapsible left sidebar, top bar with global search, language toggle, alerts bell and role
+menu. The fairness banner is a trust cue a judge will notice within about four seconds — do
+not bury it.
 
-## 5. Screens (page-by-page)
+## 4. Components
 
-### S1. Login
-- KSP-style split: left = KADI brand + tagline "Connecting the links" + Karnataka emblem strip; right = Catalyst embedded auth (email + optional social). Government footer.
-- After login → role-aware Home.
+- **KPI card** — big tabular number, label, delta vs baseline, optional sparkline.
+- **Data table** — sticky header, sortable, filter chips, row-click to detail, density
+  toggle. Status and gravity as colour-coded chips.
+- **Graph canvas (the hero)** — Cytoscape. Node shape by type (case = rounded square,
+  offender = circle), size by importance, colour by cluster. Edge thickness = strength,
+  colour = type. Hover tooltip, click → "why linked" side panel, legend, zoom/fit controls,
+  layout switcher (force / radial / tree / circle / grid).
+- **"Why linked" panel** — the matched attributes and the source FIR numbers, clickable. For
+  scores, the factor breakdown. **This panel is the product.** If it is empty or vague, the
+  whole "evidence not hunches" claim collapses.
+- **Map** — MapLibre, satellite basemap, district choropleth, points and heat, cluster
+  popovers, layer switch by crime head and time.
+- **Assistant panel** — chat bubbles with citation chips, push-to-talk mic, language toggle,
+  export button, suggested prompts.
+- **Empty / loading / error states** — skeletons, never bare spinners. Friendly empty copy
+  ("No linked cases found for this FIR"). Retry on error.
 
-### S2. Home / Dashboard (role-aware)
-- Row of KPI cards: Open cases (scope), Cases flagged (health), Active offender networks, New links (24h).
-- **Alerts feed** (right rail): new cross-silo links, health flags, hotspots.
-- **Quick actions:** "Open a case", "Explore the graph", search box.
-- Small trend chart (cases by week) + top crime heads. Scope label shows the user's jurisdiction.
+## 5. The screens
 
-### S3. Case-Linkage Graph explorer (**hero screen**)
-- Left: filters (crime head, date, district, edge types, min strength). Center: graph canvas. Right: contextual "Why linked" / selected-node detail.
-- Entry: from a case, an offender, a cluster, or a search. On load, animate the ego-network assembling.
-- Toggle: ego view ↔ full cluster; timeline scrubber to watch a chain form over time.
-- Top actions: "Open in map", "Create alert/watch", "Export PDF briefing".
+### Login
+A **role chooser**, not a password gate — and it says so, in plain language, on the page.
+Each of the five ranks gets a card describing exactly what that rank can see. The honest
+note about Authentication being provisioned but not yet bound belongs here and nowhere else.
 
-### S4. Cases (list) + Case detail
-- List: searchable/filterable table (CrimeNo, crime head, station, date, status, gravity, flags).
-- Detail: header (CrimeNo, status, gravity chips), timeline (incident → info received → registered → chargesheet), parties (accused/victims/complainant), acts/sections, location mini-map, **"Linked cases (N)"** → graph, health panel, "Ask assistant about this case".
+### About
+Platform, dataset and fairness documentation. What every Catalyst service is used for and
+why, plus what could not be wired and the diagnosis. Put this first in the nav: it answers
+the judge's questions before they are asked.
 
-### S5. Offender profile
-- Header: canonical name, risk score gauge (with "Why this score?" factor breakdown — **no protected attributes**), districts touched, first/last seen.
-- Tabs: Cases (all linked FIRs), Network (mini-graph), Arrests/Bail history, Co-offenders. Entity-resolution confidence shown.
+### Home / dashboard
+Role-aware. KPI cards, monthly trend, hour × weekday heatmap, disposal funnel, and the
+rank-shift finding. Alerts feed on the right rail.
 
-### S6. Investigation-Health cockpit (**secondary hero**)
-- Summary KPIs (avg investigation age, pendency %, undetected %, false-case %).
-- Worklist table of flagged cases: flag chips + reason + **recommended action** + IO + age; sort/filter; bulk "acknowledge"/"export".
-- Anomaly section: cases deviating from peers, with explanation.
+> The disposal funnel must sum to 100%. It once showed 86% because "Closed" was omitted —
+> check the arithmetic against `statusBreakdown`, not against what looks right.
 
-### S7. Map / Hotspots
-- District choropleth + points/heat; layer + time controls; cluster click → FIR list → "open in graph". Emerging-trend badges on spiking areas.
+### Case-Linkage Graph — hero screen
+Filters left, canvas centre, "why linked" panel right. Entry from a case, an offender, a
+cluster or search. A case switcher lets you move between cases without going back.
 
-### S8. Assistant (full page + dockable panel)
-- Chat with citations; mic (En/Kn); suggested prompts ("Show this accused's past cases", "Cyber-crime FIRs in Bengaluru this quarter"); export conversation to PDF; deep-links into graph/cockpit.
+Open on a case whose network is genuinely populated. An empty hero screen is worse than no
+hero screen.
 
-### S9. Audit (ACP/Admin) & Admin (Admin)
-- Audit: searchable log (user, action, target, time).
-- Admin: user list, assign roles + jurisdiction, data ingestion status, model recompute status/trigger.
+### Cases (list + detail)
+List: searchable, filterable table. Detail: header chips, timeline (incident → info received
+→ registered → chargesheet), parties, acts and sections, location mini-map, **"Linked cases
+(N)"** into the graph, health panel.
 
-## 6. Interaction & motion
-- Motion is functional and quick (150–250ms). The one "delight" moment: the graph assembling on case open. Respect `prefers-reduced-motion`.
-- Optimistic, cached reads (TanStack Query); skeletons never spinners-only.
+### Offender profile
+Canonical name, risk gauge with a **"why this score?"** factor breakdown, districts touched,
+first and last seen. Tabs for cases, network, arrest and bail history, co-offenders. Entity
+resolution confidence is shown, and low-confidence merges are flagged rather than hidden.
 
-## 7. Internationalization
-- All strings in an i18n dictionary (en, kn). Kannada uses Noto Sans Kannada. Numbers/dates localized (DD-MM-YYYY, IST). Assistant answers in the asked language.
+### Investigation health
+Summary KPIs, then a worklist of flagged cases: flag chips, reason, recommended action, IO,
+age. Sort, filter, export.
 
-## 8. Accessibility checklist
-- Contrast AA; visible focus rings; full keyboard nav (incl. graph: list-view fallback of linked cases for screen readers); ARIA labels on icons/graph nodes; forms labelled; error text not color-only; hit targets ≥40px.
+### Map / hotspots
+Satellite basemap, district choropleth, points and heat, DBSCAN hotspots, time-of-day
+filter. Cluster click → FIR list → open in graph.
+
+### Intelligence
+Per-capita ranking, correlation scatter with p-values, crime mix by urbanisation band, and
+the three-month forecast with its interval. This is where the Kodagu finding lives.
+
+### Assistant
+Chat with citations, mic for English and Kannada, suggested prompts, export to a print-ready
+briefing.
+
+> **Two bugs worth remembering here.** Voice used to fire one response per interim
+> transcript result — fix is to gate on `isFinal` plus a submitted flag, an in-flight ref and
+> a short duplicate guard. And "why are there so many cases?" returned a count until intent
+> routing learned to detect "why" and answer from the socio explanation instead.
+
+## 6. Motion
+
+Functional and quick, 150–250ms. One delight moment: the graph assembling when a case opens.
+Respect `prefers-reduced-motion`. Skeletons over spinners.
+
+## 7. Internationalisation
+
+Every string lives in an i18n dictionary (en, kn). **Every** string — the failure mode you
+already hit was a half-translated page where headings were Kannada and body text was
+English, which looks worse than no translation at all. Numbers and dates localised
+(DD-MM-YYYY, IST). The assistant answers in the language it was asked in.
+
+## 8. Accessibility
+
+AA contrast, visible focus rings, full keyboard navigation (including a list-view fallback of
+linked cases for screen readers on the graph), ARIA labels on icons and nodes, labelled
+forms, error text never colour-only, hit targets ≥ 40px.
 
 ## 9. Branding
-- Use `KADI_logo.png` (icon) in top-bar; `KADI_logo_wordmark.png` on login/exports.
-- Co-brand respectfully with "Karnataka State Police" wordmark; keep KADI secondary to the KSP identity in headers (this is *their* tool).
 
-## 10. Demo-readiness UI notes
-- Seed a **flawless demo case** whose graph, health flags, and offender profile are guaranteed populated.
-- Add a subtle "Demo dataset (synthetic)" tag in the footer so judges know the data is synthetic by design.
-- Ensure the graph "snap-together" and the Kannada voice answer both look great on a projector (large fonts, high contrast).
+Wordmark is set in type — there is no logo image file in the repo, and there should not be
+one. Co-brand respectfully: "Karnataka State Police" leads, KADI is secondary. This is
+*their* tool.
+
+## 10. Demo readiness
+
+- Land on a case whose graph, health flags and offender profile are guaranteed populated.
+- Keep the "synthetic dataset" tag visible in the footer. Judges respect the disclosure and
+  will ask if it is missing.
+- Check the graph and the Kannada answer on a projector: large type, high contrast.
+- **Show what you built, do not just mention it.** If a feature exists, it should be
+  reachable in one click from the screen you are on.

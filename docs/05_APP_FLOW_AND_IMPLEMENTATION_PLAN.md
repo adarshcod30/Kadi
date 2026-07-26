@@ -1,143 +1,214 @@
-# 05 — App Flow & Full Implementation Plan
+# 05 — App flow, and the order you built it in
 
-Part A: how the app is wired (sitemap, navigation, user journeys, key sequences).
-Part B: the phased build order Claude Code follows, with per-phase tasks, files, and a "definition of done."
+**Part A** — how the app is wired: sitemap, navigation, journeys, sequences.
+**Part B** — the build order, with a definition of done for each phase. If you are rebuilding
+from scratch, follow Part B top to bottom.
 
 ---
 
 ## PART A — App flow
 
 ### A1. Sitemap
+
 ```
-/login
-/                         Home (role-aware dashboard)
+/login                    Role chooser (see the honesty note below)
+/                         Home — role-aware dashboard
+/about                    Platform, dataset and fairness documentation
 /graph                    Case-Linkage Graph explorer
-  /graph?case=:id | ?offender=:id | ?cluster=:id
+  /graph?case=:id
 /cases                    Case list
   /cases/:id              Case detail
 /offenders                Offender watchlist
   /offenders/:id          Offender profile
-/health                   Investigation-Health cockpit
+/health                   Investigation-health worklist
 /map                      Map / hotspots
-/assistant                Assistant (also dockable everywhere)
-/audit                    Audit log            [ACP/Admin]
-/admin                    Users/roles/ingestion [Admin]
+/intelligence             Per-capita analytics, correlations, forecast
+/assistant                Bilingual assistant
 ```
 
-### A2. Global navigation
-Sidebar (Home, Graph, Cases, Offenders, Health, Map, Assistant, Audit*, Admin*) + top-bar global search (⌘K jumps to case/offender/graph), language toggle, alerts, profile/role. Assistant is dockable from any page.
+`?as=<SI|Inspector|ACP|Analyst|Admin>` on any route opens the app directly in that rank.
+Handy for sharing a view and for headless capture — but remember it bypasses the chooser, so
+treat the URL as semi-public.
 
-### A3. Primary user journeys
+### A2. Navigation
 
-**J1 — "Is this FIR connected?" (IO, the demo spine)**
-`Home → search/open Case → Case detail shows "Linked cases (N)" → click → Graph assembles ego-network → click a red offender node → "Why linked" panel (shared accused across 3 stations) → open Offender profile → risk factors → "Export PDF briefing".`
+Sidebar: About, Home, Graph, Cases, Offenders, Health, Map, Intelligence, Assistant. Top bar
+carries global search, the En/ಕನ್ನಡ toggle, alerts and the role menu.
 
-**J2 — "What's slipping?" (ACP)**
-`Home KPIs → Health cockpit → worklist sorted by age → flagged case shows reason + recommended action ("consolidate 3 linked cases sharing accused A2") → open in Graph → acknowledge/assign.`
+### A3. The journeys that matter
 
-**J3 — "Ask it" (any role, incl. Kannada voice)**
-`Assistant → type/speak "ಈ ಆರೋಪಿಯ ಹಿಂದಿನ ಪ್ರಕರಣಗಳು?" → grounded answer + FIR citations → "show on graph" deep-link → export PDF.`
+**J1 — "Is this FIR connected?"** (the demo spine)
+`Home → open a case → "Linked cases (N)" → Graph assembles the ego-network → click an edge →
+"why linked" names the shared offender across three stations → open the offender profile →
+read the risk factors → export the briefing.`
 
-**J4 — analyst state view**
-`Map hotspots → emerging-trend badge → cluster → FIRs → Graph → vulnerability analytics (victim-support framing).`
+Rehearse this one until it is muscle memory. It is the whole pitch in five clicks.
 
-### A4. Key sequence diagrams
+**J2 — "What is slipping?"**
+`Home KPIs → Health → worklist sorted by age → a flagged case shows its reason and a
+recommended action → open it in the graph.`
 
-**Open case → graph (read path, fast):**
+**J3 — "Just ask it"**
+`Assistant → type or speak "ಈ ಆರೋಪಿಯ ಹಿಂದಿನ ಪ್ರಕರಣಗಳು?" → grounded answer with FIR citations
+→ export.`
+
+**J4 — the analyst view**
+`Intelligence → Kodagu ranks 30th by count and 6th per capita → Map → hotspots → cluster →
+FIRs → Graph.`
+
+### A4. Sequences
+
+**Open case → graph (read path — fast because nothing is computed here):**
 ```
-Client → GET /graph/case/:id → Function → NoSQL(ego nodes/edges)+Cache → return {nodes,edges,explanation} → Cytoscape animate
-```
-
-**Assistant NL query (structured):**
-```
-Client → POST /assistant/query {text, lang}
-Function → RBAC scope → pick safe parametrized ZCQL (or constrained gen) → Data Store rows
-        → QuickML GLM-4.7 (summarize + cite) → AuditLog write → return {answer, citations[]}
-```
-
-**Voice (Kannada):**
-```
-Client mic → POST /assistant/voice(audio) → Zia STT → (Kn→En translate) → same as NL query
-        → answer → (En→Kn translate) → Zia TTS → return {text, audioUrl, citations}
-```
-
-**Nightly recompute (write path, async):**
-```
-Cron → Job(recompute_graph) [AppSail] → ER → graph build → community → MO sim → risk → anomaly → health
-     → write Data Store derived tables + mirror NoSQL + refresh Cache → emit Alerts for new links/flags
+Client → GET /graph/case/:id → Function → interned read-model (lazy Proxy rehydrate)
+       → { nodes, edges, explanation } → Cytoscape animates
 ```
 
-**New FIR (incremental):**
+**Assistant query:**
 ```
-Data Store insert → Signal → Event Function → enqueue incremental Job → update affected ego-graph + metrics + alerts
+Client → POST /assistant/query { text, lang }
+Function → RBAC scope → intent routing → parametrized read over the case data
+         → grounded answer + FIR citations → audit write → response
 ```
+
+QuickML sits behind `QUICKML_ENABLED` and is off. The deterministic engine is the live path —
+and it cannot invent an FIR number, which is worth more here than fluency.
+
+**Nightly recompute (write path — where all the work happens):**
+```
+Cron 02:00 IST → Job → entity resolution → graph build → communities → MO similarity
+               → risk → anomaly → health → spatial → socio → forecast → evaluate
+               → build_bundle (intern) → derived JSON the API reads
+```
+
+### A5. Say this out loud about login
+
+The sign-in screen is a **role chooser, not a password gate**. Catalyst Authentication is
+provisioned, but the API still trusts a role header rather than a verified JWT. The login
+page states this in plain language and so should you.
+
+The role *scoping* is completely real: the API filters every query by the caller's unit,
+district or state and refuses out-of-scope reads. Only the identity check is outstanding.
+Binding it means changing `userFromRequest` in `rbac.js` to read the Catalyst token; nothing
+else moves.
 
 ---
 
-## PART B — Implementation plan (all-in, several weeks)
+## PART B — The build order
 
-**Method:** ship a thin end-to-end slice on Catalyst in week 1, then deepen the hero. Keep `PROGRESS.md` updated. Commit after each working unit (no AI attribution — see CLAUDE.md). Where a Catalyst console action/credential is needed, mock behind an interface, note it in `PROGRESS.md → Needs Adarsh`, and continue.
+**Method:** ship a thin end-to-end slice on Catalyst first, then deepen the hero. Commit
+after each working unit, Conventional Commits, no AI attribution anywhere — not in commit
+messages, not in file headers. Where a console action or credential is needed, mock behind an
+interface and keep moving rather than blocking.
 
-### Phase 0 — Foundations (days 1–3)
-**Tasks**
-- Init repo, `.gitignore`, `PROGRESS.md`, folder layout (per CLAUDE.md).
-- `catalyst init` (Functions + Slate; add AppSail). ⚠️ *Needs Adarsh:* create Catalyst project → project ID / org ID / env.
-- Scaffold `client` (Vite+TS+Tailwind), `functions/api` (router + error envelope + SDK init), `appsail` (Flask/FastAPI hello).
-- Design tokens + layout shell (topbar/sidebar/fairness banner) from UI doc.
-- CI: wire **Pipelines** to GitHub (optional now).
-**Done when:** `catalyst serve` + `vite` run locally; empty app shell renders; one `/health` function returns ok; first commit(s) made.
+### Phase 0 — Foundations
 
-### Phase 1 — Data + vertical slice (week 1)
-**Tasks**
-- Build the **synthetic data generator** (`data/generator`) per `06_SYNTHETIC_DATA_SPEC.md`; produce CSVs.
-- Create Data Store tables (Part A + B schema). ⚠️ *Needs Adarsh:* enable Data Store; confirm import via Stratus bucket.
-- Import lookups → CaseMaster → children (FK order).
-- Implement `GET /cases`, `GET /cases/:id` (RBAC-scoped ZCQL).
-- Client: Case list + Case detail reading real data through the deployed function.
-- Deploy to Catalyst (`catalyst deploy`); whitelist front-end domain + CORS.
-**Done when:** a deployed Catalyst URL lists and opens real (synthetic) FIRs. **This is the "skeleton live" milestone.**
+- Init the repo, `.gitignore`, folder layout.
+- `catalyst init` — Functions + Web Client Hosting; add AppSail.
+- Scaffold `client` (Vite + TS + Tailwind), `functions/api` (router, error envelope, SDK
+  init), `appsail`.
+- Design tokens and the layout shell from [04](04_UI_UX_GUIDELINES.md).
 
-### Phase 2 — The hero: linkage graph + offenders (week 2)
-**Tasks (AppSail/Jobs)**
-- `entity_resolution.py` → `OffenderIdentity`/`Map` (fairness test: no protected cols).
-- `graph_build.py` → `LinkEdge` (+ evidence) ; `community.py` clusters ; `mo_similarity.py`.
-- Job `recompute_graph`; mirror nodes/edges to NoSQL; **Cron** nightly. ⚠️ *Needs Adarsh:* enable NoSQL/Cron, run first job.
-- Ground-truth eval test (recovers ≥90% planted gangs).
-**Tasks (API + client)**
-- `GET /graph/case/:id`, `/graph/cluster/:id`, `/graph/search`, `GET /offenders/:id`, `/offenders`.
-- Graph explorer screen (Cytoscape) with "Why linked" panel + filters + cluster expand + animation.
-- Offender profile screen (risk gauge + factor breakdown).
-**Done when:** opening a case assembles a cross-silo network; offender profiles resolve name variants; "Why" shows evidence. **Hero demo works.**
+**Done when:** the app shell renders locally and `/health` returns ok.
 
-### Phase 3 — Intelligence + trust (week 3)
-**Tasks**
-- `health_metrics.py`, `anomaly.py`, `spatial.py`; `risk_score.py` via Zia AutoML/QuickML. ⚠️ *Needs Adarsh:* QuickML/AutoML setup + deployment IDs.
-- `GET /health/cases`,`/health/summary`,`/geo/points`,`/geo/hotspots`,`/analytics/vulnerability`,`/audit`.
-- Screens: Health cockpit, Map/hotspots, Audit; fairness panel + factor explanations everywhere.
-- RBAC hardening + Data Store permission scopes per role; AuditLog on sensitive reads.
-**Done when:** cockpit flags planted slipping cases with reasons + actions; map shows hotspots; audit + fairness visible.
+> Do not hand-write `catalyst.json`. Scaffold a throwaway project and copy its real schema —
+> you will otherwise burn an afternoon on a file whose format is undocumented. And leave
+> `project_id` out of it entirely; the binding belongs in `.catalystrc`, as strings.
 
-### Phase 4 — Assistant + voice + export (week 3–4)
-**Tasks**
-- `POST /assistant/query` (LLM over DB via safe ZCQL tools + citations). ⚠️ *Needs Adarsh:* QuickML LLM endpoint + Connection scope; RAG doc IDs.
-- RAG over IPC/BNS/SOP docs; `POST /assistant/voice` (Zia STT/TTS/translation — verify Kannada). 
-- `POST /assistant/export` → SmartBrowz PDF → Stratus URL.
-- Assistant UI (chat + mic + citations + export + deep-links).
-**Done when:** English + Kannada question answered with citations on stage; PDF export works.
+### Phase 1 — Data and a vertical slice
 
-### Phase 5 — Harden + pitch (final week)
-**Tasks**
-- Seed the flawless demo path; performance pass (cache, indexes); empty/error states; a11y pass.
-- Full deploy + smoke test all links (Catalyst URL, GitHub, video).
-- **Deck (official template) + demo video + rehearse 7-min pitch** (owner assigned day 1).
-- Fill submission form fields (prototype brief, links).
-**Done when:** every item in `01_PRD.md §7` is checked.
+- Build the generator per [06](06_SYNTHETIC_DATA_SPEC.md); emit CSVs.
+- Create the Data Store tables ([03](03_DATABASE_SCHEMA.md)); import in FK order via a
+  Stratus bucket.
+- Implement `GET /cases` and `GET /cases/:id`, RBAC-scoped.
+- Client: case list and case detail against the deployed function.
+- Deploy.
 
-### B1. Team ownership (maps to your skills)
-- **Web-dev:** client shell, graph/map/cockpit/assistant UIs, design system.
-- **Backend:** Functions API, Data Store/ZCQL, RBAC, deploy/CORS, API Gateway.
-- **Data/ML:** generator, AppSail pipeline (ER/graph/ML/metrics), QuickML/RAG/Zia, eval tests.
-- **Design/pitch (assign one owner from day 1):** deck, demo video, narrative, UI review. *(This seat was the gap flagged earlier; do not leave it to the last night — it's ~half the score.)*
+**Done when:** a deployed Catalyst URL lists and opens real FIRs. This is the "skeleton live"
+milestone and it is worth more than it looks — everything after it is addition, not
+integration risk.
 
-### B2. Cross-cutting definition of done
-Every feature: RBAC-scoped, returns an `explanation`, has empty/loading/error states, is covered by at least a smoke test, reads from precomputed data (no heavy compute in Functions), and is committed with a clean conventional-commit message (no AI attribution).
+### Phase 2 — The hero: linkage graph and offenders
+
+- `entity_resolution.py` → identities, with the fairness test in place **from the first
+  commit**, not retrofitted.
+- `graph_build.py` → typed edges with evidence · `community.py` · `mo_similarity.py`.
+- The recompute Job, plus Cron nightly.
+- Ground-truth evaluation scoring the planted patterns.
+- `GET /graph/case/:id`, `/graph/cluster/:id`, `/graph/search`, `/offenders`, `/offenders/:id`.
+- Graph explorer with the "why linked" panel, filters and cluster expansion.
+- Offender profile with the risk gauge and factor breakdown.
+
+**Done when:** opening a case assembles a cross-silo network, offender profiles resolve name
+variants, and "why" shows real evidence.
+
+> **Watch the edge-type mix here.** Capping neighbours by raw strength quietly favours MO
+> similarity (scores ~0.99) over shared-offender links (~0.95), so the graph fills with the
+> least interesting edge type and the strength slider stops discriminating. Rank by edge
+> *kind* first, strength second.
+
+### Phase 3 — Intelligence and trust
+
+- `health_metrics.py`, `anomaly.py`, `spatial.py`, `risk_score.py`.
+- `/health/*`, `/geo/*`, `/analytics/*`, `/audit`.
+- Screens: health worklist, map, intelligence.
+- RBAC hardening; audit on sensitive reads; the fairness statement surfaced in the UI.
+
+**Done when:** the worklist flags the planted slipping cases with reasons and actions, the
+map shows hotspots, and the audit trail and fairness statement are both visible.
+
+### Phase 4 — Assistant, voice, export
+
+- `POST /assistant/query` with citations.
+- `POST /assistant/voice` — browser Web Speech for STT/TTS.
+- `POST /assistant/export` → print-ready briefing HTML.
+- Assistant UI: chat, mic, citations, export, deep links.
+
+**Done when:** an English *and* a Kannada question are answered with citations.
+
+> Call the export a **print-ready briefing**, not a PDF. It returns HTML. Claiming a PDF
+> pipeline that does not exist is exactly the kind of thing a judge checks.
+
+### Phase 5 — Harden and pitch
+
+- Seed the demo path; performance pass; empty and error states; accessibility pass.
+- Full deploy, then smoke-test every link.
+- Deck (`deck/`, `node build.js`), demo video, rehearse the pitch.
+- Fill the submission form: prototype brief, links.
+
+**Done when:** every box in [01 §7](01_PRD.md) is ticked.
+
+### B1. Definition of done — applies to every feature
+
+- RBAC-scoped.
+- Returns an `explanation` payload.
+- Has empty, loading and error states.
+- Covered by at least a smoke test.
+- Reads precomputed data — **no heavy compute in a Function**.
+- Committed with a clean conventional-commit message and no AI attribution.
+
+### B2. What is left
+
+In priority order, and each is genuinely small:
+
+1. **Bind Catalyst Authentication** — swap the role header for a verified JWT in
+   `userFromRequest`. One function.
+2. **Read from Data Store** — replace the bundled read-model with ZCQL reads behind the
+   existing store interface.
+3. **Finish QuickML and Zia** — settle the request-body contract with Zoho support, then
+   enable Kannada STT/TTS server-side.
+4. **Persist the audit trail** — move the in-memory ring buffer into a Data Store table.
+5. **Ingest live data** — Signals on FIR insert for incremental recompute instead of a
+   nightly full rebuild.
+6. **Extend the graph** — vehicle numbers, phone/IMEI and bank accounts as first-class link
+   types.
+
+### B3. Where the hours actually went
+
+Worth knowing before you estimate anything similar again: the pipeline logic was the
+predictable part. The time went on platform archaeology — a silent integer-precision bug, an
+undocumented `catalyst.json` schema, an AppSail container that ignores `requirements.txt`, a
+Job that fails silently unless its entry file is called `index.js`, and an API Gateway that
+takes the whole site down when enabled without routes.
+
+Budget for that. It is not a sign anything is going wrong.
