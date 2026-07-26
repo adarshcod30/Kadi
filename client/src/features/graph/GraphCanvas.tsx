@@ -73,6 +73,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
       elements.push({
         data: {
           id: e.id, source: e.source, target: e.target, etype: e.edgeType,
+          atypes: (e.allTypes && e.allTypes.length ? e.allTypes : [e.edgeType]),
           color: EDGE_COLOR[e.edgeType] || '#94A3B8', width: 0.8 + (e.strength || 0.3) * 2.2,
           strength: e.strength, raw: e,
         },
@@ -146,8 +147,11 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
     cy.batch(() => {
       cy.edges().forEach((e) => {
         const t = e.data('etype');
+        // Match on every signal the edge carries. Filtering on the primary type alone made
+        // "Shared section" and the other enrichment toggles no-ops.
+        const types: string[] = e.data('atypes') || [t];
         const strong = (e.data('strength') || 1) >= filters.minStrength || t === 'appears_in';
-        const on = (filters.edgeTypes.has(t) || t === 'appears_in') && strong;
+        const on = (t === 'appears_in' || types.some((x) => filters.edgeTypes.has(x))) && strong;
         e.toggleClass('hidden', !on);
       });
       cy.nodes().forEach((n) => {

@@ -349,6 +349,36 @@ module.exports = {
   stats: (user) => load().stats,
   districtStats: () => load().districtStats,
   national: () => load().national,
+  // Cases whose ego-network actually demonstrates the product: several shared-offender
+  // links and more than one kind of evidence. Sorting the case list by raw link count
+  // surfaces pure modus-operandi clusters instead, which all look identical.
+  featuredNetworks: (limit = 6) => {
+    const db = load();
+    const out = [];
+    for (const [caseId, edges] of Object.entries(db.adjacency)) {
+      if (!Array.isArray(edges) || !edges.length) continue;
+      let offenderLinks = 0;
+      const signals = new Set();
+      for (const e of edges) {
+        if (e.edgeType === 'shared_offender') offenderLinks += 1;
+        for (const t of (e.allTypes || [e.edgeType])) signals.add(t);
+      }
+      if (offenderLinks < 2) continue;
+      const c = db.cases.get(String(caseId));
+      out.push({
+        caseMasterId: caseId,
+        crimeNo: c ? c.crimeNo : caseId,
+        districtName: c ? c.districtName : '',
+        crimeSubHead: c ? c.crimeSubHead : '',
+        links: edges.length,
+        offenderLinks,
+        signalTypes: [...signals],
+        why: `${offenderLinks} case(s) tied to the same resolved offender, across ${signals.size} kinds of evidence`,
+      });
+    }
+    out.sort((a, b) => (b.offenderLinks - a.offenderLinks) || (b.signalTypes.length - a.signalTypes.length));
+    return { items: out.slice(0, limit) };
+  },
   socio: () => load().socio,
   // Forecast rows are keyed by districtId only; join the name here so the client never
   // has to hold a second lookup just to label a chart.

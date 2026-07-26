@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch } from 'lucide-react';
-import { useGraphCase, useGraphCluster, useCases } from '../api/hooks';
+import { useGraphCase, useGraphCluster, useCases, useFeaturedNetworks } from '../api/hooks';
 import { GraphCanvas, EDGE_COLOR, HEAD_COLOR, GraphFilters } from '../features/graph/GraphCanvas';
 import { WhyPanel } from '../features/graph/WhyPanel';
 import { Empty, Mono, Chip } from '../components/ui';
@@ -26,7 +26,7 @@ export default function GraphExplorer() {
   const clusterId = params.get('cluster') || undefined;
   const [sel, setSel] = useState<{ node?: GraphNode; edge?: GraphEdge } | null>(null);
   const [edgeTypes, setEdgeTypes] = useState<Set<string>>(new Set(EDGE_TYPES.map((e) => e[0])));
-  const [minStrength, setMinStrength] = useState(0.3);
+  const [minStrength, setMinStrength] = useState(0);
   const [layout, setLayout] = useState('fcose');
 
   const caseQ = useGraphCase(clusterId ? undefined : caseId);
@@ -37,9 +37,16 @@ export default function GraphExplorer() {
 
   useEffect(() => { setSel(null); }, [caseId, clusterId]);
 
+  // Count every signal an edge carries, not just its primary type. The pipeline only ever
+  // sets edgeType to shared_offender or mo_similarity; the other four signals ride along in
+  // allTypes as enrichments, so counting edgeType alone showed a permanent 0 for them.
   const edgeCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const e of data?.edges || []) if (e.edgeType !== 'appears_in') c[e.edgeType] = (c[e.edgeType] || 0) + 1;
+    for (const e of data?.edges || []) {
+      if (e.edgeType === 'appears_in') continue;
+      const types = new Set<string>([e.edgeType, ...(e.allTypes || [])]);
+      for (const t of types) c[t] = (c[t] || 0) + 1;
+    }
     return c;
   }, [data]);
   const headsPresent = useMemo(() => {
@@ -108,7 +115,7 @@ export default function GraphExplorer() {
           <Control title={`Min link strength · ${minStrength.toFixed(2)}`}>
             <input type="range" min={0.3} max={0.95} step={0.05} value={minStrength}
               onChange={(e) => setMinStrength(Number(e.target.value))} className="w-full accent-kadi-blue" />
-            <p className="text-[10px] text-ink-muted mt-1">Hide weaker links to focus on the strongest connections.</p>
+            <p className="text-[10px] text-ink-muted mt-1">Most MO links score above 0.95, so this only bites near the top of the range. Shared-offender links sit around 0.95.</p>
           </Control>
 
           {headsPresent.length > 0 && (
@@ -192,15 +199,17 @@ function CaseSwitcher({ current }: { current?: string }) {
 
 function GraphEntry() {
   const nav = useNavigate();
+  const { data: featured } = useFeaturedNetworks();
   const { data } = useCases({ sort: 'linked_desc', pageSize: 8 });
 
-  // Land on an actual network rather than an explainer. This is the hero feature; a page
-  // that only *describes* it wastes the first impression. Opens the most-connected case,
-  // and `replace` keeps the back button pointing wherever the user came from.
+  // Open a network that actually demonstrates linkage. Sorting by raw link count lands on
+  // a pure modus-operandi cluster - fourteen identical nodes, every filter reading zero -
+  // which looks broken. /graph/featured returns cases with several shared-offender links
+  // and more than one kind of evidence. Falls back to most-linked if none qualify.
   useEffect(() => {
-    const top = data?.items?.[0];
-    if (top) nav(`/graph?case=${top.caseMasterId}`, { replace: true });
-  }, [data, nav]);
+    const pick = featured?.items?.[0] || data?.items?.[0];
+    if (pick) nav(`/graph?case=${pick.caseMasterId}`, { replace: true });
+  }, [featured, data, nav]);
 
   return (
     <div className="max-w-3xl mx-auto mt-6">

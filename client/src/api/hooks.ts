@@ -42,6 +42,8 @@ export const useGeoGrid = (params: Record<string, unknown>, enabled = true) =>
   useQuery({ queryKey: ['geo-grid', params], queryFn: () => api.get<any>(`/geo/grid${qs(params)}`), enabled });
 export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
+export const useFeaturedNetworks = () =>
+  useQuery({ queryKey: ['graph-featured'], queryFn: () => api.get<any>('/graph/featured'), staleTime: Infinity });
 export const useSocio = () =>
   useQuery({ queryKey: ['socio'], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });
 export const useForecast = () =>

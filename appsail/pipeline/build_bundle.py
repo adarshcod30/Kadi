@@ -91,7 +91,14 @@ def main():
         for case_id, edges in adj.items():
             if not edges:
                 continue
-            keep = sorted(edges, key=lambda e: -float(e.get("strength", 0)))[:MAX_NEIGHBOURS]
+            # Top-N by strength alone was a mistake: mo_similarity averages 0.993 while
+            # shared_offender averages 0.954, so a strongest-N filter quietly deleted every
+            # shared-offender link - the rarest and most investigatively useful edge in the
+            # graph (1,926 of 137k). Keep those first, then fill with the strongest MO.
+            def _rank(e):
+                primary = 0 if e.get("edgeType") == "shared_offender" else 1
+                return (primary, -float(e.get("strength", 0)))
+            keep = sorted(edges, key=_rank)[:MAX_NEIGHBOURS]
             out = []
             for e in keep:
                 ev = e.get("evidence") or {}
@@ -150,7 +157,9 @@ def main():
     if os.path.exists(src):
         with open(src) as f:
             rows = list(csv.DictReader(f))
-        fields = [c for c in rows[0].keys() if c != "BriefFacts"]
+        # BriefFacts stays: the detail view renders it as "Brief facts (MO)" and dropping
+        # it left that panel blank in production.
+        fields = list(rows[0].keys())
         dst = os.path.join(OUT, "CaseMaster.csv")
         with open(dst, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fields)
@@ -160,10 +169,10 @@ def main():
         b, a = size_mb(src), size_mb(dst)
         total_before += b
         total_after += a
-        print(f"  CaseMaster.csv   {b:6.1f} MB -> {a:5.1f} MB   ({len(rows):,} FIRs, BriefFacts dropped)")
+        print(f"  CaseMaster.csv   {b:6.1f} MB -> {a:5.1f} MB   ({len(rows):,} FIRs)")
 
     # ---- lookups + party tables the detail view needs ----
-    for name in LOOKUPS + ["Accused", "Victim", "ComplainantDetails"]:
+    for name in LOOKUPS + ["Accused", "Victim", "ComplainantDetails", "ActSectionAssociation", "ArrestSurrender", "ChargesheetDetails"]:
         s = os.path.join(SRC, f"{name}.csv")
         if os.path.exists(s):
             with open(s) as fi, open(os.path.join(OUT, f"{name}.csv"), "w") as fo:
