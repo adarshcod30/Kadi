@@ -8,13 +8,23 @@ import type { AssistantResponse } from '../lib/types';
 
 interface Msg { role: 'user' | 'assistant'; content: string; res?: AssistantResponse }
 
+// Cover every intent the engine actually handles - the socio-economic and forecasting
+// answers were unreachable from here, so those capabilities were invisible to anyone
+// who did not already know to ask for them.
 const SUGGESTIONS = [
   'Which cases are slipping?',
+  'Which districts have the highest crime rate per capita?',
+  'Forecast for next month',
   'Cyber-crime FIRs in Bengaluru this quarter',
   "Show this accused's past cases",
   'Emerging hotspots',
 ];
-const SUGGESTIONS_KN = ['ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?', 'ಈ ಆರೋಪಿಯ ಹಿಂದಿನ ಪ್ರಕರಣಗಳು?'];
+const SUGGESTIONS_KN = [
+  'ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?',
+  'ತಲಾ ಜನಸಂಖ್ಯೆಯ ಅಪರಾಧ ದರ',
+  'ಮುಂದಿನ ತಿಂಗಳ ಮುನ್ಸೂಚನೆ',
+  'ಈ ಆರೋಪಿಯ ಹಿಂದಿನ ಪ್ರಕರಣಗಳು?',
+];
 
 export default function Assistant() {
   const nav = useNavigate();
@@ -102,7 +112,7 @@ export default function Assistant() {
       <div className="flex-1 card overflow-auto p-4 space-y-3">
         {!msgs.length && (
           <div className="text-sm text-ink-muted">
-            <p className="mb-3">Ask about cases, offenders, slipping investigations or hotspots. Try:</p>
+            <p className="mb-3">Ask about cases, offenders, slipping investigations, per-capita crime rates, forecasts or hotspots. Try:</p>
             <div className="flex flex-wrap gap-2">
               {(lang === 'kn' ? SUGGESTIONS_KN : SUGGESTIONS).map((s) => (
                 <button key={s} onClick={() => send(s)} className={`chip bg-kadi-blue50 text-kadi-blue hover:bg-kadi-blue hover:text-white ${lang === 'kn' ? 'kn' : ''}`}>{s}</button>

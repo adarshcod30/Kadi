@@ -13,6 +13,18 @@ import {
 import HomeAnalytics from '../components/HomeAnalytics';
 import { useT } from '../lib/i18n';
 
+// All four Data Store statuses, so the bar always totals 100%. Deriving it from
+// open/chargeSheeted/undetected alone silently dropped 'closed'.
+const DISPOSAL = (s: any) => {
+  const b = s.statusBreakdown || {};
+  return [
+    { k: 'Chargesheeted', v: b.chargeSheeted ?? s.chargeSheeted ?? 0, c: '#2FA8A0' },
+    { k: 'Under investigation', v: b.open ?? s.openCases ?? 0, c: '#1A6FC4' },
+    { k: 'Undetected', v: b.undetected ?? s.undetected ?? 0, c: '#C0392B' },
+    { k: 'Closed', v: b.closed ?? 0, c: '#5B6B7E' },
+  ].filter((x) => x.v > 0);
+};
+
 export default function Dashboard() {
   const nav = useNavigate();
   const t = useT();
@@ -111,11 +123,7 @@ export default function Dashboard() {
             {stats ? (
               <div className="p-4">
                 <div className="flex h-9 rounded-ctl overflow-hidden border border-line">
-                  {[
-                    { k: 'Chargesheeted', v: stats.chargeSheeted, c: '#2FA8A0' },
-                    { k: 'Under investigation', v: stats.openCases, c: '#1A6FC4' },
-                    { k: 'Undetected', v: stats.undetected, c: '#C0392B' },
-                  ].map((seg) => {
+                  {DISPOSAL(stats).map((seg) => {
                     const pct = (seg.v / (stats.totalCases || 1)) * 100;
                     return (
                       <div key={seg.k} title={`${seg.k}: ${seg.v.toLocaleString()} (${pct.toFixed(1)}%)`}
@@ -126,12 +134,8 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {[
-                    { k: 'Chargesheeted', v: stats.chargeSheeted, c: '#2FA8A0' },
-                    { k: 'Under investigation', v: stats.openCases, c: '#1A6FC4' },
-                    { k: 'Undetected', v: stats.undetected, c: '#C0392B' },
-                  ].map((seg) => (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {DISPOSAL(stats).map((seg) => (
                     <div key={seg.k} className="rounded-ctl bg-surface-2 border border-line px-3 py-2">
                       <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
                         <span className="w-2 h-2 rounded-full" style={{ background: seg.c }} />{seg.k}
