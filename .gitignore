@@ -61,3 +61,8 @@ deck/node_modules/
 deck/unpacked/
 deck/template.pptx
 deck/_t.*
+
+# Deck QA artefacts — regenerate with `node build.js && python3 preview.py`
+deck/preview.html
+deck/qa/
+deck/shots/

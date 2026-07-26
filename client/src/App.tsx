@@ -24,6 +24,12 @@ export default function App() {
   // Login renders standalone (no shell chrome), and a first-time visitor lands there so
   // the role model is the first thing seen rather than something buried in a menu.
   const loc = useLocation();
+  // ?as=<Role> lets a link open the app directly in a given rank. Useful for sharing a
+  // demo view, and for headless capture where there is no stored session.
+  const asRole = new URLSearchParams(loc.search).get('as');
+  if (asRole && ['SI', 'Inspector', 'ACP', 'Analyst', 'Admin'].includes(asRole)) {
+    localStorage.setItem('kadi.role', asRole);
+  }
   const hasRole = Boolean(localStorage.getItem('kadi.role'));
   if (loc.pathname === '/login') {
     return (
