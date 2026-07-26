@@ -64,5 +64,6 @@ deck/_t.*
 
 # Deck QA artefacts — regenerate with `node build.js && python3 preview.py`
 deck/preview.html
+deck/analytics_slide.html
 deck/qa/
 deck/shots/

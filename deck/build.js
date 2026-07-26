@@ -741,7 +741,19 @@ function arrowD(s, cx, y, h) {
   s.addNotes('Walk the live URL rather than reading this slide: Home, Intelligence (Kodagu), Graph (why-linked), Map, Assistant.');
 }
 
-// ============================================================ 14. Benchmarking
+// ============================================================ 14. Live analytics
+{
+  // Drawn as one SVG by make_analytics_slide.py and placed full-bleed. pptxgenjs charts
+  // cannot express a forecast interval band, a 7x24 heatmap, a dumbbell plot or a fitted
+  // scatter -- and shipping the PNG guarantees the deck and the exported image are the
+  // same pixels. Regenerate with: python3 make_analytics_slide.py
+  const s = pptx.addSlide();
+  s.addImage({ path: `${__dirname}/analytics_slide.png`, x: 0, y: 0, w: 10, h: 5.625 });
+  s.addNotes('Every series is read from deck/data/*.json, captured live from the deployed API. '
+    + 'Six views: volume + forecast, crime mix, hour x weekday, disposal, rank shift, urbanisation correlation.');
+}
+
+// ============================================================ 15. Benchmarking
 {
   const s = slide('Performance & benchmarking', 'Measured on the deployed build — and here is exactly how');
 
@@ -796,7 +808,7 @@ function arrowD(s, cx, y, h) {
   });
 }
 
-// ============================================================ 15. The finding
+// ============================================================ 16. The finding
 {
   const s = slide('The finding that changes the map', 'Why counts mislead, and what per-capita analysis reveals');
 
@@ -856,7 +868,7 @@ function arrowD(s, cx, y, h) {
   });
 }
 
-// ============================================================ 16. Fairness
+// ============================================================ 17. Fairness
 {
   const s = slide('Fair by construction — and proven', 'The hardest question a jury asks, answered with a test');
 
@@ -891,7 +903,7 @@ function arrowD(s, cx, y, h) {
   });
 }
 
-// ============================================================ 17. Links
+// ============================================================ 18. Links
 {
   const s = slide('Links', 'Everything is publicly accessible and independently verifiable');
   const links = [
@@ -922,7 +934,7 @@ function arrowD(s, cx, y, h) {
   });
 }
 
-// ============================================================ 18. Future
+// ============================================================ 19. Future
 {
   const s = slide('Additional details & future development', 'What ships next, in priority order');
   const items = [
@@ -968,7 +980,7 @@ function arrowD(s, cx, y, h) {
   });
 }
 
-// ============================================================ 19. Thank you
+// ============================================================ 20. Thank you
 {
   const s = pptx.addSlide();
   s.background = bg('bg_thanks');
