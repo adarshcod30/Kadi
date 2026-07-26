@@ -5,6 +5,7 @@ import {
   ArrowRight, CheckCircle2, AlertTriangle, Cpu, Lock, Globe,
 } from 'lucide-react';
 import { SiloToGraph, FairnessShield, PipelineFlow, MapHotspot, RiskArt, AssistantArt } from '../components/illustrations';
+import { PlatformSection, DataSection } from '../components/AboutSections';
 import { useStats, useEval } from '../api/hooks';
 
 const rise = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
@@ -123,6 +124,14 @@ export default function About() {
             <p className="text-xs text-ink-muted">Measured on planted ground-truth patterns in the synthetic dataset (target ≥ 90%).</p>
           </div>
         </div>
+      </Section>
+
+      <Section title="The data behind every number" kicker="Dataset">
+        <DataSection />
+      </Section>
+
+      <Section title="Built on Zoho Catalyst" kicker="Platform">
+        <PlatformSection />
       </Section>
 
       {/* footer note */}

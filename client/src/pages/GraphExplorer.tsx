@@ -61,10 +61,22 @@ export default function GraphExplorer() {
           <p className="text-xs text-ink-muted max-w-2xl">{data?.explanation?.summary
             || 'Assembling the network…'} Each node is an FIR or an offender; each line is a proven link. Click a line to see <b>why two cases connect</b>. Drag nodes, switch layout, filter link types.</p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 items-center">
+          <CaseSwitcher current={caseId} />
           {caseId && <button onClick={() => nav(`/cases/${caseId}`)} className="btn-outline text-sm"><FileText size={14} /> Case</button>}
           <button onClick={() => nav('/map')} className="btn-outline text-sm"><MapIcon size={14} /> Map</button>
         </div>
+      </div>
+
+      {/* What this tab is actually for. Without it the graph reads as a pretty diagram
+          rather than the thing that replaces "independent silos" in the problem statement. */}
+      <div className="mb-3 rounded-card border border-line bg-kadi-blue50/60 px-4 py-2.5 text-[12.5px] text-kadi-navy700">
+        <b>What this is:</b> every FIR in Karnataka, joined to every other FIR it shares real
+        evidence with — the same resolved offender, a co-accused, a near-identical modus
+        operandi, the same place and time window, or the same act &amp; section.
+        <b> Why it matters:</b> a station sees only its own register, so a serial offender working
+        across districts is invisible. Here the connection is one hop away, and every line is
+        clickable evidence rather than a hunch. Use the switcher above to move between cases.
       </div>
 
       {/* Responsive: stacks on small screens, 3-column workbench from xl up */}
@@ -149,6 +161,32 @@ function Control({ title, icon, children }: { title: string; icon?: React.ReactN
       <div className="label mb-1.5 flex items-center gap-1.5">{icon}{title}</div>
       {children}
     </div>
+  );
+}
+
+// Lets an investigator move between networks without going back to the Cases list.
+// Previously the tab opened one case and offered no way to reach another.
+function CaseSwitcher({ current }: { current?: string }) {
+  const nav = useNavigate();
+  const { data } = useCases({ sort: 'linked_desc', pageSize: 15 });
+  const items = data?.items || [];
+  if (!items.length) return null;
+  return (
+    <select
+      value={current || ''}
+      onChange={(e) => nav(`/graph?case=${e.target.value}`)}
+      className="input text-sm max-w-[240px]"
+      aria-label="Switch to another case network"
+    >
+      {!items.some((c: any) => String(c.caseMasterId) === String(current)) && current && (
+        <option value={current}>Current case</option>
+      )}
+      {items.map((c: any) => (
+        <option key={c.caseMasterId} value={c.caseMasterId}>
+          {c.crimeNo} · {c.linkedCount} links · {c.districtName}
+        </option>
+      ))}
+    </select>
   );
 }
 

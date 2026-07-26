@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational } from '../api/hooks';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
@@ -15,15 +15,52 @@ import { useT } from '../lib/i18n';
 
 // All four Data Store statuses, so the bar always totals 100%. Deriving it from
 // open/chargeSheeted/undetected alone silently dropped 'closed'.
-const DISPOSAL = (s: any) => {
+const DISPOSAL = (s: any, t: (k: string) => string) => {
   const b = s.statusBreakdown || {};
   return [
-    { k: 'Chargesheeted', v: b.chargeSheeted ?? s.chargeSheeted ?? 0, c: '#2FA8A0' },
-    { k: 'Under investigation', v: b.open ?? s.openCases ?? 0, c: '#1A6FC4' },
-    { k: 'Undetected', v: b.undetected ?? s.undetected ?? 0, c: '#C0392B' },
-    { k: 'Closed', v: b.closed ?? 0, c: '#5B6B7E' },
+    { k: t('chargesheeted'), v: b.chargeSheeted ?? s.chargeSheeted ?? 0, c: '#2FA8A0' },
+    { k: t('underInvestigation'), v: b.open ?? s.openCases ?? 0, c: '#1A6FC4' },
+    { k: t('undetected'), v: b.undetected ?? s.undetected ?? 0, c: '#C0392B' },
+    { k: t('closed'), v: b.closed ?? 0, c: '#5B6B7E' },
   ].filter((x) => x.v > 0);
 };
+
+function RankShift() {
+  const { data: socio } = useSocio();
+  const rows = [...(socio?.districts || [])]
+    .sort((a: any, b: any) => Math.abs(b.rankShift) - Math.abs(a.rankShift))
+    .slice(0, 7);
+  if (!rows.length) return <Skeleton rows={4} />;
+  const max = Math.max(...rows.map((r: any) => Math.abs(r.rankShift)), 1);
+  return (
+    <div className="p-4 space-y-2">
+      {rows.map((d: any) => {
+        const pct = (Math.abs(d.rankShift) / max) * 50;
+        const up = d.rankShift > 0;
+        return (
+          <div key={d.districtId} className="flex items-center gap-2 text-[12px]">
+            <span className="w-28 shrink-0 truncate text-ink">{d.districtName}</span>
+            <span className="flex-1 relative h-4 bg-surface-2 rounded">
+              <span className="absolute top-0 bottom-0 left-1/2 w-px bg-line" />
+              <span className="absolute top-0.5 bottom-0.5 rounded"
+                style={{
+                  background: up ? '#2FA8A0' : '#C0392B',
+                  left: up ? '50%' : `${50 - pct}%`,
+                  width: `${pct}%`,
+                }} />
+            </span>
+            <span className="w-24 shrink-0 text-right text-ink-muted">
+              #{d.rankByCount} → #{d.rankByRate}
+            </span>
+          </div>
+        );
+      })}
+      <p className="text-[12px] text-ink-muted pt-1">
+        Kodagu is 30th by raw count but 6th per 100,000 residents — invisible on a count map.
+      </p>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -80,7 +117,7 @@ export default function Dashboard() {
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: trend + heatmap + districts */}
         <div className="lg:col-span-2 space-y-5">
-          <VizCard title="FIRs registered per month" hint="Monthly FIR volume over the dataset window — watch for sustained rises that signal shifting crime patterns.">
+          <VizCard title={t('firsPerMonth')} hint="Monthly FIR volume over the dataset window — watch for sustained rises that signal shifting crime patterns.">
             <div className="h-52 p-3">
               {stats ? (
                 <ResponsiveContainer width="100%" height="100%" key={stats.trend.length}>
@@ -96,11 +133,11 @@ export default function Dashboard() {
             </div>
           </VizCard>
 
-          <VizCard title="When crime happens — hour × weekday" hint="Spatiotemporal signal: darker cells are hours with more incidents. Night-time and weekend spikes guide patrol deployment.">
+          <VizCard title={t('whenCrime')} hint="Spatiotemporal signal: darker cells are hours with more incidents. Night-time and weekend spikes guide patrol deployment.">
             {stats ? <HeatMap data={stats.heat} /> : <Skeleton rows={4} />}
           </VizCard>
 
-          <VizCard title="Top districts by case volume" hint="Case counts per district — click through to the district drill-down on the map." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
+          <VizCard title={t('topDistricts')} hint="Case counts per district — click through to the district drill-down on the map." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
             <div className="h-56 p-3">
               {districts ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -119,11 +156,11 @@ export default function Dashboard() {
 
           {/* Disposal funnel — the left column was a card shorter than the right, leaving a
               visible gap, and clearance rate is the metric a DGP actually asks for. */}
-          <VizCard title="Where cases end up" hint="Every registered FIR flows to one of three outcomes. The clearance rate is chargesheeted over total; a large undetected share is where investigative effort is being lost.">
+          <VizCard title={t('whereCasesEnd')} hint="Every registered FIR flows to one of three outcomes. The clearance rate is chargesheeted over total; a large undetected share is where investigative effort is being lost.">
             {stats ? (
               <div className="p-4">
                 <div className="flex h-9 rounded-ctl overflow-hidden border border-line">
-                  {DISPOSAL(stats).map((seg) => {
+                  {DISPOSAL(stats, t).map((seg) => {
                     const pct = (seg.v / (stats.totalCases || 1)) * 100;
                     return (
                       <div key={seg.k} title={`${seg.k}: ${seg.v.toLocaleString()} (${pct.toFixed(1)}%)`}
@@ -135,7 +172,7 @@ export default function Dashboard() {
                   })}
                 </div>
                 <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {DISPOSAL(stats).map((seg) => (
+                  {DISPOSAL(stats, t).map((seg) => (
                     <div key={seg.k} className="rounded-ctl bg-surface-2 border border-line px-3 py-2">
                       <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
                         <span className="w-2 h-2 rounded-full" style={{ background: seg.c }} />{seg.k}
@@ -152,6 +189,13 @@ export default function Dashboard() {
               </div>
             ) : <Skeleton rows={4} />}
           </VizCard>
+
+          {/* Headline finding, and it fills the column that was running short. */}
+          <VizCard title={t('countsMislead')}
+            hint="Bars show how far a district moves when you divide by population. Green means it is worse per-capita than raw counts suggest; red means it only looked bad because it is populous."
+            action={<button onClick={() => nav('/intelligence')} className="text-xs link">Intelligence</button>}>
+            <RankShift />
+          </VizCard>
         </div>
 
         {/* Right: eval, donuts, alerts */}
@@ -165,21 +209,21 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          <VizCard title="Case status mix" hint="Disposition of all FIRs. A high undetected share highlights where investigations stall.">
+          <VizCard title={t('caseStatusMix')} hint="Disposition of all FIRs. A high undetected share highlights where investigations stall.">
             {stats && statusData ? (<>
               <Donut data={statusData} centerLabel="cases" centerValue={stats.totalCases.toLocaleString()} />
               <Legend items={statusData.map((s) => ({ name: s.name, color: s.color, value: s.value.toLocaleString() }))} />
             </>) : <Skeleton rows={4} />}
           </VizCard>
 
-          <VizCard title="Crime mix" hint="Share of FIRs by major crime head — property and cyber crime dominate real volume.">
+          <VizCard title={t('crimeMix')} hint="Share of FIRs by major crime head — property and cyber crime dominate real volume.">
             {stats && headData ? (<>
               <Donut data={headData} centerLabel="heads" centerValue={String(stats.topCrimeHeads.length)} />
               <Legend items={headData.map((h) => ({ name: h.name, color: h.color }))} />
             </>) : <Skeleton rows={4} />}
           </VizCard>
 
-          <VizCard title="Alerts" hint="Live signals: new cross-district networks, slipping cases, emerging hotspots, station anomalies." action={<button onClick={() => nav('/health')} className="text-xs link">All</button>}>
+          <VizCard title={t('alerts')} hint="Live signals: new cross-district networks, slipping cases, emerging hotspots, station anomalies." action={<button onClick={() => nav('/health')} className="text-xs link">All</button>}>
             <div className="divide-y divide-line max-h-[320px] overflow-auto">
               {(alerts || []).slice(0, 8).map((a) => (
                 <motion.button key={a.alertId} whileHover={{ x: 3 }}
@@ -195,7 +239,7 @@ export default function Dashboard() {
           </VizCard>
 
           {national && (
-            <VizCard title="India context" hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context).">
+            <VizCard title={t('indiaContext')} hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context).">
               <div className="p-3 text-sm">
                 <p className="text-xs text-ink-muted mb-2">Karnataka ranks <b className="text-kadi-navy">#{national.focusRank}</b> of {national.states.length} · {national.focusRatePerLakh}/lakh</p>
                 {national.states.slice(0, 5).map((s: any) => (
@@ -214,7 +258,7 @@ export default function Dashboard() {
       {/* ---- Analytical section: forecast, composition, correlation, volume ---- */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="mt-4">
         <div className="flex items-baseline gap-2 mb-3">
-          <h2 className="text-lg font-semibold text-kadi-navy">The picture behind the numbers</h2>
+          <h2 className="text-lg font-semibold text-kadi-navy">{t('pictureBehind')}</h2>
           <p className="text-sm text-ink-muted">— where it is heading, what kind, why there, and who carries it.</p>
         </div>
         <HomeAnalytics stats={stats} />
@@ -223,7 +267,7 @@ export default function Dashboard() {
       {/* ---- Illustrated capabilities: what you can actually do from here ---- */}
       <motion.div variants={stagger} initial="hidden" animate="show">
         <div className="flex items-baseline gap-2 mb-3">
-          <h2 className="text-lg font-semibold text-kadi-navy">Explore the intelligence</h2>
+          <h2 className="text-lg font-semibold text-kadi-navy">{t('exploreIntel')}</h2>
           <p className="text-sm text-ink-muted">— four ways KADI turns these records into action.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

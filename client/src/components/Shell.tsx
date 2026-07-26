@@ -131,6 +131,7 @@ function FairnessBanner() {
 }
 
 function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: Role) => void; label?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const roles: Role[] = ['SI', 'Inspector', 'ACP', 'Analyst', 'Admin'];
   return (
@@ -141,11 +142,18 @@ function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: R
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-56 card p-1 z-30 text-ink">
-          <div className="px-3 py-2 text-xs text-ink-muted">Switch role (demo)</div>
+          <div className="px-3 py-2 text-xs text-ink-muted">{t('switchRole')}</div>
           {roles.map((r) => (
             <button key={r} onClick={() => onChange(r)}
               className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-surface-3 ${r === current ? 'text-kadi-blue font-medium' : ''}`}>{r}</button>
           ))}
+          <div className="border-t border-line mt-1 pt-1">
+            <button
+              onClick={() => { localStorage.removeItem('kadi.role'); window.location.href = '/app/login'; }}
+              className="w-full text-left px-3 py-2 rounded text-sm text-ink-muted hover:bg-surface-3">
+              {t('signOut')}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -153,6 +161,7 @@ function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: R
 }
 
 function AlertsPanel({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const { data: alerts } = useAlerts();
   const nav = useNavigate();
   const go = (a: any) => {
@@ -166,7 +175,7 @@ function AlertsPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="absolute right-0 mt-2 w-80 card z-30 text-ink max-h-[70vh] overflow-auto">
       <div className="px-4 py-2 border-b border-line flex items-center justify-between">
-        <span className="text-sm font-semibold">Alerts</span>
+        <span className="text-sm font-semibold">{t('alerts')}</span>
         <button onClick={onClose}><X size={14} className="text-ink-muted" /></button>
       </div>
       {(alerts || []).slice(0, 12).map((a) => (
