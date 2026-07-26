@@ -68,12 +68,32 @@ function query(user, text, lang) {
   const hasPast = /past case|previous case|history|prior|ಹಿಂದಿನ ಪ್ರಕರಣ|previous/.test(t);
   const hasHotspot = /hotspot|emerging|spike|ಹಾಟ್‌ಸ್ಪಾಟ್|ಏರಿಕೆ/.test(t);
   const hasForecast = /forecast|predict|next month|coming month|projection|ಮುನ್ಸೂಚನೆ|ಮುನ್ನೋಟ/.test(t);
+  // "why are there so many cases" is a causal question, not a count. Without this it fell
+  // through to the list intent and answered "Found 40836 cases", which is not the question.
+  const hasWhy = /\bwhy\b|what (is|are) (the )?(reason|driver|cause)|because|ಏಕೆ|ಕಾರಣ/.test(t);
   // Per-capita / socio-economic questions. \b on "rate" matters: without it this also
   // fires on "accurate", stealing "how accurate is the forecast" from the branch above.
   const hasRate = /per.?capita|per 100|\brates?\b|literac|urbanis|urbaniz|densit|socio|ತಲಾ|ದರ/.test(t);
   const hasList = /fir|case|ಪ್ರಕರಣ|show|list|how many|count/.test(t);
 
-  if (hasForecast) {
+  if (hasWhy && !hasForecast) {
+    intent = 'socio_rates';
+    const socio = queries.socio();
+    const top = (socio.districts || []).slice(0, 5);
+    top.forEach((d) => citations.push({
+      type: 'district', id: String(d.districtId), label: `${d.districtName} ${d.ratePer100k}/100k`,
+    }));
+    const corr = (socio.correlations || []).filter((c) => c.strength !== 'not significant');
+    const comp = socio.composition || [];
+    const urban = comp.find((c) => c.band === 'Urban');
+    const rural = comp.find((c) => c.band === 'Rural');
+    answer = isKn
+      ? `ಒಟ್ಟು ಸಂಖ್ಯೆ ಹೆಚ್ಚಾಗಿ ಜನಸಂಖ್ಯೆಯನ್ನು ಅಳೆಯುತ್ತದೆ. ತಲಾ ಒಂದು ಲಕ್ಷಕ್ಕೆ ನೋಡಿದಾಗ ನಗರ ಜಿಲ್ಲೆಗಳ ದರ ${urban ? urban.ratePer100k : 0}, ಗ್ರಾಮೀಣ ${rural ? rural.ratePer100k : 0}.`
+      : `Raw counts mostly track population. Normalised per 100,000 residents, urban districts run at ${urban ? urban.ratePer100k : 0} versus ${rural ? rural.ratePer100k : 0} in rural ones`
+        + (corr.length ? `, and ${corr.map((c) => `${c.indicator.toLowerCase()} correlates ${c.direction}ly (r=${c.pearson})`).join('; ')}` : '')
+        + '. Higher urban rates also reflect better reporting and station access, so this is association, not cause.';
+    action = { type: 'open_intelligence' };
+  } else if (hasForecast) {
     intent = 'forecast';
     const fc = queries.forecast();
     const rising = (fc.districts || []).filter((d) => d.direction === 'rising').slice(0, 5);

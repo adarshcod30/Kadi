@@ -45,13 +45,31 @@ export default function Assistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Guard against re-entrant and duplicate sends. Voice previously fired one request per
+  // interim transcript, so a single spoken sentence produced a cascade of partial queries
+  // ("Why", "Why there", "Why there are"...) each with its own answer.
+  const inFlight = useRef(false);
+  const lastSent = useRef<{ text: string; at: number }>({ text: '', at: 0 });
+
   const send = async (text: string) => {
-    if (!text.trim()) return;
+    const q = text.trim();
+    if (!q) return;
+    if (inFlight.current) return;
+    // Same question twice within 1.5s is a double-fire, not a deliberate repeat.
+    if (q === lastSent.current.text && Date.now() - lastSent.current.at < 1500) return;
+    inFlight.current = true;
+    lastSent.current = { text: q, at: Date.now() };
     setInput('');
-    setMsgs((m) => [...m, { role: 'user', content: text }]);
-    const res = await ask.mutateAsync({ text, lang });
-    setMsgs((m) => [...m, { role: 'assistant', content: res.answer, res }]);
-    speak(res.ttsText || res.answer, res.lang);
+    setMsgs((m) => [...m, { role: 'user', content: q }]);
+    try {
+      const res = await ask.mutateAsync({ text: q, lang });
+      setMsgs((m) => [...m, { role: 'assistant', content: res.answer, res }]);
+      speak(res.ttsText || res.answer, res.lang);
+    } catch (e: any) {
+      setMsgs((m) => [...m, { role: 'assistant', content: 'That query could not be answered just now. Please try again.' }]);
+    } finally {
+      inFlight.current = false;
+    }
   };
 
   const speak = (text: string, l: string) => {
@@ -68,8 +86,29 @@ export default function Assistant() {
     if (listening) { recRef.current?.stop(); setListening(false); return; }
     const rec = new SR();
     rec.lang = lang === 'kn' ? 'kn-IN' : 'en-IN';
-    rec.interimResults = false;
-    rec.onresult = (e: any) => { const t = e.results[0][0].transcript; setInput(t); send(t); };
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+    // Interim results are ON for live feedback in the input box, but only the FINAL
+    // transcript is ever submitted. Reading e.results[0] on every event and sending it
+    // was the cause of the partial-question cascade.
+    rec.interimResults = true;
+    let submitted = false;
+    rec.onresult = (e: any) => {
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const r = e.results[i];
+        if (r.isFinal) final += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setInput((final || interim).trim());          // live feedback only
+      if (final.trim() && !submitted) {
+        submitted = true;
+        try { rec.stop(); } catch { /* already stopping */ }
+        send(final.trim());
+      }
+    };
+    rec.onerror = () => { setListening(false); };
     rec.onend = () => setListening(false);
     rec.start(); recRef.current = rec; setListening(true);
   };
