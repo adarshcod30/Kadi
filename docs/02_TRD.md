@@ -177,7 +177,7 @@ Derived tables are rebuilt by the Job. The API reads them, never recomputes them
 1. **Entity resolution** — block on name key + district, then `rapidfuzz` similarity with
    **rarity-aware distinctiveness** (a rare surname match counts for far more than a common
    one), plus shared co-accused / section / location signals. Union-find merges the
-   clusters. 36,289 accused rows → 300 identities, each with a confidence. **No protected
+   clusters. 36,890 accused rows → 300 identities, each with a confidence. **No protected
    attributes.**
 2. **Graph build** — a `networkx` multigraph. Edge types: shared offender, co-accused, same
    location cell, overlapping time window, MO similarity, shared act & section. Every edge

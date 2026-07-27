@@ -32,7 +32,7 @@ Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
 | | | | | | |
 |:--:|:--:|:--:|:--:|:--:|:--:|
 | **40,836** | **300** | **68,808** | **100%** | **3.9%** | **8** |
-| FIRs analysed | offenders resolved<br/>from 36,289 records | typed evidence links | ground-truth<br/>recovery | forecast MAPE<br/>(hold-out) | Catalyst services |
+| FIRs analysed | offenders resolved<br/>from 36,890 records | typed evidence links | ground-truth<br/>recovery | forecast MAPE<br/>(hold-out) | Catalyst services |
 
 *Every figure on this page is read live from the deployed API. Nothing is illustrative.*
 
@@ -93,7 +93,7 @@ Every FIR joined to every other FIR it shares real evidence with, across six typ
 Every edge is clickable proof — which attribute matched, on which FIRs.
 
 **Entity Resolution**
-Rarity-aware fuzzy matching folds **36,289** accused records into **300** real people, surviving
+Rarity-aware fuzzy matching folds **36,890** accused records into **300** real people, surviving
 spelling variants, initials and transliteration drift.
 
 </td><td width="33%" valign="top">
@@ -257,7 +257,7 @@ model.
 
 ```mermaid
 flowchart TD
-    A["FIR intake<br/>29 KSP tables"] --> B["Entity resolution<br/>36,289 → 300 identities<br/>RapidFuzz + union-find"]
+    A["FIR intake<br/>29 KSP tables"] --> B["Entity resolution<br/>36,890 → 300 identities<br/>RapidFuzz + union-find"]
     B --> C["MO similarity<br/>TF-IDF + NearestNeighbors"]
     C --> D["Graph build<br/>6 typed edge kinds · 68,808 links"]
     D --> E["Louvain communities"]

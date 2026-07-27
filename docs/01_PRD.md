@@ -110,7 +110,7 @@ deployed build.
 
 ### F2 · Repeat / habitual offender profiles — P0
 - One profile per resolved identity, with name variants merged by entity resolution:
-  **36,289 accused records fold into 300 real people**.
+  **36,890 accused records fold into 300 real people**.
 - A behaviour-based risk score (0–100) with a visible factor breakdown — prior count,
   gravity mix, recency, network centrality. **No protected attributes.** If you cannot show
   the breakdown, do not show the score.

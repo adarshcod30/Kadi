@@ -131,7 +131,7 @@ API and carried into the deck and this README.
 | Metric | Value |
 |---|---|
 | FIRs analysed | 40,836 |
-| Accused records → resolved identities | 36,289 → 300 |
+| Accused records → resolved identities | 36,890 → 300 |
 | Active networks / cross-district | 117 / 7 |
 | Cases flagged by investigation health | 19,006 |
 | Ground-truth recovery | 100% (gang, chain, cyber ring, identity ER) |
