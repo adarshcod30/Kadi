@@ -166,7 +166,9 @@ export default function Intelligence() {
                       <Scatter key={b} name={b} data={(corr.points || []).filter((p: any) => p.band === b)}
                         fill={BAND_COLOR[b]} isAnimationActive={false} />
                     ))}
-                    <RLegend wrapperStyle={{ fontSize: 11 }} />
+                    {/* Top-aligned: the default bottom legend overlapped the x-axis
+                        label, which sits at insideBottom offset -12. */}
+                    <RLegend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 11 }} />
                   </ScatterChart>
                 </ResponsiveContainer>
               </div>

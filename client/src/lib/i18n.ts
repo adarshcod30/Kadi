@@ -27,7 +27,7 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   linkedCases: { en: 'Linked cases', kn: 'ಸಂಬಂಧಿತ ಪ್ರಕರಣಗಳು' },
   whyLinked: { en: 'Why linked?', kn: 'ಏಕೆ ಸಂಬಂಧಿಸಿದೆ?' },
   openCases: { en: 'Open cases', kn: 'ತೆರೆದ ಪ್ರಕರಣಗಳು' },
-  flagged: { en: 'Flagged cases', kn: 'ಗುರುತಿಸಲಾದ ಪ್ರಕರಣಗಳು' },
+  flagged: { en: 'Serious flags', kn: 'ಗಂಭೀರ ಗುರುತುಗಳು' },
   networks: { en: 'Offender networks', kn: 'ಆರೋಪಿ ಜಾಲಗಳು' },
   riskScore: { en: 'Risk score', kn: 'ಅಪಾಯ ಸೂಚ್ಯಂಕ' },
   recommendedAction: { en: 'Recommended action', kn: 'ಶಿಫಾರಸು ಮಾಡಿದ ಕ್ರಮ' },

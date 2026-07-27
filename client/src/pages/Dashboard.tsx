@@ -101,8 +101,8 @@ export default function Dashboard() {
       {/* KPIs — animated entrance */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation in your scope.', to: '/cases?status=1' },
-          { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases flagged as slipping (ageing / pendency / undetected-risk).', accent: '#C9820A', to: '/health' },
+          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation, state-wide.', to: '/cases?status=1' },
+          { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases carrying a high-severity health flag — ageing, pendency or undetected-risk. The Health cockpit shows the subset within your rank scope.', accent: '#C9820A', to: '/health' },
           { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offenders who operate with co-offenders — genuine groups, not just cases with a similar modus operandi.', accent: '#1A6FC4', to: '/offenders' },
           { label: 'Resolved offenders', value: stats?.resolvedOffenders, hint: 'Distinct repeat offenders after name-variant entity resolution.', to: '/offenders' },
           { label: 'Emerging hotspots', value: stats?.emergingHotspots, hint: 'Areas where recent activity far exceeds the historical baseline.', accent: '#C0392B', to: '/map' },
@@ -113,6 +113,12 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </motion.div>
+
+      {/* The command view is deliberately state-wide; Cases, Health and Graph are
+          rank-scoped. Saying so stops the two readings looking contradictory. */}
+      <p className="text-xs text-ink-muted -mt-1">
+        Command view — these figures are state-wide. Cases, Health and Graph are scoped to your rank.
+      </p>
 
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: trend + heatmap + districts */}
