@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio } from '../api/hooks';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
@@ -71,6 +71,17 @@ export default function Dashboard() {
   const { data: ev } = useEval();
   const { data: districts } = useDistricts();
   const { data: national } = useNational();
+  const { data: fc } = useForecast();
+
+  // The final month in `trend` is the month still in progress, so it carries a
+  // fraction of a normal month's FIRs and renders as a cliff. The pipeline already
+  // computes `lastCompleteMonth` and the forecast excludes partial months from its
+  // fit for exactly this reason -- read the same value here so the two panels agree.
+  const trend = (() => {
+    const rows = stats?.trend || [];
+    const last = fc?.lastCompleteMonth;
+    return last ? rows.filter((r: any) => r.month <= last) : rows;
+  })();
 
   const statusData = stats && [
     { name: 'Charge-sheeted', value: stats.statusBreakdown.chargeSheeted, color: '#1E874B' },
@@ -123,11 +134,11 @@ export default function Dashboard() {
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: trend + heatmap + districts */}
         <div className="lg:col-span-2 space-y-5">
-          <VizCard title={t('firsPerMonth')} hint="Monthly FIR volume over the dataset window — watch for sustained rises that signal shifting crime patterns.">
+          <VizCard title={t('firsPerMonth')} hint="Monthly FIR volume over the dataset window — watch for sustained rises that signal shifting crime patterns. The month still in progress is excluded, since a partial month reads as a false collapse.">
             <div className="h-52 p-3">
               {stats ? (
-                <ResponsiveContainer width="100%" height="100%" key={stats.trend.length}>
-                  <AreaChart data={stats.trend} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                <ResponsiveContainer width="100%" height="100%" key={trend.length}>
+                  <AreaChart data={trend} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
                     <defs><linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1A6FC4" stopOpacity={0.35} /><stop offset="100%" stopColor="#1A6FC4" stopOpacity={0.02} /></linearGradient></defs>
                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} minTickGap={20} />
                     <YAxis tick={{ fontSize: 10, fill: '#5B6B7E' }} tickLine={false} axisLine={false} width={32} />
