@@ -129,7 +129,8 @@ appsail/
 data/
   generator/                  generate.py, patterns.py, karnataka.py
   output/*.csv                29 tables (gitignored — regenerate)
-deck/                         submission deck + build/QA tooling
+docs/
+  deck/                       submission deck, prototype brief, analytics slide
 ```
 
 ## 5. API surface

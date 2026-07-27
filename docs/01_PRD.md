@@ -183,8 +183,8 @@ You should be able to demonstrate all six of these live:
 - [x] Live solution deployed **on Catalyst**
 - [x] Public GitHub repo with README and setup steps
 - [x] Demo video (problem → prototype → workflows)
-- [x] Prototype brief, ≤1024 characters — `deck/PROTOTYPE_BRIEF.txt`
-- [x] Official PPT template filled — `deck/`, built by `node build.js`
+- [x] Prototype brief, ≤1024 characters — `docs/deck/PROTOTYPE_BRIEF.txt`
+- [x] Official PPT template filled — `docs/deck/`, 20 slides
 - [x] All links tested and public
 
 ## 8. Assumptions you are working under

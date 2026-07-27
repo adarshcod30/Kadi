@@ -173,7 +173,7 @@ map shows hotspots, and the audit trail and fairness statement are both visible.
 
 - Seed the demo path; performance pass; empty and error states; accessibility pass.
 - Full deploy, then smoke-test every link.
-- Deck (`deck/`, `node build.js`), demo video, rehearse the pitch.
+- Deck (`docs/deck/`), demo video, rehearse the pitch.
 - Fill the submission form: prototype brief, links.
 
 **Done when:** every box in [01 §7](01_PRD.md) is ticked.

@@ -56,14 +56,8 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Deck build artefacts (the .pptx itself is committed; its scaffolding is not)
-deck/node_modules/
-deck/unpacked/
-deck/template.pptx
-deck/_t.*
 
 # Deck QA artefacts — regenerate with `node build.js && python3 preview.py`
-deck/preview.html
-deck/analytics_slide.html
-deck/qa/
-deck/shots/
+
+# Local scratch space
+scratch/

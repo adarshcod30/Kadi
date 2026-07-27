@@ -126,7 +126,7 @@ Leave it off until then.
 ## Verified numbers
 
 Everything quoted in the deck and README comes from here, captured live from the deployed
-API into `deck/data/*.json`.
+API and carried into the deck and this README.
 
 | Metric | Value |
 |---|---|

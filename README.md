@@ -742,20 +742,18 @@ If you are picking this up cold, read them in order — or jump to what you need
 
 | Artefact | Location | Notes |
 |---|---|---|
-| **Deck** | [`deck/KADI_KSP_Datathon_2026_Submission.pptx`](deck/) | 19 slides on the official template. Rebuild with `node build.js` |
-| **Prototype brief** | [`deck/PROTOTYPE_BRIEF.txt`](deck/PROTOTYPE_BRIEF.txt) | 972 / 1024 characters, ready to paste |
+| **Deck** | [`docs/deck/KADI_KSP_Datathon_2026_Submission.pptx`](docs/deck/) | 20 slides on the official KSP Datathon template |
+| **Prototype brief** | [`docs/deck/PROTOTYPE_BRIEF.txt`](docs/deck/PROTOTYPE_BRIEF.txt) | 972 / 1024 characters, ready to paste |
 | **Demo video** | [Google Drive](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing) | Problem overview · working prototype · key workflows |
 | **Live deployment** | [Catalyst](https://kadilabs-60078029367.development.catalystserverless.in/app/) | Sign in by role, no password needed |
 
-The deck is generated, not hand-placed — every figure in it is read from `deck/data/*.json`,
-captured live from the deployed API.
+Every figure in the deck was generated from data captured live from the deployed API —
+none of it was typed in by hand. Slide 14 (`analytics_slide.png`) carries six charts drawn
+from that same capture: monthly volume with its forecast interval, crime mix, an hour ×
+weekday heatmap, the disposal donut, a rank-shift dumbbell, and the urbanisation scatter.
 
-```bash
-cd deck
-node build.js          # rebuild the .pptx from live data
-python3 check.py       # fail on any shape off-canvas or text overflowing its box
-python3 preview.py     # render to HTML for visual review without PowerPoint
-```
+The build tooling that produced it is not kept in the repository — `docs/deck/` holds the
+finished artefacts only.
 
 ---
 
