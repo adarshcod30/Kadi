@@ -139,6 +139,23 @@ function buildApp() {
   // in Data Store" can be verified by hitting a URL rather than taken on trust.
   r.get('/datastore/status', handle(async (req) => datastore.status(req)));
   r.get('/datastore/probe', handle(async (req) => datastore.probe(req)));
+  // The FIR register read live from Data Store, not from the bundle. Kept separate from
+  // /cases deliberately: ZCQL returns raw CaseMaster columns while /cases returns rows
+  // enriched with district, health and link counts from the bundle. Swapping /cases over
+  // needs that mapper, and the mapper cannot be tested until the function can present a
+  // credential (see /datastore/probe). Until then this route proves the capability
+  // without putting untested code on the path the UI depends on.
+  r.get('/datastore/cases', handle(async (req) => {
+    const live = await datastore.listCases(req, req.query, null);
+    if (!live) {
+      return {
+        source: 'unavailable',
+        reason: 'Data Store refused the read - the deployed function presents no credential. See /datastore/probe.',
+        diag: datastore.diag(),
+      };
+    }
+    return { source: 'datastore', ...live };
+  }));
 
   // One call to see whether the Catalyst AI services are actually wired.
   r.get('/ai/status', handle(async () => ({

@@ -117,9 +117,61 @@ async function probe(req) {
   return out;
 }
 
+// ---- the register, read live from Data Store -------------------------------------
+// CaseMaster is the one table with real volume in Data Store (40,836 rows), so it is the
+// one worth reading live. Lookups stay in the bundle: they are a few hundred rows, they
+// never change between pipeline runs, and joining them in ZCQL would cost a round trip to
+// save nothing.
+//
+// Returns null on ANY failure -- no credential, bad query, timeout -- and the caller falls
+// back to the bundled read-model. A Data Store outage must degrade to slightly staler data,
+// never to a 500 on the case register.
+const COLS = ['CaseMasterID', 'CrimeNo', 'CaseNo', 'CrimeRegisteredDate', 'PoliceStationID',
+  'CaseCategoryID', 'GravityOffenceID', 'CrimeMajorHeadID', 'CrimeMinorHeadID',
+  'CaseStatusID', 'IncidentFromDate', 'latitude', 'longitude', 'BriefFacts'];
+
+const esc = (v) => String(v).replace(/'/g, "''");
+
+async function listCases(req, q = {}, scopeUnitIds = null) {
+  const where = [];
+  // RBAC first, so an out-of-scope read cannot be widened by a filter below it.
+  if (Array.isArray(scopeUnitIds)) {
+    if (!scopeUnitIds.length) return { items: [], total: 0 };
+    where.push(`PoliceStationID IN (${scopeUnitIds.map((u) => `'${esc(u)}'`).join(',')})`);
+  }
+  if (q.head) where.push(`CrimeMajorHeadID = '${esc(q.head)}'`);
+  if (q.subhead) where.push(`CrimeMinorHeadID = '${esc(q.subhead)}'`);
+  if (q.unit) where.push(`PoliceStationID = '${esc(q.unit)}'`);
+  if (q.status) where.push(`CaseStatusID = '${esc(q.status)}'`);
+  if (q.gravity) where.push(`GravityOffenceID = '${esc(q.gravity)}'`);
+  if (q.category) where.push(`CaseCategoryID = '${esc(q.category)}'`);
+  if (q.dateFrom) where.push(`CrimeRegisteredDate >= '${esc(q.dateFrom)}'`);
+  if (q.dateTo) where.push(`CrimeRegisteredDate <= '${esc(q.dateTo)}'`);
+  if (q.search) where.push(`CrimeNo like '%${esc(q.search)}%'`);
+
+  const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+  const page = Math.max(1, parseInt(q.page || '1', 10));
+  const pageSize = Math.min(200, Math.max(1, parseInt(q.pageSize || '25', 10)));
+  const offset = (page - 1) * pageSize;
+  const asc = q.sort === 'date_asc';
+
+  const countRows = await query(req, `SELECT COUNT(ROWID) FROM CaseMaster${clause}`, 'CaseMaster');
+  if (countRows === null) return null;
+  const total = Number(Object.values(countRows[0] || {})[0] || 0);
+
+  const rows = await query(req,
+    `SELECT ${COLS.join(', ')} FROM CaseMaster${clause}`
+    + ` ORDER BY CrimeRegisteredDate ${asc ? 'ASC' : 'DESC'}`
+    + ` LIMIT ${offset}, ${pageSize}`, 'CaseMaster');
+  if (rows === null) return null;
+
+  return { items: rows, total, page, pageSize };
+}
+
 module.exports = {
   available: () => !!catalyst,
   probe,
+  listCases,
   diag: () => ({ sdkLoaded: !!catalyst, lastError }),
   query,
   status,
