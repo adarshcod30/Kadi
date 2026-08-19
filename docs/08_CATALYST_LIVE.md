@@ -83,9 +83,10 @@ refused, not hidden. Only the identity check is outstanding. Fix: read the Catal
 `userFromRequest` and map it to the officer's rank. One function.
 
 **2 · The deployed API reads bundled files, not Data Store.**
-The 40,836 rows really are in Data Store and really are queryable by ZCQL — you can
-demonstrate that. But the UI reads a precomputed read-model shipped inside the function
-bundle. The seam to implement against is `functions/api/services/store.mock.js`.
+The rows are in Data Store and are queryable by ZCQL from an authenticated client — but
+**not from the deployed function**, which cannot present a credential (see 5). The ZCQL
+adapter is written (`services/datastore.js`) and the seam to swap against is
+`services/store.mock.js`; both are waiting on the credential, not on code.
 
 **3 · The audit trail is in-memory.**
 A ring buffer in `services/audit.js`. It is lost on cold start. Moving it to a Data Store
@@ -95,13 +96,38 @@ table is small and worth doing before anyone relies on it for accountability.
 Call it a **print-ready briefing**. SmartBrowz is not wired. Do not describe it as a PDF
 pipeline.
 
-**5 · Cache writes return 401.**
-`PERMISSION_NEEDED` from inside a deployed function. Ruled out: segment id, SDK version, the
-scope API, and table permissions (App User write was granted, tested via `CREATEDTIME`, then
-reverted). It looks platform-level and is unresolved.
+**5 · Cache writes return 401 — and so does everything else. One root cause.**
 
-Zero user impact — the KPI query recomputes in about a millisecond, so every call is simply a
-miss that falls through to compute. The adapter is a no-op until the permission is sorted.
+This was recorded for a long time as a Cache-specific bug. It is not.
+
+Hitting `/datastore/probe` on the deployed function shows ZCQL returning **byte-for-byte the
+same** `401 PERMISSION_NEEDED`, and so does `userManagement().getCurrentUser()`. All three
+SDK scopes — default, `admin`, `user` — fail identically.
+
+The environment tells you why. The function receives **no credential of any kind**:
+
+```
+CATALYST_PROJECT_ID, CATALYST_RESOURCE_ID, CATALYST_FUNCTION_TYPE,
+X_ZOHO_CATALYST_ACCOUNTS_URL, X_ZOHO_CATALYST_CONSOLE_URL, ...
+```
+
+Identifiers and URLs only. `X_ZOHO_CATALYST_PROJECT_KEY` is **absent**, and there is no
+token or secret anywhere in the environment.
+
+The SPA calls `/server/api/...` as a public, anonymous HTTP request, so `initialize(req)`
+has nothing to resolve a credential from. Every project-owned service call therefore fails:
+Cache, ZCQL and user management alike.
+
+**This single cause sits under three of the limitations on this page — 1, 2 and 5.** Fixing
+it once would unblock the Data Store read path, the Cache adapter, and the identity binding
+together. It needs a project credential made available to the function (a project key set as
+an environment variable, or a Connection carrying Data Store scopes), which is a console
+action.
+
+Verify any of this yourself at `/datastore/status` and `/datastore/probe`.
+
+Zero user impact today — the KPI query recomputes in about a millisecond, so every Cache
+call is simply a miss that falls through to compute.
 
 **6 · QuickML rejects the request body.**
 `400 PATTERN_NOT_MATCHED` mentioning `zoho-inputstream`. The endpoint, model id

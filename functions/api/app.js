@@ -12,6 +12,7 @@ const audit = require('./services/audit');
 const cache = require('./services/cache');
 const quickml = require('./services/quickml');
 const zia = require('./services/zia');
+const datastore = require('./services/datastore');
 
 function buildApp() {
   const app = express();
@@ -133,6 +134,11 @@ function buildApp() {
     rbac.requireRole(req.user, ['ACP', 'Admin']);
     return { items: audit.list({ limit: Number(req.query.limit) || 100, action: req.query.action }) };
   }));
+
+  // Row counts read live from Data Store via ZCQL. Exists so the claim "40,836 FIRs are
+  // in Data Store" can be verified by hitting a URL rather than taken on trust.
+  r.get('/datastore/status', handle(async (req) => datastore.status(req)));
+  r.get('/datastore/probe', handle(async (req) => datastore.probe(req)));
 
   // One call to see whether the Catalyst AI services are actually wired.
   r.get('/ai/status', handle(async () => ({
