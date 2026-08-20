@@ -723,6 +723,7 @@ If you are picking this up cold, read them in order — or jump to what you need
 
 | # | Document | What it covers |
 |---|---|---|
+| **00** | [**KADI, end to end**](docs/00_PROJECT_ANATOMY.md) | **Start here.** Every part of the project verified against the code — including a full list of what is wrong, stale or unfinished, and a ranked refinement backlog |
 | 01 | [What you are building, and why](docs/01_PRD.md) | The problem, the personas, every feature with its shipped status, the access matrix |
 | 02 | [How it is wired](docs/02_TRD.md) | Architecture, the eight Catalyst services, the API surface, the pipeline, the performance work |
 | 03 | [The data contract](docs/03_DATABASE_SCHEMA.md) | The KSP source schema verbatim, the tables KADI adds, Catalyst type mapping and traps |
