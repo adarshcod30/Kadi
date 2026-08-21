@@ -1,6 +1,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCases, useLookups, useMe } from '../api/hooks';
-import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip } from '../components/ui';
+import { useCases, useLookups, useMe, useCommand } from '../api/hooks';
+import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, Section } from '../components/ui';
+import { Share2 } from 'lucide-react';
 
 export default function Cases() {
   const [params, setParams] = useSearchParams();
@@ -10,6 +11,13 @@ export default function Cases() {
   const q = Object.fromEntries(params.entries());
   const page = Number(q.page || '1');
   const { data, isLoading } = useCases({ ...q, pageSize: 25 });
+  const { data: command } = useCommand(false);
+  // District tier gets a second view of the register: not "my cases filtered", but the cases
+  // registered ELSEWHERE that share evidence with one of mine. That is the silo-breaking
+  // answer, and a plain filtered list can never surface it.
+  const districtView = command?.view === 'district';
+  const linkedIn = districtView ? (command.linkedInFromOtherDistricts || []) : [];
+  const tab = q.view === 'linked' ? 'linked' : 'mine';
 
   // scope-aware district options: non-state roles only see their own district
   const scope = me?.capabilities.scope;
@@ -60,7 +68,56 @@ export default function Cases() {
 
       {/* Table — scrolls horizontally on small screens instead of breaking the layout */}
       <div className="card overflow-x-auto">
-        {isLoading ? <Skeleton rows={10} /> : !data?.items.length ? <Empty title="No cases found" hint="Try adjusting the filters." /> : (
+        {districtView && (
+          <div className="flex gap-1 border-b border-line mb-3">
+            {([['mine', `Registered in ${command.districtName}`], ['linked', `Linked in from elsewhere (${(command.linkedInTotal || 0).toLocaleString()})`]] as const).map(([k, label]) => (
+              <button key={k} onClick={() => set('view', k === 'mine' ? '' : 'linked')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${
+                  tab === k ? 'border-kadi-blue text-kadi-blue' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {districtView && tab === 'linked' ? (
+          <div>
+            <p className="text-[12.5px] text-ink-muted mb-2 flex items-start gap-1.5">
+              <Share2 size={14} className="text-kadi-teal shrink-0 mt-0.5" />
+              Cases registered in other districts that share proven evidence with a case in
+              {' '}{command.districtName}. None of these appear in this district's own register.
+            </p>
+            {!linkedIn.length ? <Empty title="No inbound links" hint="No case outside this district currently links to one inside it." /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium">CrimeNo</th>
+                      <th className="text-left px-4 py-2 font-medium">Crime</th>
+                      <th className="text-left px-4 py-2 font-medium">Registered in</th>
+                      <th className="text-left px-4 py-2 font-medium">Station</th>
+                      <th className="text-left px-4 py-2 font-medium">Linked by</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedIn.map((c: any) => (
+                      <tr key={c.caseMasterId} onClick={() => nav(`/graph?case=${c.caseMasterId}`)}
+                        className="border-b border-line/60 hover:bg-kadi-blue50/50 cursor-pointer">
+                        <td className="px-4 py-2"><Mono>{c.crimeNo}</Mono></td>
+                        <td className="px-4 py-2 text-ink">{c.crimeSubHead}</td>
+                        <td className="px-4 py-2 text-ink-muted">{c.districtName}</td>
+                        <td className="px-4 py-2 text-ink-muted">{c.unitName}</td>
+                        <td className="px-4 py-2">
+                          <Chip>{String(c.edgeType).replace(/_/g, ' ')}</Chip>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : isLoading ? <Skeleton rows={10} /> : !data?.items.length ? <Empty title="No cases found" hint="Try adjusting the filters." /> : (
           <table className="w-full text-sm min-w-[820px]">
             <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
               <tr>

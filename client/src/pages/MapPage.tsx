@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3 } from 'lucide-react';
-import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational } from '../api/hooks';
+import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe } from '../api/hooks';
 import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
@@ -51,7 +51,16 @@ export default function MapPage() {
   const [basemap, setBasemap] = useState<'sat' | 'streets'>('sat');
   const [head, setHead] = useState('');
   const [hours, setHours] = useState<[number, number]>([0, 23]);
+  const { data: me } = useMe();
+  // A district officer should land on their district, not on all Karnataka with their own
+  // area as one polygon among 31. State tier still opens on the whole state.
   const [selDistrict, setSelDistrict] = useState<string | null>(null);
+  useEffect(() => {
+    const cap = me?.capabilities;
+    if (cap && cap.effectiveScope === 'district' && cap.districtId && selDistrict === null) {
+      setSelDistrict(String(cap.districtId));
+    }
+  }, [me]);
 
   const { data: districts } = useDistricts();
   const { data: national } = useNational();

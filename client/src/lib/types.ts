@@ -1,7 +1,19 @@
 // Shared API types (mirror the Node API response shapes).
 export interface Me {
   user: { appUserId: string; name: string; role: string; unitId: string | null; districtId: string | null };
-  capabilities: { role: string; label: string; scope: string; canViewVulnerability: boolean; canViewAudit: boolean; canAdmin: boolean };
+  capabilities: {
+    role: string; label: string; scope: string;
+    // Two tiers, and the drill state on top of them. effectiveScope is what the server is
+    // actually applying right now -- a state user drilled into a district reads 'district'.
+    tier: 'state' | 'district';
+    effectiveScope: 'state' | 'district';
+    districtId: string | null;
+    drillUnitId: string | null;
+    drilledFromState: boolean;
+    canSwitchDistrict: boolean;
+    canViewWholeState: boolean;
+    canViewVulnerability: boolean; canViewAudit: boolean; canAdmin: boolean;
+  };
   fairness: string;
   roles: string[];
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Share2 } from 'lucide-react';
-import { useHealthCases, useHealthSummary } from '../api/hooks';
+import { useHealthCases, useHealthSummary , useMe } from '../api/hooks';
 import { KpiCard, Section, Chip, SeverityDot, Skeleton, Empty, Mono } from '../components/ui';
 
 const FLAG_LABEL: Record<string, string> = {
@@ -10,6 +10,7 @@ const FLAG_LABEL: Record<string, string> = {
 };
 
 export default function Health() {
+  const { data: me } = useMe();
   const nav = useNavigate();
   const [severity, setSeverity] = useState('high');
   const [flag, setFlag] = useState('');
@@ -20,7 +21,9 @@ export default function Health() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-kadi-navy">Investigation-Health Cockpit</h1>
-        <p className="text-sm text-ink-muted">Early warning for cases slipping past detection timelines — deterministic, auditable, with recommended actions.</p>
+        <p className="text-sm text-ink-muted">{me?.capabilities?.effectiveScope === 'district'
+            ? `Cases slipping past detection timelines in ${me.capabilities.districtId ? 'this district' : 'your district'} — deterministic, auditable, each with a recommended action. Ordered so the ones nearest failure surface first.`
+            : 'Early warning across all 31 districts — deterministic, auditable, with recommended actions. Use the scope control to narrow to one district.'}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

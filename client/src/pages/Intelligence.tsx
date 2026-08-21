@@ -8,11 +8,23 @@ import {
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles } from 'lucide-react';
-import { useSocio, useForecast, useOccasions, useZones } from '../api/hooks';
+import { useSocio, useForecast, useOccasions, useZones, useMe } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
 
 type TabKey = 'where' | 'why' | 'when' | 'next';
+// District tier asks different questions of the same analytics. "Why is crime distributed
+// like this across Karnataka" is not an operational question for someone running one
+// district; "which of my stations, and how do I compare" is.
+const DISTRICT_TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
+  { key: 'where', label: 'My stations', icon: MapPin,
+    blurb: 'Which stations in this district sit above their own baseline, and what is driving it.' },
+  { key: 'when', label: 'When', icon: CalendarDays,
+    blurb: 'How offending here moves through the calendar — festivals and holidays are not ordinary days.' },
+  { key: 'next', label: 'What next', icon: Sparkles,
+    blurb: 'Where this district is heading over the next three months, against a measured error.' },
+];
+
 const TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
   { key: 'where', label: 'Where', icon: MapPin,
     blurb: 'Which districts carry the burden once you divide by population — and which are currently above their own baseline.' },
@@ -174,6 +186,9 @@ export default function Intelligence() {
   const [tab, setTab] = useState<TabKey>('where');
   const { data: zones } = useZones();
   const { data: occ } = useOccasions();
+  const { data: me } = useMe();
+  const districtView = me?.capabilities?.effectiveScope === 'district';
+  const tabs = districtView ? DISTRICT_TABS : TABS;
   const { data: socio, isLoading: sLoad } = useSocio();
   const { data: fc, isLoading: fLoad } = useForecast();
   const [indicator, setIndicator] = useState(0);
@@ -214,15 +229,18 @@ export default function Intelligence() {
       <motion.div variants={rise} className="card p-5 bg-gradient-to-br from-kadi-navy to-kadi-navy700 text-white">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold">Sociological &amp; Predictive Intelligence</h1>
+            <h1 className="text-xl font-semibold">
+              {districtView ? `Intelligence — ${zones?.districts?.[0]?.districtName || 'this district'}` : 'Sociological & Predictive Intelligence'}
+            </h1>
             <p className="text-white/75 text-sm mt-1 max-w-2xl">
-              Raw FIR counts mostly measure population — the biggest district always “looks worst”.
-              Normalising to incidents per 100,000 residents and correlating against socio-economic
-              indicators is what turns a count map into an explanation.
+              {districtView
+                ? 'Station-level status against each station\'s own baseline, how offending here moves through the calendar, and where the next three months are heading.'
+                : 'Raw FIR counts mostly measure population — the biggest district always “looks worst”. Normalising to incidents per 100,000 residents and correlating against socio-economic indicators is what turns a count map into an explanation.'}
             </p>
           </div>
           <div className="flex gap-3">
-            <HeroStat label="Districts analysed" value={districts.length} />
+            <HeroStat label={districtView ? 'Stations here' : 'Districts analysed'}
+              value={districtView ? (zones?.stations?.length ?? '—') : districts.length} />
             <HeroStat label="Forecast horizon" value={`${fc?.horizonMonths || 3} mo`} />
             <HeroStat label="Backtest MAPE" value={fc?.accuracy ? `${fc.accuracy.mape}%` : '—'} good />
           </div>
@@ -233,7 +251,7 @@ export default function Intelligence() {
           single stacked page makes every panel feel equally important -- which means none of
           them lead. Each tab answers one question. */}
       <div className="flex gap-1 border-b border-line overflow-x-auto">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex items-center gap-1.5 transition-colors ${
               tab === t.key ? 'border-kadi-blue text-kadi-blue' : 'border-transparent text-ink-muted hover:text-ink'}`}>
@@ -241,7 +259,7 @@ export default function Intelligence() {
           </button>
         ))}
       </div>
-      <p className="text-[12.5px] text-ink-muted -mt-2">{TABS.find((t) => t.key === tab)?.blurb}</p>
+      <p className="text-[12.5px] text-ink-muted -mt-2">{tabs.find((t) => t.key === tab)?.blurb}</p>
 
       {tab === 'where' && <AiNote kind="where" text={zones?.insight} />}
       {tab === 'when' && <AiNote kind="when" text={occ?.insight} />}
@@ -250,7 +268,9 @@ export default function Intelligence() {
       <motion.div variants={rise}>
         <ZoneBoard zones={zones} />
       </motion.div>
-      {/* ---- The headline finding: counts vs rates ---- */}
+      {/* Per-capita ranking across districts is a state question. Under "My stations" it
+          would answer something the reader did not ask. */}
+      {!districtView && (
       <motion.div variants={rise}>
         <Section
           title={<span className="flex items-center gap-2"><Users2 size={15} className="text-kadi-blue" />Counts mislead — the same districts ranked per 100,000 residents</span>}
@@ -294,9 +314,10 @@ export default function Intelligence() {
           </div>
         </Section>
       </motion.div>
+      )}
       </>}
 
-      {tab === 'why' && <>
+      {tab === 'why' && !districtView && <>
       {/* ---- Correlation ---- */}
       <motion.div variants={rise}>
         <Section
