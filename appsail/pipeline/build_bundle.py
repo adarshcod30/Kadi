@@ -166,16 +166,18 @@ def main():
         total_after += a
         print(f"  case_health      {b:6.1f} MB -> {a:5.1f} MB   ({len(slim):,} entries)")
 
-    # ---- offender_map ----
+    # ---- offender_map: NOT shipped ----
+    # 6.0 MB of accused-record to identity mapping that the API never opens. The comment at
+    # the top of this file said "only the case->offender direction is read", and that is
+    # exactly right -- offender_of_case (28 KB) carries that direction. The full map is
+    # pipeline working state and evaluation input, not something the read path needs.
+    #
+    # Dropping it takes ~12% off every deploy and off the JSON a cold container parses before
+    # serving its first request.
     src = os.path.join(DERIVED, "offender_map.json")
     if os.path.exists(src):
-        with open(src) as f:
-            om = json.load(f)
-        b = size_mb(src)
-        a = write(os.path.join(OUT_DERIVED, "offender_map.json"), om)
-        total_before += b
-        total_after += a
-        print(f"  offender_map     {b:6.1f} MB -> {a:5.1f} MB")
+        total_before += size_mb(src)
+        print(f"  offender_map     {size_mb(src):6.1f} MB ->   skipped (never read by the API)")
 
     # ---- CaseMaster without BriefFacts (list view never renders it) ----
     src = os.path.join(SRC, "CaseMaster.csv")
