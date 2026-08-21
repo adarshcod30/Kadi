@@ -184,6 +184,14 @@ function getCluster(user, clusterId) {
 function listOffenders(user, q = {}) {
   const db = load();
   let rows = db.offenders.slice();
+  // District tier sees offenders with at least one case in their district. An offender who
+  // also works elsewhere stays visible -- that cross-jurisdiction reach is the finding, not
+  // something to hide from the district that is dealing with them.
+  if (user && user.roleMeta && user.roleMeta.tier === 'district') {
+    const did = String(user.districtId);
+    rows = rows.filter((o) => (o.districts || []).map(String).includes(did));
+  }
+  if (q.crossDistrict === 'true') rows = rows.filter((o) => (o.distinctDistricts || 0) >= 2);
   if (q.band) rows = rows.filter((o) => o.band === q.band);
   if (q.minRisk) rows = rows.filter((o) => (o.riskScore || 0) >= Number(q.minRisk));
   if (q.search) {
@@ -368,32 +376,84 @@ module.exports = {
   // Cases whose ego-network actually demonstrates the product: several shared-offender
   // links and more than one kind of evidence. Sorting the case list by raw link count
   // surfaces pure modus-operandi clusters instead, which all look identical.
-  featuredNetworks: (limit = 6) => {
+  // Cases worth opening the graph on. Sorting by raw link count surfaces pure
+  // modus-operandi clusters that all look identical -- twelve teal blobs of the same crime
+  // type teach a viewer nothing. Selection therefore maximises VARIETY: different crime
+  // heads, different evidence mixes, different network shapes. State scope returns ~20,
+  // district scope ~12 drawn from that district only.
+  featuredNetworks: (limit = 20, user = null) => {
     const db = load();
-    const out = [];
+    const districtOnly = user && user.roleMeta && user.roleMeta.tier === 'district'
+      ? String(user.districtId) : null;
+
+    const cand = [];
     for (const [caseId, edges] of Object.entries(db.adjacency)) {
       if (!Array.isArray(edges) || !edges.length) continue;
+      const c = db.cases.get(String(caseId));
+      if (!c) continue;
+      if (districtOnly && String(c.districtId) !== districtOnly) continue;
       let offenderLinks = 0;
       const signals = new Set();
       for (const e of edges) {
         if (e.edgeType === 'shared_offender') offenderLinks += 1;
         for (const t of (e.allTypes || [e.edgeType])) signals.add(t);
       }
-      if (offenderLinks < 2) continue;
-      const c = db.cases.get(String(caseId));
-      out.push({
+      cand.push({
         caseMasterId: caseId,
-        crimeNo: c ? c.crimeNo : caseId,
-        districtName: c ? c.districtName : '',
-        crimeSubHead: c ? c.crimeSubHead : '',
+        crimeNo: c.crimeNo,
+        districtId: c.districtId,
+        districtName: c.districtName || '',
+        crimeHead: c.crimeHead || '',
+        crimeSubHead: c.crimeSubHead || '',
         links: edges.length,
         offenderLinks,
         signalTypes: [...signals],
-        why: `${offenderLinks} case(s) tied to the same resolved offender, across ${signals.size} kinds of evidence`,
+        // richness: evidence diversity first, then people, then raw size
+        score: signals.size * 100 + Math.min(offenderLinks, 12) * 8 + Math.min(edges.length, 40),
       });
     }
-    out.sort((a, b) => (b.offenderLinks - a.offenderLinks) || (b.signalTypes.length - a.signalTypes.length));
-    return { items: out.slice(0, limit) };
+    cand.sort((a, b) => b.score - a.score);
+
+    // Round-robin across crime head, then across evidence-mix signature, so the picker
+    // shows genuinely different networks rather than twenty of the strongest one kind.
+    const byHead = new Map();
+    for (const x of cand) {
+      const k = x.crimeHead || 'Other';
+      if (!byHead.has(k)) byHead.set(k, []);
+      byHead.get(k).push(x);
+    }
+    const heads = [...byHead.keys()];
+    const picked = [];
+    const seenSig = new Set();
+    for (let round = 0; picked.length < limit && round < 40; round += 1) {
+      let addedThisRound = false;
+      for (const h of heads) {
+        if (picked.length >= limit) break;
+        const list = byHead.get(h);
+        while (list.length) {
+          const x = list.shift();
+          const sig = x.signalTypes.slice().sort().join('|');
+          // allow a signature twice, so a common-but-real mix is not starved out
+          const n = seenSig.has(sig) ? 2 : 0;
+          if (n && round < 2) continue;
+          seenSig.add(sig);
+          picked.push({ ...x, why: `${x.offenderLinks} case(s) tied to the same resolved `
+            + `offender, across ${x.signalTypes.length} kinds of evidence` });
+          addedThisRound = true;
+          break;
+        }
+      }
+      if (!addedThisRound) break;
+    }
+    return {
+      items: picked.slice(0, limit),
+      scope: districtOnly ? 'district' : 'state',
+      districtId: districtOnly,
+      variety: {
+        crimeHeads: new Set(picked.map((p) => p.crimeHead)).size,
+        evidenceMixes: new Set(picked.map((p) => p.signalTypes.slice().sort().join('|'))).size,
+      },
+    };
   },
   socio: () => load().socio,
   // Forecast rows are keyed by districtId only; join the name here so the client never

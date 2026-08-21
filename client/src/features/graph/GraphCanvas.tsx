@@ -1,6 +1,6 @@
 // GraphCanvas — the hero Cytoscape node-link canvas (interactive + customizable).
 // Case nodes are coloured by crime head and labelled with the crime type; offender nodes
-// are circles coloured by risk band. Edges are filterable by type + strength, the layout
+// are circles coloured by risk band. Edges are filterable by type + corroboration, the layout
 // is switchable, nodes are freely draggable, and hovering isolates a node's neighbourhood.
 import { useEffect, useRef } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
@@ -33,7 +33,7 @@ const headColor = (h?: string) => (h && HEAD_COLOR[h]) || '#5B6B7E';
 
 export interface GraphFilters {
   edgeTypes: Set<string>;
-  minStrength: number;
+  minEvidence: number;
   layout: string;
 }
 
@@ -75,7 +75,10 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
           id: e.id, source: e.source, target: e.target, etype: e.edgeType,
           atypes: (e.allTypes && e.allTypes.length ? e.allTypes : [e.edgeType]),
           color: EDGE_COLOR[e.edgeType] || '#94A3B8', width: 0.8 + (e.strength || 0.3) * 2.2,
-          strength: e.strength, raw: e,
+          strength: e.strength,
+          // how many independent kinds of evidence back this link
+          kinds: (e.allTypes && e.allTypes.length) ? e.allTypes.length : 1,
+          raw: e,
         },
       });
     }
@@ -150,7 +153,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
         // Match on every signal the edge carries. Filtering on the primary type alone made
         // "Shared section" and the other enrichment toggles no-ops.
         const types: string[] = e.data('atypes') || [t];
-        const strong = (e.data('strength') || 1) >= filters.minStrength || t === 'appears_in';
+        const strong = (e.data('kinds') || 1) >= filters.minEvidence || t === 'appears_in';
         const on = (t === 'appears_in' || types.some((x) => filters.edgeTypes.has(x))) && strong;
         e.toggleClass('hidden', !on);
       });
@@ -176,7 +179,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
     ro.observe(ref.current);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.edgeTypes, filters.minStrength, filters.layout, data]);
+  }, [filters.edgeTypes, filters.minEvidence, filters.layout, data]);
 
   const zoom = (f: number) => cyRef.current?.zoom({ level: (cyRef.current.zoom() || 1) * f, renderedPosition: { x: (ref.current?.clientWidth || 0) / 2, y: (ref.current?.clientHeight || 0) / 2 } });
   const fit = () => { const cy = cyRef.current; if (cy) cy.animate({ fit: { eles: cy.elements(':visible'), padding: 45 } }, { duration: 250 }); };

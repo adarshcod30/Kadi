@@ -53,6 +53,31 @@ def write(path, obj):
     return size_mb(path)
 
 
+
+def _add_strength_percentiles(adj):
+    """Raw cosine strengths cluster hard: MO links sit around 0.99, shared-offender around
+    0.95. A slider over that range does nothing until the last sliver, which is why the UI
+    had to apologise for it in its own help text. Rank every edge against the whole
+    population and store the percentile, so the control spreads evenly across the data."""
+    vals = []
+    for edges in adj.values():
+        for e in edges:
+            v = e.get("s")
+            if isinstance(v, (int, float)):
+                vals.append(v)
+    if not vals:
+        return adj
+    ordered = sorted(vals)
+    n = len(ordered)
+    import bisect
+    for edges in adj.values():
+        for e in edges:
+            v = e.get("s")
+            if isinstance(v, (int, float)):
+                e["p"] = round(bisect.bisect_left(ordered, v) / n, 3)
+    return adj
+
+
 def main():
     os.makedirs(OUT_DERIVED, exist_ok=True)
     total_before = total_after = 0.0

@@ -89,7 +89,12 @@ function buildApp() {
     audit.record({ user: req.user, action: 'view_graph', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
     return q.graphForCase(req.user, req.params.id, { maxNeighbors: Number(req.query.maxNeighbors) || 60 });
   }));
-  r.get('/graph/featured', handle(async () => q.featuredNetworks(6)));
+  r.get('/graph/featured', handle(async (req) => {
+    // ~20 for state, ~12 for a district -- enough variety to browse, few enough to scan.
+    const stateTier = req.user.roleMeta.tier === 'state';
+    const limit = Number(req.query.limit) || (stateTier ? 20 : 12);
+    return q.featuredNetworks(limit, req.user);
+  }));
   r.get('/graph/cluster/:id', handle(async (req) => q.getCluster(req.user, req.params.id)));
   r.get('/graph/search', handle(async (req) => ({ clusters: q.clusters().filter((c) => {
     if (req.query.crossDistrict === 'true' && !c.crossDistrict) return false;

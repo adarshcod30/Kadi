@@ -26,7 +26,7 @@ export default function GraphExplorer() {
   const clusterId = params.get('cluster') || undefined;
   const [sel, setSel] = useState<{ node?: GraphNode; edge?: GraphEdge } | null>(null);
   const [edgeTypes, setEdgeTypes] = useState<Set<string>>(new Set(EDGE_TYPES.map((e) => e[0])));
-  const [minStrength, setMinStrength] = useState(0);
+  const [minEvidence, setMinEvidence] = useState(1);
   const [layout, setLayout] = useState('fcose');
 
   const caseQ = useGraphCase(clusterId ? undefined : caseId);
@@ -55,7 +55,7 @@ export default function GraphExplorer() {
     return [...s];
   }, [data]);
 
-  const filters: GraphFilters = { edgeTypes, minStrength, layout };
+  const filters: GraphFilters = { edgeTypes, minEvidence, layout };
   const toggle = (t: string) => setEdgeTypes((s) => { const n = new Set(s); n.has(t) ? n.delete(t) : n.add(t); return n; });
 
   if (!caseId && !clusterId) return <GraphEntry />;
@@ -112,10 +112,16 @@ export default function GraphExplorer() {
             </div>
           </Control>
 
-          <Control title={`Min link strength · ${minStrength.toFixed(2)}`}>
-            <input type="range" min={0.3} max={0.95} step={0.05} value={minStrength}
-              onChange={(e) => setMinStrength(Number(e.target.value))} className="w-full accent-kadi-blue" />
-            <p className="text-[10px] text-ink-muted mt-1">Most MO links score above 0.95, so this only bites near the top of the range. Shared-offender links sit around 0.95.</p>
+          <Control title={`Corroborating evidence · ${minEvidence}+ kind${minEvidence > 1 ? 's' : ''}`}>
+            <input type="range" min={1} max={4} step={1} value={minEvidence}
+              onChange={(e) => setMinEvidence(Number(e.target.value))}
+              className="w-full accent-kadi-blue" />
+            <p className="text-[11px] text-ink-muted mt-1">
+              How many independent kinds of evidence back each link. Two cases sharing an
+              offender <em>and</em> a modus operandi is a stronger claim than either alone.
+              Raw match scores do not discriminate here — 89% of edges score exactly 1.0 — so
+              this filters on corroboration instead.
+            </p>
           </Control>
 
           {headsPresent.length > 0 && (
