@@ -272,8 +272,108 @@ function enrich(rows, db) {
   });
 }
 
+// Generic row insert over the same raw-HTTPS path that ZCQL uses. Returns false rather than
+// throwing: a failed audit write must never turn a successful read into a 500.
+function insertRows(req, table, rows) {
+  return new Promise((resolve) => {
+    const h = (req && req.headers) || {};
+    const token = h['x-zc-admin-cred-token'] || h['x-zc-user-cred-token'];
+    const secret = h['x-zc-project-secret-key'];
+    const projectId = h['x-zc-projectid'] || process.env.CATALYST_PROJECT_ID;
+    if (!token || !secret || !projectId) { httpError = 'no credential headers'; return resolve(false); }
+    const body = JSON.stringify(rows.map((r) => ({ ...r })));
+    const rq = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${projectId}/table/${encodeURIComponent(table)}/row`,
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+        Environment: h['x-zc-environment'] || 'Development',
+        'X-ZC-PROJECT-SECRET-KEY': secret,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (c) => { out += c; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) return resolve(true);
+        httpError = `insert ${table} http ${res.statusCode}: ${out.slice(0, 160)}`;
+        resolve(false);
+      });
+    });
+    rq.on('error', (e) => { httpError = `insert net: ${e.message}`; resolve(false); });
+    rq.write(body);
+    rq.end();
+  });
+}
+
+// Create a table if it is missing. Idempotent: an existing table returns a duplicate error
+// which is treated as success.
+//
+// Column descriptions must be plain ASCII -- a single em-dash makes Create_Column fail with
+// PATTERN_NOT_MATCHED and the error names neither the character nor the field.
+function ensureTable(req, tableName, columns) {
+  return new Promise((resolve) => {
+    const h = (req && req.headers) || {};
+    const token = h['x-zc-admin-cred-token'];
+    const secret = h['x-zc-project-secret-key'];
+    const projectId = h['x-zc-projectid'] || process.env.CATALYST_PROJECT_ID;
+    if (!token || !secret || !projectId) return resolve({ ok: false, reason: 'no credential' });
+    // Both shapes were tried against the live endpoint. A bare object returns 400
+    // INVALID_INPUT (parsed, but the fields are not what it wants); an array returns 400
+    // JSON_PARSE_ERROR (not parsed at all). So the object form is the closer of the two and
+    // the remaining gap is the exact column_list schema, which the REST docs do not pin down.
+    //
+    // Rather than keep guessing at an undocumented body -- the same trap that cost an
+    // afternoon on catalyst.json -- create the table once from the console or the Catalyst
+    // MCP, with the columns in AUDIT_COLUMNS. Everything downstream already works: the
+    // write-through reaches Data Store and gets a clean 404 INVALID_ID purely because the
+    // table is absent.
+    const body = JSON.stringify({ table_name: tableName, column_list: columns });
+    const rq = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${projectId}/table`,
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+        Environment: h['x-zc-environment'] || 'Development',
+        'X-ZC-PROJECT-SECRET-KEY': secret,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (c) => { out += c; });
+      res.on('end', () => {
+        const dup = /already exist|duplicate/i.test(out);
+        resolve({ ok: (res.statusCode >= 200 && res.statusCode < 300) || dup,
+          existed: dup, status: res.statusCode, body: out.slice(0, 260) });
+      });
+    });
+    rq.on('error', (e) => resolve({ ok: false, reason: e.message }));
+    rq.write(body);
+    rq.end();
+  });
+}
+
+const AUDIT_COLUMNS = [
+  { column_name: 'appUserId', data_type: 'varchar', max_length: 64, description: 'App user id' },
+  { column_name: 'userName', data_type: 'varchar', max_length: 128, description: 'Display name' },
+  { column_name: 'role', data_type: 'varchar', max_length: 32, description: 'Role at time of action' },
+  { column_name: 'action', data_type: 'varchar', max_length: 64, description: 'What was done' },
+  { column_name: 'targetType', data_type: 'varchar', max_length: 32, description: 'Kind of record' },
+  { column_name: 'targetId', data_type: 'varchar', max_length: 64, description: 'Record identifier' },
+  { column_name: 'queryText', data_type: 'text', description: 'Natural language query if any' },
+  { column_name: 'ip', data_type: 'varchar', max_length: 64, description: 'Client address' },
+  { column_name: 'ts', data_type: 'varchar', max_length: 32, description: 'ISO timestamp' },
+];
+
 module.exports = {
   available: () => !!catalyst,
+  insertRows,
+  ensureTable,
+  AUDIT_COLUMNS,
   probe,
   listCases,
   enrich,

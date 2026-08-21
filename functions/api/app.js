@@ -108,13 +108,13 @@ function buildApp() {
     return { ...q.listCases(req.user, req.query), source: 'bundle' };
   }));
   r.get('/cases/:id', handle(async (req) => {
-    audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
+    audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
     return q.getCase(req.user, req.params.id);
   }));
 
   // graph (the hero)
   r.get('/graph/case/:id', handle(async (req) => {
-    audit.record({ user: req.user, action: 'view_graph', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
+    audit.record({ user: req.user, action: 'view_graph', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
     return q.graphForCase(req.user, req.params.id, { maxNeighbors: Number(req.query.maxNeighbors) || 60 });
   }));
   r.get('/graph/featured', handle(async (req) => {
@@ -146,7 +146,7 @@ function buildApp() {
     return { ...a, insight: text, insightSource: source };
   }));
   r.get('/offenders/:id', handle(async (req) => {
-    audit.record({ user: req.user, action: 'view_offender', targetType: 'offender', targetId: req.params.id, ip: req.clientIp });
+    audit.record({ user: req.user, action: 'view_offender', targetType: 'offender', targetId: req.params.id, ip: req.clientIp, req });
     const o = await q.getOffender(req.user, req.params.id);
     if (String(req.query.explain) !== 'true') return o;
     // Facts only. The model never sees, and never invents, an FIR number.
@@ -211,14 +211,14 @@ function buildApp() {
   r.post('/assistant/query', handle(async (req) => {
     const text = (req.body && req.body.text) || '';
     const lang = (req.body && req.body.lang) || 'en';
-    audit.record({ user: req.user, action: 'assistant_query', targetType: 'nl', queryText: text, ip: req.clientIp });
+    audit.record({ user: req.user, action: 'assistant_query', targetType: 'nl', queryText: text, ip: req.clientIp, req });
     return assistant.queryEnhanced(req.user, text, lang, req);
   }));
   r.post('/assistant/voice', handle(async (req) => {
     // Local fallback: client does Web Speech STT/TTS; here we answer the transcribed text.
     const text = (req.body && req.body.text) || '';
     const lang = (req.body && req.body.lang) || 'en';
-    audit.record({ user: req.user, action: 'assistant_voice', targetType: 'nl', queryText: text, ip: req.clientIp });
+    audit.record({ user: req.user, action: 'assistant_voice', targetType: 'nl', queryText: text, ip: req.clientIp, req });
     const ans = await assistant.queryEnhanced(req.user, text, lang, req);
     // Zia TTS when available; otherwise the client speaks it with Web Speech.
     const spoken = await zia.translateThenSpeak(req, ans.answer, lang);
@@ -266,6 +266,26 @@ function buildApp() {
   }));
 
   // One call to see whether the Catalyst AI services are actually wired.
+  // One-shot bootstrap for tables the app writes to but the pipeline does not create.
+  // Idempotent, admin-only, and reports what it found rather than what it assumed.
+  r.post('/admin/bootstrap', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin']);
+    const audit_ = await datastore.ensureTable(req, 'AuditLog', datastore.AUDIT_COLUMNS);
+    return {
+      AuditLog: audit_,
+      columns: datastore.AUDIT_COLUMNS.map((c) => `${c.column_name}:${c.data_type}`),
+      note: audit_.ok ? 'Table ready.'
+        : 'Create AuditLog from the console with the columns above. Write-through is already '
+          + 'live and will start persisting the moment the table exists - see /audit/health.',
+    };
+  }));
+
+  r.get('/audit/health', handle(async () => ({
+    buffered: audit.list({ limit: 1 }).length ? 'yes' : 'empty',
+    persistence: audit.persistence(),
+    note: 'Rows are written through to the AuditLog Data Store table. The buffer answers reads.',
+  })));
+
   r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
 
   r.get('/ai/status', handle(async () => ({
