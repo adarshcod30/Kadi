@@ -354,7 +354,74 @@ function vulnerability(user) {
 module.exports = {
   FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
-  stats: (user) => load().stats,
+  // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
+  // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --
+  // which made the whole role model look decorative. State tier still gets the precomputed
+  // figures (they are the same thing, and free); district tier is computed from its own
+  // case list.
+  stats: (user) => {
+    const db = load();
+    if (!user || user.roleMeta.tier === 'state') return { ...db.stats, scope: 'state' };
+
+    const rows = scoped(user, db.caseList);
+    const ids = new Set(rows.map((c) => String(c.caseMasterId)));
+    const status = { open: 0, chargeSheeted: 0, closed: 0, undetected: 0 };
+    const heads = new Map();
+    const trend = new Map();
+    const heat = new Map();
+    let heinous = 0;
+    for (const c of rows) {
+      const st = String(c.statusId);
+      if (st === '1') status.open += 1;
+      else if (st === '2') status.chargeSheeted += 1;
+      else if (st === '4') status.undetected += 1;
+      else status.closed += 1;
+      if (String(c.gravityId) === '1') heinous += 1;
+      const h = c.crimeHead || 'Other';
+      heads.set(h, (heads.get(h) || 0) + 1);
+      const m = String(c.crimeRegisteredDate || '').slice(0, 7);
+      if (m) trend.set(m, (trend.get(m) || 0) + 1);
+      if (c.dow !== undefined && c.hour !== undefined) {
+        const k = `${c.dow}:${c.hour}`;
+        heat.set(k, (heat.get(k) || 0) + 1);
+      }
+    }
+    const health = db.healthList.filter((h) => ids.has(String(h.caseMasterId)));
+    const did = String(user.districtId);
+    const offs = db.offenders.filter((o) => (o.districts || []).map(String).includes(did));
+    const zones = (db.zones && db.zones.stations) || [];
+
+    return {
+      scope: 'district',
+      districtId: did,
+      districtName: (rows[0] && rows[0].districtName) || '',
+      totalCases: rows.length,
+      openCases: status.open,
+      chargeSheeted: status.chargeSheeted,
+      undetected: status.undetected,
+      flaggedCases: health.length,
+      seriousFlaggedCases: health.filter((h) => h.severity === 'high').length,
+      // Same definition as the state figure: offenders who operate with co-offenders.
+      // Counting distinct case clusters instead gave 2,545 for one district against 127
+      // state-wide, which is not a smaller number of the same thing.
+      activeNetworks: offs.filter((o) => (o.coOffenders || []).length > 0).length,
+      crossDistrictNetworks: offs.filter((o) => (o.distinctDistricts || 0) >= 2).length,
+      resolvedOffenders: offs.length,
+      highRiskOffenders: offs.filter((o) => o.band === 'High').length,
+      emergingHotspots: zones.filter((z) => String(z.districtId) === did && z.zone === 'red_pulsing').length,
+      caseAnomalies: db.stats.caseAnomalies,
+      topCrimeHeads: [...heads.entries()].sort((a, b) => b[1] - a[1])
+        .map(([name, count], i) => ({ headId: String(i + 1), name, count })),
+      trend: [...trend.entries()].sort().map(([month, count]) => ({ month, count })),
+      heat: [...heat.entries()].map(([k, count]) => {
+        const [dow, hour] = k.split(':').map(Number);
+        return { dow, hour, count };
+      }),
+      statusBreakdown: status,
+      gravitySplit: { heinous, nonHeinous: rows.length - heinous },
+      computedTs: db.stats.computedTs,
+    };
+  },
   occasions: () => load().occasions,   // calendar effects are state-level by nature
   // Zone board. State tier sees every district plus the station alerts; district tier sees
   // only its own district and the stations inside it -- the same two-tier rule as everywhere

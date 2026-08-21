@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
+  Globe, MapPin, ChevronDown,
 } from 'lucide-react';
-import { useMe, useAlerts } from '../api/hooks';
+import { useMe, useAlerts, useLookups } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
 import { setRole, getRole, Role } from '../lib/api';
 import { SeverityDot } from './ui';
@@ -67,6 +68,7 @@ export function Shell({ children }: { children: ReactNode }) {
           className="text-sm px-2 py-1 rounded hover:bg-white/10" title="Language">
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
+        <ScopeBadge me={me} />
         <div className="relative">
           <button onClick={() => setShowAlerts((s) => !s)} className="relative p-1.5 rounded hover:bg-white/10">
             <Bell size={18} />
@@ -126,6 +128,53 @@ function FairnessBanner() {
       <span>{t('fairness')}</span>
       <button onClick={() => { setOpen(false); sessionStorage.setItem('kadi.fairness.dismissed', '1'); }}
         className="ml-auto text-ink-muted hover:text-ink"><X size={14} /></button>
+    </div>
+  );
+}
+
+// Scope has to be legible at a glance, not inferred from which numbers look smaller.
+// Without this the two-tier model was invisible: a Sub-Inspector and the DGP saw the same
+// chrome, and the only difference was in figures nobody was comparing side by side.
+function ScopeBadge({ me }: { me: any }) {
+  const [open, setOpen] = useState(false);
+  const { data: lookups } = useLookups();
+  if (!me) return null;
+  const cap = me.capabilities || {};
+  const stateTier = cap.tier === 'state';
+  const districts = (lookups?.districts || []) as any[];
+  const current = districts.find((d: any) => String(d.districtId) === String(cap.districtId));
+
+  if (stateTier) {
+    return (
+      <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px]">
+        <Globe size={13} /> All Karnataka
+        <span className="text-white/55">· 31 districts</span>
+      </span>
+    );
+  }
+  return (
+    <div className="relative hidden sm:block">
+      <button onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-full bg-kadi-gold/20 border border-kadi-gold/40 px-3 py-1 text-[12px] hover:bg-kadi-gold/30">
+        <MapPin size={13} /> {current?.districtName || `District ${cap.districtId}`}
+        <ChevronDown size={12} className="opacity-70" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-60 max-h-80 overflow-auto bg-surface border border-line rounded-card shadow-lg z-50 py-1">
+          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-ink-muted border-b border-line">
+            Drill into a district
+          </div>
+          {districts.map((d: any) => (
+            <button key={d.districtId}
+              onClick={() => { const u = new URL(window.location.href);
+                u.searchParams.set('district', String(d.districtId)); window.location.href = u.toString(); }}
+              className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-kadi-blue50 ${
+                String(d.districtId) === String(cap.districtId) ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
+              {d.districtName}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
