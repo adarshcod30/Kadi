@@ -1,0 +1,157 @@
+// The two tiers do different jobs, so they get different panels rather than the same panels
+// with smaller numbers.
+//
+//   STATE     strategic  -- which districts need attention, where to move resources
+//   DISTRICT  operational -- which of my stations, and what is reaching into my district
+//
+// Everything here is computed server-side by queries.stateCommand / districtCommand; these
+// components only decide how to show it.
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, MapPin, Building2, Share2, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Section, Skeleton } from './ui';
+import { Hint, stagger, rise } from './viz';
+
+const ZONE: Record<string, { dot: string; label: string; pulse?: boolean }> = {
+  red_pulsing: { dot: '#C0392B', label: 'Pulsing', pulse: true },
+  red: { dot: '#C0392B', label: 'Red' },
+  yellow: { dot: '#C9820A', label: 'Yellow' },
+  normal: { dot: '#3AA76D', label: 'Normal' },
+};
+
+export function CommandInsight({ text, view }: { text?: string; view: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-card border border-kadi-blue/25 bg-kadi-blue50/40 px-4 py-3 flex items-start gap-2.5">
+      <Sparkles size={15} className="text-kadi-blue shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-kadi-blue mb-0.5">
+          {view === 'state' ? 'The state picture' : 'Your district today'}
+        </div>
+        <p className="text-[13px] text-ink leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+/** STATE: 31 districts ranked by concern, so "where do I put attention" is answerable. */
+export function StateCommand({ data }: { data: any }) {
+  const nav = useNavigate();
+  if (!data) return <div className="card"><Skeleton rows={6} /></div>;
+  const z = data.zoneSummary || {};
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={rise}>
+        <Section
+          title={<span className="flex items-center gap-2"><MapPin size={15} className="text-kadi-blue" />
+            Districts, ordered by what needs attention</span>}
+          action={<Hint text="Ordered by zone severity first, then by how far the district sits above its own baseline — not by volume, which would just re-rank by population." />}>
+          <div className="p-2">
+            <div className="flex flex-wrap gap-2 px-2 pb-2">
+              {(['red_pulsing', 'red', 'yellow', 'normal'] as const).map((k) => (
+                <span key={k} className="flex items-center gap-1.5 text-[12px] text-ink-muted">
+                  <span className={`w-2 h-2 rounded-full ${ZONE[k].pulse ? 'animate-pulse' : ''}`}
+                    style={{ background: ZONE[k].dot }} />
+                  {ZONE[k].label} <b className="text-ink font-num">{z[k] ?? 0}</b>
+                </span>
+              ))}
+              {data.stationsPulsing?.length > 0 && (
+                <span className="flex items-center gap-1.5 text-[12px] text-danger ml-auto">
+                  <AlertTriangle size={13} /> {data.stationsPulsing.length} station(s) pulsing
+                </span>
+              )}
+            </div>
+            <div className="max-h-[420px] overflow-auto">
+              {(data.districts || []).map((d: any) => (
+                <button key={d.districtId}
+                  onClick={() => { const u = new URL(window.location.href);
+                    u.searchParams.set('district', d.districtId); window.location.href = u.toString(); }}
+                  className="w-full flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE[d.zone]?.pulse ? 'animate-pulse' : ''}`}
+                    style={{ background: ZONE[d.zone]?.dot || '#3AA76D' }} />
+                  <span className="text-[13px] text-ink flex-1 truncate">{d.districtName}</span>
+                  <span className="hidden md:block text-[11.5px] text-ink-muted w-40 truncate">{d.driverHead || ''}</span>
+                  <span className="font-num text-[12.5px] text-ink-muted w-20 text-right">{d.total?.toLocaleString()}</span>
+                  <span className="font-num text-[12.5px] text-ink-muted w-16 text-right" title="serious flags">{d.seriousFlags}</span>
+                  <span className={`font-num text-[12.5px] w-16 text-right font-medium ${
+                    d.changePct > 10 ? 'text-danger' : d.changePct < -5 ? 'text-kadi-teal' : 'text-ink-muted'}`}>
+                    {d.changePct > 0 ? '+' : ''}{d.changePct}%
+                  </span>
+                  <ArrowRight size={13} className="text-ink-muted shrink-0" />
+                </button>
+              ))}
+            </div>
+            <p className="px-2 pt-2 text-[11.5px] text-ink-muted">
+              Columns: district, what is driving the move, total FIRs, serious flags, change against its own baseline.
+              Click any row to drill into that district.
+            </p>
+          </div>
+        </Section>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** DISTRICT: my stations, and what is reaching in from outside — the silo-breaking view. */
+export function DistrictCommand({ data }: { data: any }) {
+  const nav = useNavigate();
+  if (!data) return <div className="card"><Skeleton rows={6} /></div>;
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="show" className="grid lg:grid-cols-2 gap-4">
+      <motion.div variants={rise}>
+        <Section
+          title={<span className="flex items-center gap-2"><Building2 size={15} className="text-kadi-blue" />
+            Stations in {data.districtName}</span>}
+          action={<Hint text="Ordered by zone status, then volume. Zone compares each station with its own trailing baseline." />}>
+          <div className="p-2 max-h-[420px] overflow-auto">
+            {(data.stations || []).map((s: any) => (
+              <button key={s.unitId}
+                onClick={() => nav(`/cases?unit=${s.unitId}`)}
+                className="w-full flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE[s.zone]?.pulse ? 'animate-pulse' : ''}`}
+                  style={{ background: ZONE[s.zone]?.dot || '#3AA76D' }} />
+                <span className="text-[13px] text-ink flex-1 truncate">{s.unitName}</span>
+                <span className="font-num text-[12.5px] text-ink-muted w-16 text-right">{s.total}</span>
+                <span className="font-num text-[12.5px] text-ink-muted w-14 text-right" title="open">{s.open}</span>
+                <span className="font-num text-[12.5px] text-saffron w-14 text-right" title="flagged">{s.flagged}</span>
+              </button>
+            ))}
+          </div>
+          <p className="px-3 pb-2 text-[11.5px] text-ink-muted">
+            {data.stations?.length} stations · {data.stationsFlagged} above their own baseline ·
+            this district carries {data.shareOfState}% of state volume
+          </p>
+        </Section>
+      </motion.div>
+
+      <motion.div variants={rise}>
+        <Section
+          title={<span className="flex items-center gap-2"><Share2 size={15} className="text-kadi-teal" />
+            Reaching into {data.districtName} from elsewhere</span>}
+          action={<Hint text="Cases registered in OTHER districts that share evidence with a case here. A station register cannot show this — it is the whole reason the platform exists." />}>
+          <div className="px-3 pt-3">
+            <div className="rounded-card bg-kadi-teal/10 border border-kadi-teal/30 px-3 py-2 mb-2">
+              <span className="font-num text-xl text-kadi-navy">{data.linkedInTotal?.toLocaleString()}</span>
+              <span className="text-[12.5px] text-ink-muted ml-2">
+                cases outside this district are linked to one inside it
+              </span>
+            </div>
+          </div>
+          <div className="p-2 max-h-[360px] overflow-auto">
+            {(data.linkedInFromOtherDistricts || []).map((c: any) => (
+              <button key={c.caseMasterId} onClick={() => nav(`/graph?case=${c.caseMasterId}`)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
+                <span className="font-mono text-[11.5px] text-kadi-blue shrink-0">{c.crimeNo}</span>
+                <span className="text-[12.5px] text-ink flex-1 truncate">{c.crimeSubHead}</span>
+                <span className="text-[11.5px] text-ink-muted w-28 truncate hidden sm:block">{c.districtName}</span>
+                <span className="chip bg-surface-3 text-ink-muted text-[10.5px] shrink-0">
+                  {String(c.edgeType).replace(/_/g, ' ')}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      </motion.div>
+    </motion.div>
+  );
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Shell } from './components/Shell';
+import { setRole, getRole, normaliseRole } from './lib/api';
 import { LangContext, Lang } from './lib/i18n';
 import About from './pages/About';
 import Dashboard from './pages/Dashboard';
@@ -26,10 +27,12 @@ export default function App() {
   const loc = useLocation();
   // ?as=<Role> lets a link open the app directly in a given rank. Useful for sharing a
   // demo view, and for headless capture where there is no stored session.
-  const asRole = new URLSearchParams(loc.search).get('as');
-  if (asRole && ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI', 'Inspector', 'ACP'].includes(asRole)) {
-    localStorage.setItem('kadi.role', asRole);
-  }
+  // Must go through setRole, not straight to localStorage. api.ts resolves currentRole once
+  // at module load, which happens BEFORE this runs -- writing storage alone left every fetch
+  // still sending the previous role. The bug hid because ?as=Analyst matches the default.
+  const asRole = normaliseRole(new URLSearchParams(loc.search).get('as'));
+  const asRaw = new URLSearchParams(loc.search).get('as');
+  if (asRaw && asRole !== getRole()) setRole(asRole);
   const hasRole = Boolean(localStorage.getItem('kadi.role'));
   if (loc.pathname === '/login') {
     return (

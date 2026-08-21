@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast } from '../api/hooks';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
+import { StateCommand, DistrictCommand, CommandInsight } from '../components/CommandViews';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
 import {
@@ -72,6 +73,7 @@ export default function Dashboard() {
   const { data: districts } = useDistricts();
   const { data: national } = useNational();
   const { data: fc } = useForecast();
+  const { data: command } = useCommand();
 
   // The final month in `trend` is the month still in progress, so it carries a
   // fraction of a normal month's FIRs and renders as a cliff. The pipeline already
@@ -125,11 +127,17 @@ export default function Dashboard() {
         ))}
       </motion.div>
 
-      {/* The command view is deliberately state-wide; Cases, Health and Graph are
-          rank-scoped. Saying so stops the two readings looking contradictory. */}
       <p className="text-xs text-ink-muted -mt-1">
-        Command view — these figures are state-wide. Cases, Health and Graph are scoped to your rank.
+        {command?.view === 'district'
+          ? `Operational view — every figure below is ${command.districtName}. Use the scope control in the header to switch district.`
+          : 'Command view — all 31 districts. Drill into any one from the table below, or from the header.'}
       </p>
+
+      {/* The two tiers get different panels, not the same panels with smaller numbers. */}
+      <CommandInsight text={command?.insight} view={command?.view || 'state'} />
+      {command?.view === 'district'
+        ? <DistrictCommand data={command} />
+        : <StateCommand data={command} />}
 
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: trend + heatmap + districts */}

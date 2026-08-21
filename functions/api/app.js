@@ -63,6 +63,35 @@ function buildApp() {
     });
     return { ...data, insight: text, insightSource: source };
   }));
+  // One route, two products. The tier decides which command view you get, and the payload
+  // says which one so the client renders the right thing rather than guessing from shape.
+  r.get('/command', handle(async (req) => {
+    const stateView = req.user.roleMeta.tier === 'state' && !req.user.drilledFromState;
+    const body = stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
+    const out = { view: stateView ? 'state' : 'district', ...body };
+    if (String(req.query.explain) !== 'true') return out;
+    const facts = stateView ? {
+      scope: 'Karnataka, 31 districts',
+      districtsNeedingAttention: body.needsAttention,
+      zoneSummary: body.zoneSummary,
+      stationsPulsing: body.stationsPulsing.length,
+      topByConcern: body.districts.slice(0, 4).map((d) => ({
+        district: d.districtName, zone: d.zone, change: `${d.changePct}%`,
+        driver: d.driverHead, seriousFlags: d.seriousFlags })),
+    } : {
+      district: body.districtName,
+      shareOfStateVolume: `${body.shareOfState}%`,
+      stations: body.stations.length,
+      stationsAboveBaseline: body.stationsFlagged,
+      casesLinkedInFromOtherDistricts: body.linkedInTotal,
+      busiestStations: body.stations.slice(0, 3).map((s) => ({
+        station: s.unitName, cases: s.total, open: s.open, zone: s.zone })),
+    };
+    const kind = stateView ? 'state command picture' : 'district command picture';
+    const { text, source } = await insight.generate(req, kind, facts, { maxTokens: 200 });
+    return { ...out, insight: text, insightSource: source };
+  }));
+
   r.get('/alerts', handle(async (req) => q.alerts(req.user)));
 
   // Zone board -- the brief's "emerging trend alerts / red-zone pulsing", computed against

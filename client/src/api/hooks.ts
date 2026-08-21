@@ -46,6 +46,9 @@ export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
 export const useFeaturedNetworks = () =>
   useQuery({ queryKey: ['graph-featured', role()], queryFn: () => api.get<any>('/graph/featured'), staleTime: Infinity });
+export const useCommand = (explain = true) =>
+  useQuery({ queryKey: ['command', role(), explain], queryFn: () => api.get<any>(`/command${qs({ explain })}`), staleTime: 120000 });
+
 export const useZones = (explain = true) =>
   useQuery({ queryKey: ['zones', role(), role(), explain], queryFn: () => api.get<any>(`/zones${qs({ explain })}`), staleTime: 300000 });
 export const useOccasions = (explain = true) =>

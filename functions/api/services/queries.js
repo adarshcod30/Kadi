@@ -501,6 +501,119 @@ module.exports = {
     };
   },
 
+  // ---- tier-specific command views -------------------------------------------------
+  // The two tiers do different jobs, so they get different panels rather than the same
+  // panels with smaller numbers. State is strategic: which districts need attention, where
+  // to move resources. District is operational: which of my stations, which of my cases,
+  // and -- the part only this platform can offer -- which cases from ELSEWHERE are linked
+  // into mine.
+
+  // STATE: districts ranked, so the question "where do I put attention" is answerable.
+  stateCommand: (user) => {
+    const db = load();
+    const zonesByDistrict = new Map(((db.zones || {}).districts || [])
+      .map((z) => [String(z.districtId), z]));
+    const health = new Map();
+    for (const h of db.healthList) {
+      const k = String(h.districtId);
+      const e = health.get(k) || { flagged: 0, high: 0 };
+      e.flagged += 1; if (h.severity === 'high') e.high += 1;
+      health.set(k, e);
+    }
+    const offByDistrict = new Map();
+    for (const o of db.offenders) {
+      for (const d of (o.districts || [])) {
+        const k = String(d);
+        const e = offByDistrict.get(k) || { offenders: 0, crossDistrict: 0 };
+        e.offenders += 1;
+        if ((o.distinctDistricts || 0) >= 2) e.crossDistrict += 1;
+        offByDistrict.set(k, e);
+      }
+    }
+    const rows = (db.districtStats.districts || []).map((d) => {
+      const k = String(d.districtId);
+      const z = zonesByDistrict.get(k) || {};
+      const h = health.get(k) || { flagged: 0, high: 0 };
+      const o = offByDistrict.get(k) || { offenders: 0, crossDistrict: 0 };
+      return {
+        districtId: k, districtName: d.district, total: d.total, open: d.open,
+        zone: z.zone || 'normal', changePct: z.changePct ?? 0, driverHead: z.driverHead || null,
+        flagged: h.flagged, seriousFlags: h.high,
+        offenders: o.offenders, crossDistrictOffenders: o.crossDistrict,
+        topHead: (d.topHeads && d.topHeads[0] && d.topHeads[0].name) || '',
+      };
+    });
+    // needs-attention first: zone severity, then how far above baseline
+    const rank = { red_pulsing: 0, red: 1, yellow: 2, normal: 3 };
+    rows.sort((a, b) => (rank[a.zone] - rank[b.zone]) || (b.changePct - a.changePct));
+    return {
+      districts: rows,
+      zoneSummary: (db.zones || {}).summary || {},
+      stationsPulsing: ((db.zones || {}).stations || []).filter((x) => x.zone === 'red_pulsing'),
+      needsAttention: rows.filter((r) => r.zone !== 'normal').length,
+    };
+  },
+
+  // DISTRICT: my stations, and what is reaching into my district from outside it.
+  districtCommand: (user) => {
+    const db = load();
+    const did = String(user.districtId);
+    const mine = db.caseList.filter((c) => String(c.districtId) === did);
+    const mineIds = new Set(mine.map((c) => String(c.caseMasterId)));
+
+    const byStation = new Map();
+    for (const c of mine) {
+      const k = String(c.unitId);
+      const e = byStation.get(k) || { unitId: k, unitName: c.unitName || k, total: 0, open: 0, flagged: 0 };
+      e.total += 1;
+      if (String(c.statusId) === '1') e.open += 1;
+      if (c.healthSeverity) e.flagged += 1;
+      byStation.set(k, e);
+    }
+    const zoneByUnit = new Map(((db.zones || {}).stations || []).map((z) => [String(z.unitId), z]));
+    const stations = [...byStation.values()].map((st) => {
+      const z = zoneByUnit.get(st.unitId) || {};
+      return { ...st, zone: z.zone || 'normal', changePct: z.changePct ?? 0 };
+    });
+    const rank = { red_pulsing: 0, red: 1, yellow: 2, normal: 3 };
+    stations.sort((a, b) => (rank[a.zone] - rank[b.zone]) || (b.total - a.total));
+
+    // The silo-breaking view: cases OUTSIDE my district that link to cases inside it. This
+    // is the thing a station register structurally cannot show, and it is the reason the
+    // platform exists.
+    const linkedIn = [];
+    const seen = new Set();
+    for (const id of mineIds) {
+      for (const e of (db.adjacency[id] || [])) {
+        const nid = String(e.neighborId);
+        if (mineIds.has(nid) || seen.has(nid)) continue;
+        const nc = db.cases.get(nid);
+        if (!nc) continue;
+        seen.add(nid);
+        linkedIn.push({
+          caseMasterId: nid, crimeNo: nc.crimeNo,
+          districtName: nc.districtName, unitName: nc.unitName,
+          crimeSubHead: nc.crimeSubHead,
+          edgeType: e.edgeType, strength: e.strength,
+          linkedToLocalCase: id,
+        });
+      }
+    }
+    const strong = { shared_offender: 0, co_accused: 1, mo_similarity: 2 };
+    linkedIn.sort((a, b) => (strong[a.edgeType] ?? 9) - (strong[b.edgeType] ?? 9));
+
+    const stateTotal = db.stats.totalCases || 1;
+    return {
+      districtId: did,
+      districtName: (mine[0] && mine[0].districtName) || '',
+      stations,
+      stationsFlagged: stations.filter((s) => s.zone !== 'normal').length,
+      linkedInFromOtherDistricts: linkedIn.slice(0, 40),
+      linkedInTotal: linkedIn.length,
+      shareOfState: Math.round((mine.length / stateTotal) * 1000) / 10,
+    };
+  },
+
   occasions: () => load().occasions,   // calendar effects are state-level by nature
   // Zone board. State tier sees every district plus the station alerts; district tier sees
   // only its own district and the stations inside it -- the same two-tier rule as everywhere
