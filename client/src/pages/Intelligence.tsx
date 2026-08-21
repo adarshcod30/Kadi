@@ -41,6 +41,79 @@ function AiNote({ text, kind }: { text?: string; kind: string }) {
   );
 }
 
+const ZONE_STYLE: Record<string, { dot: string; label: string; ring?: string }> = {
+  red_pulsing: { dot: '#C0392B', label: 'Pulsing red', ring: 'animate-pulse' },
+  red: { dot: '#C0392B', label: 'Red' },
+  yellow: { dot: '#C9820A', label: 'Yellow' },
+  normal: { dot: '#3AA76D', label: 'Normal' },
+};
+
+// The brief asks for "visual indicators when a crime category spikes in a region compared to
+// historical averages". Every area is measured against its OWN trailing baseline, so a
+// consistently busy district does not sit permanently red -- which is what would happen if
+// this ranked by volume, and is exactly the failure per-capita analysis exists to correct.
+function ZoneBoard({ zones }: { zones: any }) {
+  if (!zones) return <div className="card"><Skeleton rows={4} /></div>;
+  const s = zones.summary || {};
+  const districts = zones.districts || [];
+  const pulsing = (zones.stations || []).filter((x: any) => x.zone === 'red_pulsing');
+  const counts: [string, number][] = [
+    ['red_pulsing', s.red_pulsing || 0], ['red', s.red || 0],
+    ['yellow', s.yellow || 0], ['normal', s.normal || 0],
+  ];
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Target size={15} className="text-danger" />
+        Zone status — {s.month} vs its own {s.baselineMonths}-month baseline</span>}
+      action={<Hint text="Zones compare each area with its own history, not with other areas. A rise must also be materially large in absolute terms — a station going from 3 cases to 7 is +133% and four extra cases, which is noise wearing a big percentage." />}>
+      <div className="p-4 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {counts.map(([z, n]) => (
+            <div key={z} className="flex items-center gap-2 rounded-ctl border border-line px-3 py-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${ZONE_STYLE[z].ring || ''}`}
+                style={{ background: ZONE_STYLE[z].dot }} />
+              <span className="text-[12.5px] text-ink-muted">{ZONE_STYLE[z].label}</span>
+              <span className="font-num text-sm text-ink font-medium">{n}</span>
+            </div>
+          ))}
+        </div>
+
+        {pulsing.length > 0 && (
+          <div className="rounded-card border border-danger/30 bg-danger/5 px-3 py-2.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-danger animate-pulse" />
+              <b className="text-[13px] text-ink">Pulsing — above baseline and still rising</b>
+            </div>
+            {pulsing.slice(0, 4).map((x: any) => (
+              <div key={x.unitId} className="text-[12.5px] text-ink-muted">
+                Station {x.unitId}: <b className="text-ink">{x.current}</b> this month against a
+                baseline of {x.baseline} — <b className="text-danger">{x.changePct > 0 ? '+' : ''}{x.changePct}%</b>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div>
+          <div className="label mb-1">Districts, furthest from their own baseline first</div>
+          {districts.slice(0, 8).map((d: any) => (
+            <div key={d.districtId} className="flex items-center gap-3 px-1 py-1.5 border-b border-line/60 last:border-0">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE_STYLE[d.zone]?.ring || ''}`}
+                style={{ background: ZONE_STYLE[d.zone]?.dot || '#3AA76D' }} />
+              <span className="text-[13px] text-ink flex-1 truncate">{d.districtName}</span>
+              <span className="text-[11.5px] text-ink-muted w-40 truncate hidden sm:block">{d.driverHead || ''}</span>
+              <span className="font-num text-[12.5px] text-ink-muted w-24 text-right">{d.current} vs {d.baseline}</span>
+              <span className={`font-num text-[12.5px] w-16 text-right font-medium ${
+                d.changePct > 10 ? 'text-danger' : d.changePct < -5 ? 'text-kadi-teal' : 'text-ink-muted'}`}>
+                {d.changePct > 0 ? '+' : ''}{d.changePct}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function OccasionPanels({ occ }: { occ: any }) {
   if (!occ) return <div className="card"><Skeleton rows={6} /></div>;
   const classes = occ.classes || [];
@@ -174,6 +247,9 @@ export default function Intelligence() {
       {tab === 'when' && <AiNote kind="when" text={occ?.insight} />}
 
       {tab === 'where' && <>
+      <motion.div variants={rise}>
+        <ZoneBoard zones={zones} />
+      </motion.div>
       {/* ---- The headline finding: counts vs rates ---- */}
       <motion.div variants={rise}>
         <Section
