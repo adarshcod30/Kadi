@@ -90,7 +90,23 @@ function buildApp() {
   r.get('/clusters', handle(async () => q.clusters().slice(0, 100)));
 
   // cases
-  r.get('/cases', handle(async (req) => q.listCases(req.user, req.query)));
+  // Deliberately NOT routed through Data Store. The mapper exists and works
+  // (datastore.enrich), but the Data Store copy is a snapshot from before the corpus was
+  // regenerated -- it returns 40,836 rows against the bundle's 40,829, and its lookup tables
+  // are stale too. Serving slightly wrong data to look architecturally purer is a bad trade.
+  //
+  // ?source=datastore opts in for demonstration; /datastore/cases shows the live ZCQL path
+  // on its own. Re-import CaseMaster via Stratus bulk-write and this becomes a one-line flip.
+  r.get('/cases', handle(async (req) => {
+    if (String(req.query.source) === 'datastore') {
+      const live = await datastore.listCases(req, req.query, q.scopeUnitIds(req.user));
+      if (live && Array.isArray(live.items)) {
+        return { ...live, items: datastore.enrich(live.items, q.db()),
+          source: 'datastore', warning: 'Data Store snapshot predates the current corpus.' };
+      }
+    }
+    return { ...q.listCases(req.user, req.query), source: 'bundle' };
+  }));
   r.get('/cases/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp });
     return q.getCase(req.user, req.params.id);
@@ -116,6 +132,19 @@ function buildApp() {
 
   // offenders
   r.get('/offenders', handle(async (req) => q.listOffenders(req.user, req.query)));
+
+  // Association detection -- who works with whom, cross-district pairs first.
+  r.get('/offenders/associations', handle(async (req) => {
+    const a = q.associations(req.user, req.query);
+    if (String(req.query.explain) !== 'true') return a;
+    const { text, source } = await insight.generate(req, 'co-offending associations', {
+      totalPairs: a.total, crossDistrictPairs: a.crossDistrictPairs, scope: a.scope,
+      strongest: (a.items || []).slice(0, 4).map((p) => ({
+        pair: `${p.a.name} + ${p.b.name}`, sharedCases: p.sharedCases,
+        districts: p.districts.length, combinedRisk: p.combinedRisk })),
+    }, { maxTokens: 190 });
+    return { ...a, insight: text, insightSource: source };
+  }));
   r.get('/offenders/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_offender', targetType: 'offender', targetId: req.params.id, ip: req.clientIp });
     const o = await q.getOffender(req.user, req.params.id);

@@ -182,7 +182,7 @@ function load() {
     clusters, clustersById,
     hotspots, caseAnomalies, alerts, stats, zones, occasions, evalReport, districtStats, national,
     socio, forecast,
-    healthList, healthByCase,
+    healthList, healthByCase, linkedCount,
   };
   console.log(`[store.mock] loaded ${cases.size} cases, ${offenders.length} offenders in ${DB.loadedMs}ms`);
   return DB;

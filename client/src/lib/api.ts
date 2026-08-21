@@ -11,9 +11,23 @@ const LEGACY: Record<string, Role> = { Inspector: 'SI', ACP: 'DSP', SCRB: 'Analy
 export const normaliseRole = (r: string | null): Role =>
   (['Analyst','DGP','Admin','SP','DSP','SI'].includes(r || '') ? r : LEGACY[r || ''] || 'Analyst') as Role;
 
-let currentRole: Role = normaliseRole(localStorage.getItem('kadi.role'));
+// Read defensively. This runs at module scope, so anything that imports the API layer
+// without a browser storage implementation -- tests, SSR, some privacy modes -- crashed on
+// import rather than degrading. Falling back to the default role is always safe: the server
+// re-derives scope from the header on every request and never trusts the client.
+function readStoredRole(): Role {
+  try {
+    return normaliseRole(globalThis.localStorage?.getItem('kadi.role') ?? null);
+  } catch {
+    return 'Analyst';
+  }
+}
+let currentRole: Role = readStoredRole();
 export function getRole(): Role { return currentRole; }
-export function setRole(r: Role) { currentRole = r; localStorage.setItem('kadi.role', r); }
+export function setRole(r: Role) {
+  currentRole = r;
+  try { globalThis.localStorage?.setItem('kadi.role', r); } catch { /* storage unavailable */ }
+}
 
 export class ApiError extends Error {
   code: string;

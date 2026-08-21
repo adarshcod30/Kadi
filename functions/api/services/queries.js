@@ -359,6 +359,22 @@ module.exports = {
   // which made the whole role model look decorative. State tier still gets the precomputed
   // figures (they are the same thing, and free); district tier is computed from its own
   // case list.
+  // Expose the loaded store so the ZCQL mapper can reuse lookups rather than re-querying
+  // a few hundred rows that never change between pipeline runs.
+  db: () => load(),
+
+  // Units a user may read, or null for state tier (no WHERE clause needed).
+  scopeUnitIds: (user) => {
+    if (!user || user.roleMeta.tier === 'state') {
+      return user && user.drillUnitId ? [user.drillUnitId] : null;
+    }
+    if (user.drillUnitId) return [user.drillUnitId];
+    const db = load();
+    const did = String(user.districtId);
+    return Object.entries(db.lookups.unitDistrict)
+      .filter(([, d]) => String(d) === did).map(([u]) => u);
+  },
+
   stats: (user) => {
     const db = load();
     if (!user || user.roleMeta.tier === 'state') return { ...db.stats, scope: 'state' };
@@ -422,6 +438,63 @@ module.exports = {
       computedTs: db.stats.computedTs,
     };
   },
+  // Association detection. The brief names this as its own capability -- "identifying hidden
+  // criminal associations that are impossible to spot in isolated Excel sheets" -- and the
+  // data was there on every offender record without a view of its own.
+  //
+  // Returns the co-offending network as pairs, ranked by how much the two share, with the
+  // cross-district pairs surfaced first: those are precisely the associations no single
+  // station's register can see.
+  associations: (user, q = {}) => {
+    const db = load();
+    const byId = new Map(db.offenders.map((o) => [o.offenderIdentityId, o]));
+    const districtScoped = user && user.roleMeta.tier === 'district' ? String(user.districtId) : null;
+
+    const seen = new Set();
+    const pairs = [];
+    for (const o of db.offenders) {
+      for (const co of (o.coOffenders || [])) {
+        const other = byId.get(co.offenderIdentityId);
+        if (!other) continue;
+        // one row per pair, not two
+        const key = [o.offenderIdentityId, other.offenderIdentityId].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const dA = (o.districts || []).map(String);
+        const dB = (other.districts || []).map(String);
+        if (districtScoped && !dA.includes(districtScoped) && !dB.includes(districtScoped)) continue;
+
+        const union = new Set([...dA, ...dB]);
+        pairs.push({
+          a: { id: o.offenderIdentityId, name: o.canonicalName, risk: o.riskScore, band: o.band,
+            cases: o.distinctCases },
+          b: { id: other.offenderIdentityId, name: other.canonicalName, risk: other.riskScore,
+            band: other.band, cases: other.distinctCases },
+          sharedCases: co.sharedCases || 1,
+          districts: [...union],
+          crossDistrict: union.size > 1,
+          combinedRisk: Math.round(((o.riskScore || 0) + (other.riskScore || 0)) / 2),
+        });
+      }
+    }
+    if (q.crossDistrict === 'true') {
+      return { items: pairs.filter((p) => p.crossDistrict), total: pairs.length };
+    }
+    // cross-district first, then by how much they operate together, then by risk
+    pairs.sort((x, y) => (Number(y.crossDistrict) - Number(x.crossDistrict))
+      || (y.sharedCases - x.sharedCases) || (y.combinedRisk - x.combinedRisk));
+
+    const limit = Math.min(200, Number(q.limit) || 60);
+    return {
+      items: pairs.slice(0, limit),
+      total: pairs.length,
+      crossDistrictPairs: pairs.filter((p) => p.crossDistrict).length,
+      scope: districtScoped ? 'district' : 'state',
+      fairness: FAIRNESS_STATEMENT,
+    };
+  },
+
   occasions: () => load().occasions,   // calendar effects are state-level by nature
   // Zone board. State tier sees every district plus the station alerts; district tier sees
   // only its own district and the stations inside it -- the same two-tier rule as everywhere

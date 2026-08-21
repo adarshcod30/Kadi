@@ -233,10 +233,50 @@ async function listCases(req, q = {}, scopeUnitIds = null) {
   return { items: rows, total, page, pageSize };
 }
 
+// Map raw CaseMaster columns onto the enriched shape /cases returns. Lookups come from the
+// bundle: a few hundred rows that only change when the pipeline reruns, so joining them in
+// ZCQL would cost a round trip to save nothing. Health and link counts likewise -- those are
+// pipeline output, not register data, and Data Store has no table for them.
+function enrich(rows, db) {
+  const L = db.lookups;
+  return rows.map((r) => {
+    const unitId = String(r.PoliceStationID);
+    const districtId = String(L.unitDistrict[unitId] || '');
+    const id = String(r.CaseMasterID);
+    const health = db.healthByCase && db.healthByCase.get(id);
+    return {
+      caseMasterId: id,
+      crimeNo: r.CrimeNo,
+      caseNo: r.CaseNo,
+      crimeRegisteredDate: r.CrimeRegisteredDate,
+      incidentFromDate: r.IncidentFromDate,
+      unitId,
+      unitName: L.units[unitId] || '',
+      districtId,
+      districtName: L.districts[districtId] || '',
+      statusId: String(r.CaseStatusID),
+      statusName: L.statuses[String(r.CaseStatusID)] || '',
+      crimeHeadId: String(r.CrimeMajorHeadID),
+      crimeHead: L.heads[String(r.CrimeMajorHeadID)] || '',
+      crimeSubHeadId: String(r.CrimeMinorHeadID),
+      crimeSubHead: L.subheads[String(r.CrimeMinorHeadID)] || '',
+      gravityId: String(r.GravityOffenceID),
+      categoryId: String(r.CaseCategoryID),
+      briefFacts: r.BriefFacts,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      linkedCount: (db.linkedCount && db.linkedCount[id]) || 0,
+      healthSeverity: health ? health.severity : null,
+      source: 'datastore',
+    };
+  });
+}
+
 module.exports = {
   available: () => !!catalyst,
   probe,
   listCases,
+  enrich,
   diag: () => ({ sdkLoaded: !!catalyst, httpError, lastError }),
   query,
   status,
