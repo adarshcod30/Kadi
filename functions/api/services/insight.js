@@ -21,15 +21,32 @@ const SYSTEM = [
   'You will be given FACTS computed from the case database. Write 2-3 short sentences',
   'interpreting them for an officer deciding where to put attention.',
   'RULES:',
-  '- Use ONLY the numbers given. Never invent a figure, district, station or FIR number.',
+  '- Use ONLY the numbers given, COPIED EXACTLY as written. Do not reformat, round,',
+  '  re-punctuate or recompute them. If a fact says "256", write 256 -- never 2,56.',
+  '- Never invent a figure, district, station or FIR number.',
   '- No preamble, no "based on the data", no bullet points. Plain prose.',
   '- Lead with what changed or what stands out, then what it implies operationally.',
   '- Be specific and calm. No alarmism, no filler adjectives.',
   '- British English. Never mention caste, religion or occupation.',
 ].join(' ');
 
+// Numbers are pre-rendered as strings before the model ever sees them. Handing GLM a raw
+// integer invites it to re-punctuate: asked to summarise 256 it produced "2,56". Giving it
+// "256" as text means the only correct action is to copy the characters.
+function humanise(v) {
+  if (typeof v === 'number') {
+    return Number.isInteger(v) ? v.toLocaleString('en-IN') : String(v);
+  }
+  if (Array.isArray(v)) return v.map(humanise);
+  if (v && typeof v === 'object') {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, humanise(x)]));
+  }
+  return v;
+}
+
 function factsToPrompt(kind, facts) {
-  return `Context: ${kind}\n\nFACTS:\n${JSON.stringify(facts, null, 2)}\n\nWrite the interpretation.`;
+  return `Context: ${kind}\n\nFACTS (copy every number exactly as written):\n`
+    + `${JSON.stringify(humanise(facts), null, 2)}\n\nWrite the interpretation.`;
 }
 
 // Deterministic fallback so every surface has copy even when the model is unavailable.

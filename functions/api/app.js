@@ -47,9 +47,21 @@ function buildApp() {
     // has Cache scope, so every call is a miss and falls through to compute. The
     // adapter is a no-op until that permission is granted - see docs/08.
     const { data } = await cache.through(
-      req, `stats:${req.user.role}`, async () => q.stats(req.user),
+      req, `stats:${req.user.role}:${req.user.districtId || 'state'}`, async () => q.stats(req.user),
     );
-    return data;
+    if (String(req.query.explain) !== 'true') return data;
+    const sb = data.statusBreakdown || {};
+    const { text, source } = await insight.generate(req, 'command dashboard briefing', {
+      scope: data.scope, district: data.districtName || 'Karnataka',
+      totalFIRs: data.totalCases, open: data.openCases,
+      chargeSheeted: sb.chargeSheeted, undetected: sb.undetected,
+      clearancePct: data.totalCases ? Math.round(1000 * (sb.chargeSheeted || 0) / data.totalCases) / 10 : 0,
+      flaggedSlipping: data.flaggedCases, seriousFlags: data.seriousFlaggedCases,
+      repeatOffenders: data.resolvedOffenders, offenderNetworks: data.activeNetworks,
+      operatingAcrossDistricts: data.crossDistrictNetworks,
+      topCrimeHeads: (data.topCrimeHeads || []).slice(0, 3).map((h) => `${h.name} ${h.count}`),
+    });
+    return { ...data, insight: text, insightSource: source };
   }));
   r.get('/alerts', handle(async (req) => q.alerts(req.user)));
 
@@ -106,12 +118,36 @@ function buildApp() {
   r.get('/offenders', handle(async (req) => q.listOffenders(req.user, req.query)));
   r.get('/offenders/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_offender', targetType: 'offender', targetId: req.params.id, ip: req.clientIp });
-    return q.getOffender(req.user, req.params.id);
+    const o = await q.getOffender(req.user, req.params.id);
+    if (String(req.query.explain) !== 'true') return o;
+    // Facts only. The model never sees, and never invents, an FIR number.
+    const { text, source } = await insight.generate(req, 'repeat offender behavioural summary', {
+      cases: o.distinctCases, districts: o.distinctDistricts,
+      firstSeen: o.firstSeenDate, lastSeen: o.lastSeenDate,
+      nameVariantsResolved: (o.nameVariants || []).length,
+      riskScore: o.riskScore, riskBand: o.band,
+      riskFactors: (o.factors || []).map((f) => `${f.label} +${f.value}`),
+      crimeTypes: [...new Set((o.cases || []).map((c) => c.crimeSubHead).filter(Boolean))].slice(0, 6),
+      stations: [...new Set((o.cases || []).map((c) => c.unitName).filter(Boolean))].slice(0, 6),
+      coOffenders: (o.coOffenders || []).length,
+      note: 'Protected attributes are excluded from the score by construction.',
+    }, { maxTokens: 200 });
+    return { ...o, insight: text, insightSource: source };
   }));
 
   // investigation health
   r.get('/health/cases', handle(async (req) => q.listHealth(req.user, req.query)));
-  r.get('/health/summary', handle(async (req) => q.healthSummary(req.user)));
+  r.get('/health/summary', handle(async (req) => {
+    const h = await q.healthSummary(req.user);
+    if (String(req.query.explain) !== 'true') return h;
+    const { text, source } = await insight.generate(req, 'investigation health worklist', {
+      flaggedTotal: h.flaggedTotal, high: h.high, medium: h.medium,
+      avgInvestigationAgeDays: h.avgAgeDays,
+      stationAnomalies: (h.anomalies || []).length,
+      topReasons: (h.reasons || []).slice(0, 4),
+    }, { maxTokens: 180 });
+    return { ...h, insight: text, insightSource: source };
+  }));
 
   // geo
   r.get('/geo/points', handle(async (req) => q.geoPoints(req.user, req.query)));
