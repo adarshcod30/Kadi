@@ -41,7 +41,7 @@ detection timelines with no supervisory signal. And the FIR schema contains cast
 and occupation — so any predictive system built on it risks discriminating, which is the
 standard and fair criticism of predictive policing in India.
 
-**The solution.** Fold 40,836 FIRs into one graph where every edge is provable evidence, then
+**The solution.** Fold 40,829 FIRs into one graph where every edge is provable evidence, then
 build analytics on top that explain rather than merely count — and exclude protected
 attributes by construction, enforced by a test rather than a policy.
 
@@ -164,9 +164,9 @@ so the analytics exercise the same shapes they would in production.
 
 | Table | Rows |
 |---|---:|
-| CaseMaster (FIRs) | **40,836** |
+| CaseMaster (FIRs) | **40,829** |
 | Victim | 50,656 |
-| Accused | **36,890** → 300 resolved identities |
+| Accused | **36,582** → 300 resolved identities |
 | ComplainantDetails | ~40,000 |
 | ArrestSurrender | ~30,000 |
 | ActSectionAssociation | ~90,000 |
@@ -176,7 +176,7 @@ so the analytics exercise the same shapes they would in production.
 Span: Jan 2023 → Jul 2026, 43 months. Seed `2026`, regenerates byte-for-byte.
 
 > **Corrected figure.** The accused count was written as **36,289** in nine places across the
-> README, five docs and the deck. The generated table holds **36,890**. Fixed at `82e9154`.
+> README, five docs and the deck. The generated table holds **36,582**. Fixed at `82e9154`.
 > The About page in the app read the right number all along.
 
 ### How realism is achieved
@@ -211,7 +211,7 @@ There are **two** stores, and only one is on the read path.
 
 | Store | Contents | On the read path? |
 |---|---|---|
-| **Data Store** (Catalyst) | CaseMaster 40,836 · DistrictInsight 31 · **Accused 0 · OffenderIdentity 0** | ❌ no |
+| **Data Store** (Catalyst) | CaseMaster 40,829 · DistrictInsight 31 · **Accused 0 · OffenderIdentity 0** | ❌ no |
 | **Bundle** (`functions/api/data/`) | everything the UI reads | ✅ yes |
 
 Verified by ZCQL on 2026-08-20:
@@ -223,7 +223,7 @@ SELECT COUNT(ROWID) FROM Accused           → 0
 SELECT COUNT(ROWID) FROM OffenderIdentity  → 0
 ```
 
-**So two things are true at once:** the claim "40,836 FIRs are in Data Store" is *correct*,
+**So two things are true at once:** the claim "40,829 FIRs are in Data Store" is *correct*,
 and the deployed application does not read them. §8 and §10 explain why.
 
 ---
@@ -237,9 +237,9 @@ Stage order, taken from the `step()` calls in the source:
 | # | Stage | Module | What it does |
 |---|---|---|---|
 | 1 | loading source tables | `common.py` | reads the 29 CSVs |
-| 2 | **entity resolution** | `entity_resolution.py` (258 ln) | blocking → rapidfuzz → union-find. 36,890 → 300 |
+| 2 | **entity resolution** | `entity_resolution.py` (258 ln) | blocking → rapidfuzz → union-find. 36,582 → 35,662 identities · 441 repeat |
 | 3 | MO similarity | `mo_similarity.py` (73 ln) | TF-IDF + NearestNeighbors cosine |
-| 4 | graph build + community | `graph_build.py` (174) · `community.py` (28) | typed edges + Louvain → 117 networks |
+| 4 | graph build + community | `graph_build.py` (174) · `community.py` (28) | typed edges + Louvain → 127 networks |
 | 5 | offender risk | `risk_score.py` (130) | transparent additive score with factors |
 | 6 | investigation health | `health_metrics.py` (147) | deterministic flags + peer medians |
 | 7 | anomaly detection | `anomaly.py` (92) | outliers per head/area |
@@ -450,7 +450,7 @@ half-translated page (Kannada headings, English body) is worse than none.
 | **Web Client Hosting** | React SPA at `/app` | same origin as API → no CORS |
 | **Serverless Functions** | `api` (33 routes) + `refreshanalytics` (Job) | 512 MB |
 | **AppSail** | `kadi-appsail`, Python | ~135 ms; **stdlib-only** |
-| **Data Store** | 11 tables, 40,836 FIRs | live ZCQL — but see below |
+| **Data Store** | 11 tables, 40,829 FIRs | live ZCQL — but see below |
 | **Stratus** | bulk-import objects | |
 | **Job Scheduling + Cron** | nightly 02:00 IST | last run SUCCESS |
 | **Connections** | `kadi_quickml` OAuth | `deployment.READ` |
@@ -480,7 +480,7 @@ SELECT DistrictName, TotalCases, RatePer100k, RankByCount, RankByRate, RankShift
 FROM DistrictInsight WHERE RankShift > 5 ORDER BY RankShift DESC LIMIT 5
 ```
 
-→ Kodagu 335 FIRs, 51.6/100k, **#30 → #6** · Dharwad #23 → #7 · Ramanagara #19 → #11.
+→ Kodagu 335 FIRs, 51.6/100k, **#31 → #6** · Dharwad #23 → #7 · Ramanagara #19 → #11.
 
 If you get to run one query in front of a judge, run this one.
 
@@ -636,7 +636,7 @@ Nothing withheld. Grouped by how much it costs you.
 |---|---|---|
 | C1 | "21 REST endpoints" — README, docs, deck | **33** |
 | C2 | "~860KB subset" — `store.mock.js:11` | **46 MB** (function folder 52 MB) |
-| C3 | "36,289 accused" — 9 places | **36,890** — fixed at `82e9154` |
+| C3 | "36,289 accused" — 9 places | **36,582** — fixed at `82e9154` |
 | C4 | `InfoReceivedPSDate` in schema doc | Column **does not exist** in the Data Store table |
 | C5 | docs/08 "Cache… platform-level and unresolved" | Wrong diagnosis — corrected at `0d9f11a` |
 
@@ -646,7 +646,7 @@ Nothing withheld. Grouped by how much it costs you.
 |---|---|
 | D1 | Template artefact in some BriefFacts — *"…injured the complainant office hours"*, incident at 02:05 contradicting "office hours" |
 | D2 | Urbanisation correlation partly circular by construction |
-| D3 | **Pearson +0.878 vs Spearman +0.517** — the linear coefficient is leveraged by two metros; honest read is *moderate* |
+| D3 | **Pearson +0.88 vs Spearman +0.517** — the linear coefficient is leveraged by two metros; honest read is *moderate* |
 | D4 | Crime mix nearly identical across urbanisation bands (41.7/41.5/40.9% property) — plausibly a generator artefact, not a finding |
 | D5 | Chamarajanagar "+8.4% rising" is **0.6 of a case** on a base of 7.8 — inside noise |
 | D6 | `Accused` and `OffenderIdentity` empty in Data Store — no offender read path available |
@@ -711,11 +711,11 @@ Three specifically worth volunteering before anyone asks:
 1. **"The correlation is partly circular."** The generator weights urban crime upward. The
    method is sound and runs unchanged on real data — but here it is confirmation, not
    discovery.
-2. **"Pearson and Spearman disagree."** 0.878 vs 0.517 means two metros carry the linear fit.
+2. **"Pearson and Spearman disagree."** 0.88 vs 0.517 means two metros carry the linear fit.
    The honest read is a moderate monotonic relationship.
 3. **"The assistant is not an LLM."** It is a deterministic intent engine — which cannot
    hallucinate an FIR number. In police work that trade is worth making.
 
 Saying these first is what separates an analyst's work from a student project. And you can
-afford to say them, because the things that *do* work — 100% ground-truth recovery, 3.9% MAPE
+afford to say them, because the things that *do* work — 100% ground-truth recovery, 4.3% MAPE
 on a hold-out backtest, a fairness guarantee enforced by a failing test — are all measured.

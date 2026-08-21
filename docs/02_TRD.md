@@ -34,7 +34,7 @@
 │                         ▼                  ▼                   ▼             │
 │  DATA           ┌────────────────┐ ┌────────────────┐ ┌──────────────────┐   │
 │  one source     │ Data Store     │ │ Stratus bucket │ │ Cache — KPI      │   │
-│  of record      │ 11 tbl·40,836  │ │ import objects │ │ segment (see §9) │   │
+│  of record      │ 11 tbl·40,829  │ │ import objects │ │ segment (see §9) │   │
 │                 └────────────────┘ └────────────────┘ └──────────────────┘   │
 │                                                                              │
 │  PLATFORM        Authentication · Connections (OAuth) · Catalyst CLI 1.27.0  │
@@ -54,7 +54,7 @@ Eight services are live. Be precise about this in the pitch; a judge will check.
 | SPA hosting | **Web Client Hosting** | Serves `/app`. Same origin as the API, so no CORS dance. |
 | REST API + nightly Job | **Serverless Functions** | Advanced I/O accepts an Express app. Raised to 512 MB for the read-model. |
 | Python analytics | **AppSail** | Per-capita + forecast in ~135 ms. **Stdlib-only** — see §10. |
-| Relational store | **Data Store** | 11 tables, 40,836 FIRs, queried with ZCQL. |
+| Relational store | **Data Store** | 11 tables, 40,829 FIRs, queried with ZCQL. |
 | Object storage | **Stratus** | Source objects for Data Store bulk-write. |
 | Scheduled recompute | **Job Scheduling + Cron** | Nightly at 02:00 IST. Only Jobs get 15 minutes. |
 | OAuth to QuickML | **Connections** | `deployment.READ` scope. QuickML refuses anonymous calls. |
@@ -177,12 +177,12 @@ Derived tables are rebuilt by the Job. The API reads them, never recomputes them
 1. **Entity resolution** — block on name key + district, then `rapidfuzz` similarity with
    **rarity-aware distinctiveness** (a rare surname match counts for far more than a common
    one), plus shared co-accused / section / location signals. Union-find merges the
-   clusters. 36,890 accused rows → 300 identities, each with a confidence. **No protected
+   clusters. 36,582 accused rows → 35,662 identities (441 repeat), each with a confidence. **No protected
    attributes.**
 2. **Graph build** — a `networkx` multigraph. Edge types: shared offender, co-accused, same
    location cell, overlapping time window, MO similarity, shared act & section. Every edge
    carries an evidence payload naming what matched.
-3. **Communities** — Louvain over the case projection → 117 networks, 7 cross-district.
+3. **Communities** — Louvain over the case projection → 127 networks, 7 cross-district.
 4. **MO similarity** — TF-IDF over `BriefFacts`, then `NearestNeighbors` cosine within
    candidate blocks.
 5. **Offender risk** — prior count, gravity mix, recency, arrest/bail history, network
@@ -190,7 +190,7 @@ Derived tables are rebuilt by the Job. The API reads them, never recomputes them
    attributes excluded, and asserted in the output metadata.
 6. **Anomaly detection** — per crime head and area, flag outliers.
 7. **Health metrics** — deterministic: reporting delay, ageing vs peer median, pendency,
-   undetected risk, false-case pattern. 19,006 cases flagged.
+   undetected risk, false-case pattern. 18,901 cases flagged.
 8. **Spatial** — DBSCAN per crime head and time bucket → hotspots; baseline vs current for
    emerging trends.
 9. **Socio + forecast** — per-capita rates against Census indicators; linear trend ×

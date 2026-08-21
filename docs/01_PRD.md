@@ -14,7 +14,7 @@
 
 ## 1. The one-sentence pitch
 
-You are turning 40,836 siloed Karnataka FIRs into **one connected, explainable intelligence
+You are turning 40,829 siloed Karnataka FIRs into **one connected, explainable intelligence
 picture** — one that exposes serial offenders, cross-district networks and slipping
 investigations, without ever profiling a community.
 
@@ -81,7 +81,7 @@ refused, not merely hidden in the UI. Verify that claim before you present it.
 |---|---|---|---|---|---|
 | FIRs at own station | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Every FIR in the district | — | — | ✅ | ✅ | ✅ |
-| All 40,836 FIRs, state-wide | — | — | — | ✅ | ✅ |
+| All 40,829 FIRs, state-wide | — | — | — | ✅ | ✅ |
 | Case-linkage graph + why-linked evidence | ✅ scoped | ✅ scoped | ✅ district | ✅ state | ✅ |
 | Arrest & chargesheet detail | — | ✅ | ✅ | ✅ | ✅ |
 | Per-capita analytics, forecasting, anomalies | — | — | — | ✅ | ✅ |
@@ -103,14 +103,14 @@ deployed build.
 - Every edge is click-through to a **"why linked"** panel naming the exact matching
   attributes and the source FIR numbers. This is the feature that separates you from a
   dashboard — make sure it is the first thing you demo.
-- Communities (Louvain) are grouped and expandable. 117 active networks, 7 of them
+- Communities (Louvain) are grouped and expandable. 127 active networks, 7 of them
   cross-district.
 - Filters: crime head, date range, district, edge type, minimum link strength.
 - Reads are fast because they come from a **precomputed read-model**, never live compute.
 
 ### F2 · Repeat / habitual offender profiles — P0
 - One profile per resolved identity, with name variants merged by entity resolution:
-  **36,890 accused records fold into 300 real people**.
+  **36,582 accused records resolve into 35,662 identities, 441 of them repeat offenders**.
 - A behaviour-based risk score (0–100) with a visible factor breakdown — prior count,
   gravity mix, recency, network centrality. **No protected attributes.** If you cannot show
   the breakdown, do not show the score.
@@ -119,7 +119,7 @@ deployed build.
 
 ### F3 · Investigation health & early warning — P0
 - A worklist of flagged cases: reporting delay, investigation ageing against the peer
-  median, pendency, undetected risk, false-case pattern. **19,006 cases** carry at least one
+  median, pendency, undetected risk, false-case pattern. **18,901 cases** carry at least one
   flag on the current corpus.
 - Each flag states *why* and recommends a next action.
 - Sort and filter by IO, station, gravity, age.
@@ -133,12 +133,12 @@ deployed build.
 
 ### F5 · Socio-economic analytics — P1, fairness-forward
 - Rates **per 100,000 residents**, not raw counts. This is where the headline finding comes
-  from: Kodagu is 30th by count and 6th per capita.
-- Correlations against area-level indicators with p-values — urbanisation r=+0.878,
-  literacy r=+0.538, population density r=+0.889 across n=31 districts.
+  from: Kodagu is 31st by count and 6th per capita.
+- Correlations against area-level indicators with p-values — urbanisation r=+0.88,
+  literacy r=+0.546, population density r=+0.871 across n=31 districts.
 - **Hard guardrail:** these are *area-level* indicators only. They are never joined to an
   individual and never used as a feature in any person-level score.
-- Three-month district forecast with a 95% interval, backtested to **3.9% MAPE**.
+- Three-month district forecast with a 95% interval, backtested to **4.3% MAPE**.
 
 ### F6 · Explainability & audit — P0, the trust layer
 - Every edge, score and answer exposes how it was produced.

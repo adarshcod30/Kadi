@@ -52,7 +52,7 @@ default and are a single click.
 | Service | Console path | Needed for | Status |
 |---|---|---|---|
 | **Authentication** | Cloud Scale → Authentication | Login, RBAC | ✅ provisioned |
-| **Data Store** | Cloud Scale → Data Store | FIR tables | ✅ 11 tables, 40,836 FIRs |
+| **Data Store** | Cloud Scale → Data Store | FIR tables | ✅ 11 tables, 40,829 FIRs |
 | **Stratus** | Cloud Scale → Stratus | Import bucket | ✅ |
 | **Cron** | Cloud Scale → Cron | Nightly rebuild | ✅ 02:00 IST |
 | **AppSail** | Serverless → AppSail | Python analytics | ✅ live |

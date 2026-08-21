@@ -7,8 +7,8 @@ Real FIR data is confidential and cannot leave KSP. So you build and demo on a
 Say "synthetic" everywhere it appears — README, About page, deck, footer. Disclosure costs
 you nothing and buys you the judge's trust. The pipeline ingests real data unchanged.
 
-**What the generator currently produces:** 40,836 FIRs across 43 months, 31 districts, 298
-police stations, 50,656 victim records and 36,890 accused records carrying 300 true
+**What the generator currently produces:** 40,829 FIRs across 43 months, 31 districts, 298
+police stations, 50,656 victim records and 36,582 accused records carrying 300 true
 identities, plus 7 planted patterns. Deterministic under seed 2026 — it regenerates
 byte-for-byte.
 
@@ -33,10 +33,10 @@ linkage works; with it you can measure it.
 | District | 31 — the real ones |
 | Unit (police stations) | 298 |
 | Employee | ~1,500 |
-| **CaseMaster (FIRs)** | **40,836** |
+| **CaseMaster (FIRs)** | **40,829** |
 | ComplainantDetails | ~40,000 (≈1 per FIR) |
 | Victim | 50,656 (1–3 per FIR) |
-| Accused | 36,890 (0–5 per FIR) → **300 resolved identities** |
+| Accused | 36,582 (0–5 per FIR) → **300 resolved identities** |
 | ArrestSurrender | ~30,000 |
 | ActSectionAssociation | ~90,000 |
 | ChargesheetDetails | ~28,000 |

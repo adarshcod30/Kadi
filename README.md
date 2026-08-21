@@ -7,7 +7,7 @@
 **AI-Driven Crime Analytics & Visualization Platform for the Karnataka State Police**
 
 *ಕಡಿ / कड़ी — "a link in a chain."*
-Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
+Turning 40,829 siloed FIRs into one connected, explainable intelligence picture.
 
 [![Live on Catalyst](https://img.shields.io/badge/Live-Catalyst-1A6FC4?style=for-the-badge)](https://kadilabs-60078029367.development.catalystserverless.in/app/)
 [![Demo video](https://img.shields.io/badge/Demo-Video-E8871E?style=for-the-badge)](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing)
@@ -31,8 +31,8 @@ Turning 40,836 siloed FIRs into one connected, explainable intelligence picture.
 
 | | | | | | |
 |:--:|:--:|:--:|:--:|:--:|:--:|
-| **40,836** | **300** | **68,808** | **100%** | **3.9%** | **8** |
-| FIRs analysed | offenders resolved<br/>from 36,890 records | typed evidence links | ground-truth<br/>recovery | forecast MAPE<br/>(hold-out) | Catalyst services |
+| **40,829** | **441** | **63,301** | **100%** | **4.3%** | **8** |
+| FIRs analysed | repeat offenders<br/>from 36,582 records | typed evidence links | ground-truth<br/>recovery | forecast MAPE<br/>(hold-out) | Catalyst services |
 
 *Every figure on this page is read live from the deployed API. Nothing is illustrative.*
 
@@ -93,8 +93,9 @@ Every FIR joined to every other FIR it shares real evidence with, across six typ
 Every edge is clickable proof — which attribute matched, on which FIRs.
 
 **Entity Resolution**
-Rarity-aware fuzzy matching folds **36,890** accused records into **300** real people, surviving
-spelling variants, initials and transliteration drift.
+Rarity-aware fuzzy matching resolves **36,582** accused records into **35,662** identities,
+surviving spelling variants, initials and transliteration drift — and **441** of those turn up
+in two or more FIRs. Those are the repeat offenders the watchlist tracks.
 
 </td><td width="33%" valign="top">
 
@@ -106,7 +107,7 @@ red-zones for emerging trends.
 
 **Crime Forecasting**
 3-month district projections with a 95% interval — accuracy measured by hold-out backtest
-(**MAPE 3.9%**), not asserted.
+(**MAPE 4.3%**), not asserted.
 
 **Socio-economic Analytics**
 Per-capita rates correlated against urbanisation, literacy and density, with p-values so weak
@@ -141,8 +142,8 @@ sign in as **SCRB Analyst**, and follow along.
 
 ```mermaid
 flowchart LR
-    H["<b>1 · Home</b><br/>40,836 FIRs<br/>the scale of the problem"]
-    I["<b>2 · Intelligence</b><br/>Kodagu 30th by count<br/><b>6th per capita</b>"]
+    H["<b>1 · Home</b><br/>40,829 FIRs<br/>the scale of the problem"]
+    I["<b>2 · Intelligence</b><br/>Kodagu 31st by count<br/><b>6th per capita</b>"]
     G["<b>3 · Graph</b><br/>click an edge →<br/><i>why</i> two cases link"]
     M["<b>4 · Map</b><br/>hotspots where<br/>rate, not volume, is high"]
     A["<b>5 · Assistant</b><br/>ask in ಕನ್ನಡ →<br/>answer cites real FIRs"]
@@ -166,13 +167,13 @@ flowchart LR
 
 | Screen | What it shows |
 |---|---|
-| **Command Dashboard** | KPIs · monthly trend · hour × weekday heatmap · disposal funnel (39.6% clearance) · forecast with 95% band · crime-mix radial · urbanisation bubble plot · district treemap |
+| **Command Dashboard** | KPIs · monthly trend · hour × weekday heatmap · disposal funnel (39.9% clearance) · forecast with 95% band · crime-mix radial · urbanisation bubble plot · district treemap |
 | **Case-Linkage Graph** | Ego-network per FIR · 5 layouts · 6 link-type filters · "why linked" evidence panel · case switcher |
 | **Intelligence** | Per-capita ranking · rank-shift bars · correlation scatter · crime-mix by urbanisation band · state forecast |
 | **Map** | Satellite/streets basemap · district drill-down · DBSCAN hotspots · log-normalised heat grid · time-of-day filter |
-| **Investigation Health** | Worklist of 19,006 flagged cases with plain-language reasons and next actions |
+| **Investigation Health** | Worklist of 18,901 flagged cases with plain-language reasons and next actions |
 | **Offenders** | Watchlist + profile: risk gauge · glass-box factor breakdown · name variants · linked FIRs |
-| **Cases** | 40,836 FIRs filterable by head, district, status, gravity, health flag |
+| **Cases** | 40,829 FIRs filterable by head, district, status, gravity, health flag |
 | **Assistant** | Bilingual grounded Q&A · voice input · briefing export |
 | **About** | Full platform, dataset and fairness documentation |
 
@@ -200,9 +201,9 @@ residents. **A count map would never surface it.**
 
 | Indicator | Pearson r | p | Strength |
 |---|---:|---:|---|
-| Population density | +0.889 | < 0.0001 | strong |
-| Urbanisation | +0.878 | < 0.0001 | strong |
-| Literacy | +0.538 | 0.0018 | moderate |
+| Population density | +0.871 | < 0.0001 | strong |
+| Urbanisation | +0.88 | < 0.0001 | strong |
+| Literacy | +0.546 | 0.0018 | moderate |
 
 Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5.4× gap.
 
@@ -227,7 +228,7 @@ flowchart LR
         JOB["Catalyst Job + Cron<br/>full pipeline · 15-min budget<br/>nightly 02:00 IST"]
     end
     subgraph DATA["Data services"]
-        DS["Data Store<br/>11 tables · 40,836 FIRs · ZCQL"]
+        DS["Data Store<br/>11 tables · 40,829 FIRs · ZCQL"]
         ST["Stratus<br/>bulk-import objects"]
         RM["Read-model<br/>graph · risk · health · hotspots"]
     end
@@ -257,9 +258,9 @@ model.
 
 ```mermaid
 flowchart TD
-    A["FIR intake<br/>29 KSP tables"] --> B["Entity resolution<br/>36,890 → 300 identities<br/>RapidFuzz + union-find"]
+    A["FIR intake<br/>29 KSP tables"] --> B["Entity resolution<br/>36,582 → 35,662 identities · 441 repeat identities<br/>RapidFuzz + union-find"]
     B --> C["MO similarity<br/>TF-IDF + NearestNeighbors"]
-    C --> D["Graph build<br/>6 typed edge kinds · 68,808 links"]
+    C --> D["Graph build<br/>6 typed edge kinds · 63,301 links"]
     D --> E["Louvain communities"]
     E --> F["Risk · Health · Anomaly"]
     F --> G["Spatial<br/>DBSCAN hotspots"]
@@ -279,7 +280,7 @@ flowchart TD
 | **Web Client Hosting** | Serves the SPA at `/app` | Same origin as the API; deep links handled with a 404 → shell fallback |
 | **Serverless Functions** | 21-endpoint REST API + nightly Job | Advanced I/O accepts an Express app; raised to 512 MB for the read-model |
 | **AppSail** | Python analytics service | Per-capita + forecast in ~135 ms; stdlib-only build |
-| **Data Store** | 11 tables · 40,836 FIRs · live ZCQL | The FIR schema is genuinely relational |
+| **Data Store** | 11 tables · 40,829 FIRs · live ZCQL | The FIR schema is genuinely relational |
 | **Stratus** | Object storage for bulk import | Data Store bulk-write reads its source from a bucket |
 | **Job Scheduling + Cron** | Nightly analytics revalidation, 02:00 IST | Only Jobs get 15 minutes |
 | **Connections** | OAuth for QuickML (`deployment.READ`) | QuickML rejects anonymous calls |
@@ -312,12 +313,12 @@ Listed deliberately. Each was attempted and diagnosed, not skipped.
 
 | | |
 |---|---:|
-| FIRs | **40,836** (43 months, Jan 2023 – Jul 2026) |
+| FIRs | **40,829** (43 months, Jan 2023 – Jul 2026) |
 | Districts | 31 (all real KSP districts) |
 | Police stations | 298 |
-| Accused / Victims | 36,890 / 50,656 |
-| Resolved offenders | 300 |
-| Typed evidence links | 68,808 |
+| Accused / Victims | 36,582 / 50,656 |
+| Repeat offenders | 441 |
+| Typed evidence links | 63,301 |
 | Planted ground-truth patterns | 7 |
 
 ### How it is generated
@@ -367,7 +368,7 @@ every pipeline execution.
 
 | Metric | Value | Note |
 |---|---:|---|
-| Pipeline runtime | **24.6 s** | full recompute over 40,836 FIRs |
+| Pipeline runtime | **24.6 s** | full recompute over 40,829 FIRs |
 | Peak memory | **738 MB** | was 1,770 MB — see below |
 | AppSail analytics | **135 ms** | against a 30 s request cap |
 | Graph payload | **54.9 → 12.1 MB** | interned; evidence text byte-identical |
@@ -694,7 +695,7 @@ Stated plainly — every one is verifiable on the live URL.
 | # | Limitation | Detail |
 |---|---|---|
 | 1 | **Authentication is not bound** | Catalyst Authentication is provisioned and the role model is presented at sign-in, but the API derives role from a header rather than a verified JWT. RBAC *scoping* is real and server-enforced; the identity check is not. One function — `userFromRequest` — is the seam. |
-| 2 | **The API reads a bundle, not Data Store** | 40,836 FIRs are genuinely in Data Store and queryable via ZCQL, but the deployed API serves a precomputed bundle for sub-100 ms response. |
+| 2 | **The API reads a bundle, not Data Store** | 40,829 FIRs are genuinely in Data Store and queryable via ZCQL, but the deployed API serves a precomputed bundle for sub-100 ms response. |
 | 3 | **Audit log is in-memory** | A ring buffer, lost on cold start. Not yet persisted to Data Store. |
 | 4 | **PDF export returns HTML** | Print-ready and styled; SmartBrowz is not wired. |
 | 5 | **Cache · QuickML · Zia** | See [Catalyst Services](#catalyst-services) for the specific diagnosis of each. |

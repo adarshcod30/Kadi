@@ -53,7 +53,7 @@ recommended action → open it in the graph.`
 → export.`
 
 **J4 — the analyst view**
-`Intelligence → Kodagu ranks 30th by count and 6th per capita → Map → hotspots → cluster →
+`Intelligence → Kodagu ranks 31st by count and 6th per capita → Map → hotspots → cluster →
 FIRs → Graph.`
 
 ### A4. Sequences
