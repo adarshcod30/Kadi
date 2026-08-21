@@ -270,13 +270,26 @@ function buildApp() {
   // Idempotent, admin-only, and reports what it found rather than what it assumed.
   r.post('/admin/bootstrap', handle(async (req) => {
     rbac.requireRole(req.user, ['Admin']);
-    const audit_ = await datastore.ensureTable(req, 'AuditLog', datastore.AUDIT_COLUMNS);
+    // The table now exists (created from the console). Add the columns it needs.
+    const tableId = String(req.query.tableId || '55468000000187002');
+    const results = [];
+    for (const col of datastore.AUDIT_COLUMNS) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = await datastore.addColumn(req, tableId, col);
+      results.push({ column: col.column_name, ...r });
+    }
+    const audit_ = { tableId, columns: results,
+      added: results.filter((r) => r.ok && !r.existed).length,
+      alreadyThere: results.filter((r) => r.existed).length,
+      failed: results.filter((r) => !r.ok).length };
     return {
       AuditLog: audit_,
       columns: datastore.AUDIT_COLUMNS.map((c) => `${c.column_name}:${c.data_type}`),
-      note: audit_.ok ? 'Table ready.'
-        : 'Create AuditLog from the console with the columns above. Write-through is already '
-          + 'live and will start persisting the moment the table exists - see /audit/health.',
+      note: audit_.failed === 0 ? 'Table ready.'
+        : 'Schema changes are console-only: a deployed function\'s credential returns '
+          + 'OAUTH_SCOPE_MISMATCH for DDL, though row writes and ZCQL reads work over the '
+          + 'same path. Add the columns above under Data Store > AuditLog > New Column. '
+          + 'Write-through is already live and starts persisting immediately after.',
     };
   }));
 

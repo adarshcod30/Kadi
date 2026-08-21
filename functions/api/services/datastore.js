@@ -369,10 +369,55 @@ const AUDIT_COLUMNS = [
   { column_name: 'ts', data_type: 'varchar', max_length: 32, description: 'ISO timestamp' },
 ];
 
+// Add a column to an EXISTING table. Different endpoint from table creation, and a simpler
+// body -- worth trying separately rather than assuming the same 400 applies.
+function addColumn(req, tableId, col) {
+  return new Promise((resolve) => {
+    const h = (req && req.headers) || {};
+    const token = h['x-zc-admin-cred-token'];
+    const secret = h['x-zc-project-secret-key'];
+    const projectId = h['x-zc-projectid'] || process.env.CATALYST_PROJECT_ID;
+    if (!token || !secret || !projectId) return resolve({ ok: false, reason: 'no credential' });
+    // The list form is correct -- an object returns JSON_PARSE_ERROR. But it does not matter:
+    // with a valid body the endpoint answers 401 OAUTH_SCOPE_MISMATCH. The credential a
+    // deployed function receives can read and write ROWS but cannot change SCHEMA, which is
+    // a sensible boundary and not something a different body shape gets around.
+    //
+    // So DDL is console-only. Data operations are not: ZCQL reads and row inserts both work
+    // over this same path. Create the columns once from the console using AUDIT_COLUMNS and
+    // the write-through starts persisting with no code change.
+    const body = JSON.stringify([col]);
+    const rq = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${projectId}/table/${tableId}/column`,
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+        Environment: h['x-zc-environment'] || 'Development',
+        'X-ZC-PROJECT-SECRET-KEY': secret,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (c) => { out += c; });
+      res.on('end', () => {
+        const dup = /already exist|duplicate/i.test(out);
+        resolve({ ok: (res.statusCode >= 200 && res.statusCode < 300) || dup,
+          existed: dup, status: res.statusCode, body: out.slice(0, 200) });
+      });
+    });
+    rq.on('error', (e) => resolve({ ok: false, reason: e.message }));
+    rq.write(body);
+    rq.end();
+  });
+}
+
 module.exports = {
   available: () => !!catalyst,
   insertRows,
   ensureTable,
+  addColumn,
   AUDIT_COLUMNS,
   probe,
   listCases,
