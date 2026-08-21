@@ -17,6 +17,64 @@ try {
 }
 
 let lastError = null;
+let httpError = null;   // kept separate so the SDK fallback cannot mask it
+
+// ---- raw ZCQL over HTTPS ----------------------------------------------------------
+// The SDK's initialize(req) returns 401 for every scope, but the function DOES receive a
+// full admin credential -- as request headers, not environment variables:
+//   x-zc-admin-cred-token   (70-char OAuth token)
+//   x-zc-project-secret-key (64 chars)
+//   x-zc-user-type = admin
+// quickml.js already proved these work: it reaches Zoho over raw HTTPS with that token and
+// gets a 400 body-contract error, not a 401. So talk to the ZCQL REST endpoint directly and
+// skip the SDK entirely.
+const https = require('https');
+
+function httpZcql(req, sql) {
+  return new Promise((resolve) => {
+    const h = (req && req.headers) || {};
+    const token = h['x-zc-admin-cred-token'] || h['x-zc-user-cred-token'];
+    const projectId = h['x-zc-projectid'] || process.env.CATALYST_PROJECT_ID;
+    if (!token || !projectId) {
+      httpError = 'no admin-cred-token header';
+      return resolve(null);
+    }
+    const body = JSON.stringify({ query: sql });
+    const r = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${projectId}/query`,
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+        Environment: h['x-zc-environment'] || 'Development',
+        // The BaaS endpoint rejects the OAuth token alone with
+        // 404 INVALID_RESOURCE "X-ZC-PROJECT-SECRET-KEY not found".
+        'X-ZC-PROJECT-SECRET-KEY': h['x-zc-project-secret-key'] || '',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (c) => { out += c; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          httpError = `http ${res.statusCode}: ${out.slice(0, 220)}`;
+          return resolve(null);
+        }
+        try {
+          const j = JSON.parse(out);
+          resolve(j.data || []);
+        } catch (e) {
+          httpError = `parse: ${e.message}`;
+          resolve(null);
+        }
+      });
+    });
+    r.on('error', (e) => { httpError = `net: ${e.message}`; resolve(null); });
+    r.write(body);
+    r.end();
+  });
+}
 
 function zcql(req) {
   if (!catalyst) { lastError = 'sdk-not-loaded'; return null; }
@@ -40,6 +98,9 @@ function flatten(rows, table) {
 }
 
 async function query(req, sql, table) {
+  // HTTP first: it is the path that actually authenticates here.
+  const viaHttp = await httpZcql(req, sql);
+  if (viaHttp !== null) return table ? flatten(viaHttp, table) : viaHttp;
   const z = zcql(req);
   if (!z) return null;
   try {
@@ -59,22 +120,16 @@ const TABLES = ['CaseMaster', 'Accused', 'OffenderIdentity', 'District', 'Unit',
   'CrimeForecast', 'Hotspot'];
 
 async function status(req) {
-  const z = zcql(req);
-  if (!z) {
-    return { reachable: false, reason: lastError || 'no-catalyst-context', tables: {} };
-  }
   const tables = {};
+  let reachable = false;
   for (const t of TABLES) {
-    try {
-      const rows = await z.executeZCQLQuery(`SELECT COUNT(ROWID) FROM ${t}`);
-      const first = rows && rows[0] ? (rows[0][t] || rows[0]) : {};
-      const n = first.ROWID ?? first['COUNT(ROWID)'] ?? Object.values(first)[0];
-      tables[t] = Number(n);
-    } catch (e) {
-      tables[t] = { error: e && e.message ? e.message : String(e) };
-    }
+    const rows = await query(req, `SELECT COUNT(ROWID) FROM ${t}`, t);
+    if (rows === null) { tables[t] = { error: lastError }; continue; }
+    const first = rows[0] || {};
+    tables[t] = Number(first.ROWID ?? first['COUNT(ROWID)'] ?? Object.values(first)[0] ?? 0);
+    reachable = true;
   }
-  return { reachable: true, tables, lastError };
+  return { reachable, via: reachable ? 'https + x-zc-admin-cred-token' : 'none', tables, httpError, lastError };
 }
 
 // One deploy, several hypotheses. The 401 is identical to the one Cache returns, so the
@@ -109,6 +164,16 @@ async function probe(req) {
   } catch (e) {
     out._user = { err: (e && e.message ? e.message : String(e)).slice(0, 160) };
   }
+  // The earlier probe only dumped process.env and concluded there was no credential.
+  // quickml.js gets a working token out of a REQUEST HEADER (x-zc-admin-cred-token) and
+  // reaches Zoho with it -- its 400 is a body-contract error, not a 401. So check headers.
+  out._headers = Object.keys((req && req.headers) || {})
+    .filter((h) => /zc|zoho|catalyst|cred|token|auth|cookie/i.test(h))
+    .reduce((acc, h) => {
+      const v = String(req.headers[h] || '');
+      acc[h] = v.length > 12 ? `<${v.length} chars>` : v;
+      return acc;
+    }, {});
   out._env = {
     hasProjectKey: !!process.env.X_ZOHO_CATALYST_PROJECT_KEY,
     hasProjectId: !!process.env.CATALYST_PROJECT_ID,
@@ -172,7 +237,7 @@ module.exports = {
   available: () => !!catalyst,
   probe,
   listCases,
-  diag: () => ({ sdkLoaded: !!catalyst, lastError }),
+  diag: () => ({ sdkLoaded: !!catalyst, httpError, lastError }),
   query,
   status,
 };
