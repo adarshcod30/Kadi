@@ -221,7 +221,7 @@ flowchart LR
         SPA["React 18 + TypeScript SPA<br/>Cytoscape · MapLibre · Recharts<br/>EN / Kannada · voice"]
     end
     subgraph API["Serverless Function · Node 20 · 512 MB"]
-        REST["21 REST endpoints<br/>RBAC scoping · audit trail<br/>grounded assistant"]
+        REST["36 REST endpoints<br/>RBAC scoping · audit trail<br/>grounded assistant"]
     end
     subgraph COMPUTE["Python compute"]
         APPSAIL["AppSail<br/>per-capita + forecast<br/>~135 ms"]
@@ -278,7 +278,7 @@ flowchart TD
 | Service | Used for | Why this service |
 |---|---|---|
 | **Web Client Hosting** | Serves the SPA at `/app` | Same origin as the API; deep links handled with a 404 → shell fallback |
-| **Serverless Functions** | 21-endpoint REST API + nightly Job | Advanced I/O accepts an Express app; raised to 512 MB for the read-model |
+| **Serverless Functions** | 36-endpoint REST API + nightly Job | Advanced I/O accepts an Express app; raised to 512 MB for the read-model |
 | **AppSail** | Python analytics service | Per-capita + forecast in ~135 ms; stdlib-only build |
 | **Data Store** | 11 tables · 40,829 FIRs · live ZCQL | The FIR schema is genuinely relational |
 | **Stratus** | Object storage for bulk import | Data Store bulk-write reads its source from a bucket |
@@ -607,7 +607,7 @@ Kadi/
 │
 ├── functions/
 │   ├── api/                    Advanced I/O Function — the REST API
-│   │   ├── app.js              21 routes · RBAC + audit wiring
+│   │   ├── app.js              36 routes · RBAC + audit wiring
 │   │   ├── services/           queries · rbac · assistant · audit · cache · quickml · zia
 │   │   └── data/               deployable bundle (built by build_bundle.py)
 │   └── refreshanalytics/       Catalyst Job — nightly analytics revalidation

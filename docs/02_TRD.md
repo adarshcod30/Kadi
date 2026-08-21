@@ -102,7 +102,7 @@ client/                       React SPA
 functions/
   api/
     index.js                  Catalyst entry — wraps app.js
-    app.js                    all 21 routes
+    app.js                    all 36 routes
     lib/envelope.js           one response shape, one error shape
     services/
       queries.js              every read; the heart of the API
@@ -135,7 +135,7 @@ docs/
 
 ## 5. API surface
 
-21 endpoints. RBAC applied server-side on every one. Error envelope:
+36 endpoints. RBAC applied server-side on every one. Error envelope:
 `{ ok:false, error:{ code, message } }`.
 
 | Method | Path | Purpose |

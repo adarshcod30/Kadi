@@ -235,8 +235,8 @@ Fold in while touching adjacent code:
 | Audit trail in-memory | now fixable — Data Store works |
 | Cache 401 | same header bypass should fix it |
 | `/cases` onto live ZCQL | mapper now testable |
-| "21 endpoints" → 33 | correct everywhere |
-| `store.mock.js` "860KB" → 46 MB | stale comment |
+| "36 endpoints" → 33 | correct everywhere |
+| ~~`store.mock.js` "860KB"~~ | ✅ corrected to ~48 MB |
 | No frontend tests | add smoke tests |
 | 46 MB cold start | shrink the bundle |
 

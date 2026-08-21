@@ -8,7 +8,7 @@ const { parse } = require('csv-parse/sync');
 // Two possible data roots:
 //   FULL    repo-root data/output - 121MB, every CSV and derived artifact. Present in
 //           development, but gitignored and far too large to ship.
-//   BUNDLED functions/api/data - a self-contained ~860KB subset (small derived artifacts
+//   BUNDLED functions/api/data - a self-contained ~48MB subset (derived artifacts
 //           + lookup CSVs) that IS shipped, so the deployed function has something to read.
 // Prefer FULL when it exists: locally and in tests we want the complete dataset. Only the
 // deployed function, where FULL is absent, falls back to the bundle.

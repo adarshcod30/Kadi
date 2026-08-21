@@ -29,7 +29,7 @@ limitation you will find in older notes and in some Zoho documentation.
 | Service | What it runs |
 |---|---|
 | **Web Client Hosting** | The React SPA at `/app` |
-| **Serverless Functions** | `api` (21 endpoints) + `refreshanalytics` (the nightly Job) |
+| **Serverless Functions** | `api` (36 endpoints) + `refreshanalytics` (the nightly Job) |
 | **AppSail** | `kadi-appsail` — Python analytics, ~135 ms per call |
 | **Data Store** | 11 tables, 40,829 FIRs, live ZCQL |
 | **Stratus** | Bulk-import objects |

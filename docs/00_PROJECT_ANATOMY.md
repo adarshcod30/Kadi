@@ -303,7 +303,8 @@ sizes:
 | `alerts.json` | 4.9 KB | cross-district + high-risk alerts |
 
 > ⚠️ **Measured, and it contradicts the code comment.** `store.mock.js` line 11 describes the
-> bundle as *"a self-contained ~860KB subset"*. It is **46 MB**, and the whole deployed
+> bundle as *"a self-contained ~860KB subset"*. It was **46 MB** — corrected in the code
+> since. The deployed
 > `functions/api` folder is **52 MB**. That comment is stale by roughly 50×.
 >
 > This matters operationally: every `catalyst deploy --only functions` uploads 52 MB, and the
@@ -322,7 +323,7 @@ the Job already wrote. That single constraint shaped the entire architecture.
 `functions/api/app.js`. Every route returns `{ ok, data }` or `{ ok:false, error:{code,message} }`.
 RBAC applied server-side per query.
 
-> ⚠️ **Corrected count.** README and docs say **"21 REST endpoints"**. The actual count in
+> ⚠️ **Corrected count.** README and docs say **"36 REST endpoints"**. The actual count in
 > `app.js` is **33** (30 before the three `/datastore/*` routes added this week). The 21
 > figure is stale and appears in the deck too.
 
@@ -634,8 +635,8 @@ Nothing withheld. Grouped by how much it costs you.
 
 | # | Claim | Reality |
 |---|---|---|
-| C1 | "21 REST endpoints" — README, docs, deck | **33** |
-| C2 | "~860KB subset" — `store.mock.js:11` | **46 MB** (function folder 52 MB) |
+| C1 | "36 REST endpoints" — README, docs, deck | **33** |
+| C2 | ~~"~860KB subset"~~ | ✅ fixed — comment now reads ~48 MB |
 | C3 | "36,289 accused" — 9 places | **36,582** — fixed at `82e9154` |
 | C4 | `InfoReceivedPSDate` in schema doc | Column **does not exist** in the Data Store table |
 | C5 | docs/08 "Cache… platform-level and unresolved" | Wrong diagnosis — corrected at `0d9f11a` |
@@ -680,7 +681,7 @@ Ranked by value per unit of risk.
 
 | Item | Effort | Risk |
 |---|---|---|
-| Correct the "21 endpoints" claim everywhere (C1) | S | none |
+| Correct the "36 endpoints" claim everywhere (C1) | S | none |
 | Fix the stale 860KB comment (C2) | S | none |
 | Persist the audit trail to Data Store (B3) | S–M | low |
 | Add frontend smoke tests (B5) | M | none |
