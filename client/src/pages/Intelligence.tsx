@@ -7,10 +7,90 @@ import {
   ComposedChart, Area, Line, ScatterChart, Scatter, BarChart, Bar, Cell,
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2 } from 'lucide-react';
-import { useSocio, useForecast } from '../api/hooks';
+import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles } from 'lucide-react';
+import { useSocio, useForecast, useOccasions, useZones } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
+
+type TabKey = 'where' | 'why' | 'when' | 'next';
+const TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
+  { key: 'where', label: 'Where', icon: MapPin,
+    blurb: 'Which districts carry the burden once you divide by population — and which are currently above their own baseline.' },
+  { key: 'why', label: 'Why', icon: HelpCircle,
+    blurb: 'What area-level conditions the crime rate tracks with. Correlation, not causation, and the confounders are named.' },
+  { key: 'when', label: 'When', icon: CalendarDays,
+    blurb: 'How offending moves through the calendar — festivals, national holidays and ordinary days are not the same.' },
+  { key: 'next', label: 'What next', icon: Sparkles,
+    blurb: 'Three-month projections with a measured error, and the districts trending against their own history.' },
+];
+
+// The narrative sits above the charts, not instead of them. Every number in it was computed
+// by the pipeline and handed to the model; the model only chose the wording.
+function AiNote({ text, kind }: { text?: string; kind: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-card border border-kadi-blue/25 bg-kadi-blue50/40 px-4 py-3 flex items-start gap-2.5">
+      <Sparkles size={15} className="text-kadi-blue shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-kadi-blue mb-0.5">
+          Reading the {kind} picture
+        </div>
+        <p className="text-[13px] text-ink leading-relaxed">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function OccasionPanels({ occ }: { occ: any }) {
+  if (!occ) return <div className="card"><Skeleton rows={6} /></div>;
+  const classes = occ.classes || [];
+  const occasions = occ.occasions || [];
+  const tone = (v: number) => (v > 10 ? 'text-danger' : v < -5 ? 'text-kadi-teal' : 'text-ink-muted');
+  return (
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4">
+      <motion.div variants={rise}>
+        <Section title="Crime by kind of day"
+          action={<Hint text="Rates are cases per day, so classes with very different day counts stay comparable. Baseline is an ordinary weekday." />}>
+          <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {classes.map((c: any) => (
+              <div key={c.dayClass} className="rounded-card border border-line p-3">
+                <div className="text-sm font-semibold text-ink">{c.dayClass}</div>
+                <div className="text-2xl font-num text-kadi-navy mt-1">{c.casesPerDay}</div>
+                <div className="text-[11px] text-ink-muted">cases per day · {c.days} days</div>
+                <div className={`text-[12px] font-medium mt-1 ${tone(c.vsNormalPct)}`}>
+                  {c.vsNormalPct > 0 ? '+' : ''}{c.vsNormalPct}% vs ordinary day
+                </div>
+                {c.peakHour !== null && c.peakHour !== undefined && (
+                  <div className="text-[11px] text-ink-muted mt-1">peaks {String(c.peakHour).padStart(2, '0')}:00</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      </motion.div>
+
+      <motion.div variants={rise}>
+        <Section title="By occasion"
+          action={<Hint text="Lunar-calendar dates shift year to year, so each festival is windowed by a day either side. That also picks up eve-of-festival activity." />}>
+          <div className="p-2">
+            {occasions.map((o: any) => (
+              <div key={o.occasion} className="flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0">
+                <span className="text-sm text-ink flex-1 truncate">{o.occasion}</span>
+                <span className="text-[11.5px] text-ink-muted w-28 truncate">{o.topHead}</span>
+                <span className="font-num text-sm text-ink-muted w-20 text-right">{o.casesPerDay}/day</span>
+                <span className={`font-num text-sm w-16 text-right font-medium ${tone(o.vsNormalPct)}`}>
+                  {o.vsNormalPct > 0 ? '+' : ''}{o.vsNormalPct}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </motion.div>
+
+      <div className="text-[11.5px] text-ink-muted px-1">{occ.method}</div>
+    </motion.div>
+  );
+}
 
 const BAND_COLOR: Record<string, string> = {
   Urban: '#1A6FC4', Mixed: '#2FA8A0', Rural: '#E8871E',
@@ -18,6 +98,9 @@ const BAND_COLOR: Record<string, string> = {
 const AXIS = { fontSize: 10, fill: '#5B6B7E' };
 
 export default function Intelligence() {
+  const [tab, setTab] = useState<TabKey>('where');
+  const { data: zones } = useZones();
+  const { data: occ } = useOccasions();
   const { data: socio, isLoading: sLoad } = useSocio();
   const { data: fc, isLoading: fLoad } = useForecast();
   const [indicator, setIndicator] = useState(0);
@@ -73,6 +156,24 @@ export default function Intelligence() {
         </div>
       </motion.div>
 
+      {/* Four themes rather than one long scroll. The brief asks for storytelling, and a
+          single stacked page makes every panel feel equally important -- which means none of
+          them lead. Each tab answers one question. */}
+      <div className="flex gap-1 border-b border-line overflow-x-auto">
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+              tab === t.key ? 'border-kadi-blue text-kadi-blue' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            <t.icon size={14} /> {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[12.5px] text-ink-muted -mt-2">{TABS.find((t) => t.key === tab)?.blurb}</p>
+
+      {tab === 'where' && <AiNote kind="where" text={zones?.insight} />}
+      {tab === 'when' && <AiNote kind="when" text={occ?.insight} />}
+
+      {tab === 'where' && <>
       {/* ---- The headline finding: counts vs rates ---- */}
       <motion.div variants={rise}>
         <Section
@@ -117,7 +218,9 @@ export default function Intelligence() {
           </div>
         </Section>
       </motion.div>
+      </>}
 
+      {tab === 'why' && <>
       {/* ---- Correlation ---- */}
       <motion.div variants={rise}>
         <Section
@@ -236,6 +339,11 @@ export default function Intelligence() {
         </Section>
       </motion.div>
 
+      </>}
+
+      {tab === 'when' && <OccasionPanels occ={occ} />}
+
+      {tab === 'next' && <>
       {/* ---- Forecast ---- */}
       <motion.div variants={rise}>
         <Section
@@ -334,6 +442,8 @@ export default function Intelligence() {
         urbanisation are never joined to an individual and never used as a feature in any person-level
         score. Caste, religion and occupation are excluded from every model by construction.
       </motion.div>
+      </>}
+
     </motion.div>
   );
 }

@@ -44,6 +44,11 @@ export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
 export const useFeaturedNetworks = () =>
   useQuery({ queryKey: ['graph-featured'], queryFn: () => api.get<any>('/graph/featured'), staleTime: Infinity });
+export const useZones = (explain = true) =>
+  useQuery({ queryKey: ['zones', role(), explain], queryFn: () => api.get<any>(`/zones${qs({ explain })}`), staleTime: 300000 });
+export const useOccasions = (explain = true) =>
+  useQuery({ queryKey: ['occasions', explain], queryFn: () => api.get<any>(`/analytics/occasions${qs({ explain })}`), staleTime: Infinity });
+
 export const useSocio = () =>
   useQuery({ queryKey: ['socio'], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });
 export const useForecast = () =>
