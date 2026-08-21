@@ -3,7 +3,9 @@
     "name": "api",
     "stack": "node20",
     "type": "advancedio",
-    "env_variables": {}
+    "env_variables": {
+      "QUICKML_ENABLED": "true"
+    }
   },
   "execution": {
     "main": "index.js"

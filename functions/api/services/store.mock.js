@@ -163,6 +163,7 @@ function load() {
   const caseAnomalies = readJson('anomalies', { caseAnomalies: [], stationAnomalies: [] });
   const alerts = readJson('alerts', []);
   const stats = readJson('stats', {});
+  const zones = readJson('zones', { districts: [], stations: [], summary: {} });
   const evalReport = readJson('eval_report', {});
   const districtStats = readJson('district_stats', { districts: [], maxCount: 0 });
   const national = readJson('national', { states: [] });
@@ -178,7 +179,7 @@ function load() {
     cases, caseList: [...cases.values()],
     offenders, offendersById, adjacency, offenderOfCase,
     clusters, clustersById,
-    hotspots, caseAnomalies, alerts, stats, evalReport, districtStats, national,
+    hotspots, caseAnomalies, alerts, stats, zones, evalReport, districtStats, national,
     socio, forecast,
     healthList, healthByCase,
   };

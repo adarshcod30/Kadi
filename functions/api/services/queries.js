@@ -347,6 +347,21 @@ module.exports = {
   FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   stats: (user) => load().stats,
+  // Zone board. State tier sees every district plus the station alerts; district tier sees
+  // only its own district and the stations inside it -- the same two-tier rule as everywhere
+  // else, applied to alerting.
+  zones: (user) => {
+    const db = load();
+    const z = db.zones || { districts: [], stations: [], summary: {} };
+    if (user.roleMeta.tier === 'state') return z;
+    const did = String(user.districtId);
+    return {
+      ...z,
+      districts: z.districts.filter((d) => String(d.districtId) === did),
+      stations: z.stations.filter((s) => String(s.districtId) === did),
+      scopedTo: did,
+    };
+  },
   districtStats: () => load().districtStats,
   national: () => load().national,
   // Cases whose ego-network actually demonstrates the product: several shared-offender

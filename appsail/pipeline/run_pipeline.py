@@ -33,6 +33,7 @@ import risk_score
 import health_metrics
 import anomaly
 import spatial
+import zones
 import evaluate
 import national
 import socio
@@ -82,6 +83,22 @@ def run(data_dir: str):
 
     step("spatial hotspots")
     geo = spatial.compute(tables, TODAY)
+
+    step("zone status")
+    _unit_district = tables["Unit"].set_index("UnitID")["DistrictID"].astype(str).to_dict()
+    _dnames = tables["District"].set_index("DistrictID")["DistrictName"].to_dict()
+    _hnames = tables["CrimeHead"].set_index("CrimeHeadID")["CrimeGroupName"].to_dict()
+    _zone_cases = [{
+        "crimeRegisteredDate": row.CrimeRegisteredDate,
+        "districtId": _unit_district.get(row.PoliceStationID, ""),
+        "unitId": str(row.PoliceStationID),
+        "crimeHead": _hnames.get(str(row.CrimeMajorHeadID), "Other"),
+    } for row in cases.itertuples(index=False)]
+    zone_report = zones.compute(
+        _zone_cases,
+        [{"districtId": str(k), "districtName": v} for k, v in _dnames.items()],
+        unit_district=_unit_district,
+    )
 
     # ---------------- build derived read-model ----------------
     step("assembling read-model")
@@ -205,6 +222,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "anomalies", anomalies)
     common.write_json(data_dir, "hotspots", geo)
     common.write_json(data_dir, "alerts", alerts)
+    common.write_json(data_dir, "zones", zone_report)
     common.write_json(data_dir, "stats", stats)
     common.write_json(data_dir, "district_stats", district_stats)
     common.write_json(data_dir, "national", national_ctx)

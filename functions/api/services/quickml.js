@@ -277,4 +277,22 @@ async function selfTest(req) {
   }
 }
 
-module.exports = { configured, status, phrase, ragAnswer, selfTest, SYSTEM_PROMPT };
+// Generic completion. insight.js builds the prompt; this only transports it.
+async function complete(req, { system, user, maxTokens = 220, temperature = 0.35 }) {
+  const token = await accessToken(req);
+  if (!token) return null;
+  const out = await postJson(ENDPOINT, {
+    model: MODEL,
+    chat_template_kwargs: { enable_thinking: false },
+    messages: [
+      { role: 'system', content: asciiSafe(system) },
+      { role: 'user', content: asciiSafe(user) },
+    ],
+    max_tokens: maxTokens,
+    temperature,
+    stream: false,
+  }, { Authorization: `${AUTH_PREFIX} ${token}` });
+  return extractText(out);
+}
+
+module.exports = { configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };

@@ -34,7 +34,7 @@ OUT = os.path.join(ROOT, "functions", "api", "data")
 OUT_DERIVED = os.path.join(OUT, "derived")
 
 # Copied through untouched — all small.
-SMALL = ["socio", "forecast", "stats", "district_stats", "national", "alerts",
+SMALL = ["socio", "forecast", "stats", "zones", "district_stats", "national", "alerts",
          "hotspots", "eval_report", "offenders", "anomalies", "clusters",
          "case_linked_count", "offender_of_case"]
 LOOKUPS = ["District", "Unit", "CrimeHead", "CrimeSubHead", "CaseStatusMaster",

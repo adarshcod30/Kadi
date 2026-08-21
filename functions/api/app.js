@@ -13,6 +13,7 @@ const cache = require('./services/cache');
 const quickml = require('./services/quickml');
 const zia = require('./services/zia');
 const datastore = require('./services/datastore');
+const insight = require('./services/insight');
 
 function buildApp() {
   const app = express();
@@ -51,6 +52,28 @@ function buildApp() {
     return data;
   }));
   r.get('/alerts', handle(async (req) => q.alerts(req.user)));
+
+  // Zone board -- the brief's "emerging trend alerts / red-zone pulsing", computed against
+  // each area's own baseline rather than by volume. ?explain=true adds an AI reading of it.
+  r.get('/zones', handle(async (req) => {
+    const z = q.zones(req.user);
+    if (String(req.query.explain) !== 'true') return z;
+    const s = z.summary || {};
+    const top = (z.districts || []).slice(0, 3).map((d) => ({
+      district: d.districtName, change: `${d.changePct}%`, driver: d.driverHead,
+      current: d.current, baseline: d.baseline,
+    }));
+    const hot = (z.stations || []).filter((x) => x.zone === 'red_pulsing').slice(0, 3);
+    const { text, source } = await insight.generate(req, 'district and station zone status', {
+      month: s.month, baselineMonths: s.baselineMonths,
+      districtsRed: s.red, districtsPulsing: s.red_pulsing, districtsYellow: s.yellow,
+      districtsNormal: s.normal,
+      biggestMovers: top,
+      stationsPulsing: hot.map((x) => ({ unitId: x.unitId, current: x.current,
+        baseline: x.baseline, change: `${x.changePct}%` })),
+    });
+    return { ...z, insight: text, insightSource: source };
+  }));
   r.get('/eval', handle(async () => q.evalReport()));
   r.get('/clusters', handle(async () => q.clusters().slice(0, 100)));
 
