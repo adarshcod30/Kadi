@@ -1,9 +1,17 @@
 // api.ts — typed fetch wrapper for the KADI API (envelope-aware, role header).
 const BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
 
-export type Role = 'SI' | 'Inspector' | 'ACP' | 'Analyst' | 'Admin';
+// Two tiers. State: Analyst, DGP, Admin. District: SP, DSP, SI.
+export type Role = 'Analyst' | 'DGP' | 'Admin' | 'SP' | 'DSP' | 'SI';
+export const STATE_ROLES: Role[] = ['Analyst', 'DGP', 'Admin'];
+export const DISTRICT_ROLES: Role[] = ['SP', 'DSP', 'SI'];
+export const isStateTier = (r: Role) => STATE_ROLES.includes(r);
+// Older saved sessions and shared links still carry the previous names.
+const LEGACY: Record<string, Role> = { Inspector: 'SI', ACP: 'DSP', SCRB: 'Analyst' };
+export const normaliseRole = (r: string | null): Role =>
+  (['Analyst','DGP','Admin','SP','DSP','SI'].includes(r || '') ? r : LEGACY[r || ''] || 'Analyst') as Role;
 
-let currentRole: Role = (localStorage.getItem('kadi.role') as Role) || 'Analyst';
+let currentRole: Role = normaliseRole(localStorage.getItem('kadi.role'));
 export function getRole(): Role { return currentRole; }
 export function setRole(r: Role) { currentRole = r; localStorage.setItem('kadi.role', r); }
 

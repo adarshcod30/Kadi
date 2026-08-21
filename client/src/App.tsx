@@ -27,7 +27,7 @@ export default function App() {
   // ?as=<Role> lets a link open the app directly in a given rank. Useful for sharing a
   // demo view, and for headless capture where there is no stored session.
   const asRole = new URLSearchParams(loc.search).get('as');
-  if (asRole && ['SI', 'Inspector', 'ACP', 'Analyst', 'Admin'].includes(asRole)) {
+  if (asRole && ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI', 'Inspector', 'ACP'].includes(asRole)) {
     localStorage.setItem('kadi.role', asRole);
   }
   const hasRole = Boolean(localStorage.getItem('kadi.role'));

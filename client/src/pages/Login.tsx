@@ -10,32 +10,44 @@ import { motion } from 'framer-motion';
 import { ShieldCheck, Info, ArrowRight, Lock } from 'lucide-react';
 import { setRole, Role } from '../lib/api';
 
-const ROLES: { role: Role; title: string; scope: string; sees: string; colour: string }[] = [
+const ROLES: { role: Role; title: string; scope: string; sees: string; colour: string; tier: 'state' | 'district' }[] = [
+  // --- STATE TIER: the whole of Karnataka ---
   {
-    role: 'SI', title: 'Sub-Inspector', scope: 'Own police station',
-    sees: 'FIRs registered at their unit, the linkage graph around those FIRs, and their own investigation-health worklist.',
-    colour: '#2FA8A0',
-  },
-  {
-    role: 'Inspector', title: 'Inspector', scope: 'Own police station',
-    sees: 'Everything an SI sees, plus arrest and chargesheet detail for the unit.',
-    colour: '#1A6FC4',
-  },
-  {
-    role: 'ACP', title: 'ACP / DySP', scope: 'Whole district',
-    sees: 'Every FIR in the district, cross-station offender networks, district hotspots, and the audit log.',
-    colour: '#E8871E',
-  },
-  {
-    role: 'Analyst', title: 'SCRB Analyst', scope: 'Entire state',
-    sees: 'All 40,836 FIRs, state-wide networks, per-capita analytics, forecasting and anomaly detection.',
+    role: 'Analyst', title: 'SCRB Analyst', scope: 'Entire state', tier: 'state',
+    sees: 'Every FIR in Karnataka, state-wide offender networks, per-capita analytics, forecasting, anomaly detection and the zone board.',
     colour: '#0f2f44',
   },
   {
-    role: 'Admin', title: 'Administrator', scope: 'Entire state + governance',
-    sees: 'Everything an Analyst sees, plus the fairness report, pipeline status and full audit trail.',
+    role: 'DGP', title: 'State DGP', scope: 'Entire state', tier: 'state',
+    sees: 'The command picture across all 31 districts, with drill-down into any of them.',
+    colour: '#1A6FC4',
+  },
+  {
+    role: 'Admin', title: 'Administrator', scope: 'State + governance', tier: 'state',
+    sees: 'Everything the state tier sees, plus the fairness report, pipeline status and the full audit trail.',
     colour: '#7C5CBF',
   },
+  // --- DISTRICT TIER: one district, and whatever links into it ---
+  {
+    role: 'SP', title: 'Superintendent of Police', scope: 'Own district', tier: 'district',
+    sees: 'Every FIR in the district, cross-station offender networks, district hotspots and the audit log.',
+    colour: '#E8871E',
+  },
+  {
+    role: 'DSP', title: 'DySP / ACP', scope: 'Own district', tier: 'district',
+    sees: 'District FIRs, the linkage graph across stations, and the investigation-health worklist for the sub-division.',
+    colour: '#C9820A',
+  },
+  {
+    role: 'SI', title: 'Sub-Inspector (IO)', scope: 'Own district', tier: 'district',
+    sees: 'District FIRs with station drill-down, the linkage graph around their cases, and their own health worklist.',
+    colour: '#2FA8A0',
+  },
+];
+
+const TIERS = [
+  { key: 'state' as const, label: 'State access', note: 'All 31 districts. SCRB, DGP and Administrator.' },
+  { key: 'district' as const, label: 'District access', note: 'One district, plus every case linked into it. SP, DySP and Sub-Inspector.' },
 ];
 
 export default function Login() {
@@ -68,12 +80,21 @@ export default function Login() {
             <ShieldCheck size={17} className="text-kadi-blue" /> Sign in by role
           </h2>
           <p className="text-sm text-ink-muted mt-1">
-            Access is scoped by rank. Pick a role to enter with exactly the data that rank is
-            entitled to see — the scoping below is enforced server-side on every query.
+            Access runs in two tiers — <b className="text-ink">state</b> and <b className="text-ink">district</b>.
+            Pick a rank to enter with exactly the data it is entitled to see; scoping is
+            enforced server-side on every query, and a district rank can drill into any
+            station within its own district but never outside it.
           </p>
 
-          <div className="mt-4 space-y-2">
-            {ROLES.map((r) => (
+          <div className="mt-4 space-y-4">
+            {TIERS.map((tier) => (
+              <div key={tier.key}>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-kadi-navy">{tier.label}</span>
+                  <span className="text-[11.5px] text-ink-muted">{tier.note}</span>
+                </div>
+                <div className="space-y-2">
+            {ROLES.filter((r) => r.tier === tier.key).map((r) => (
               <motion.button key={r.role} whileHover={{ x: 3 }} onClick={() => enter(r.role)}
                 className="w-full text-left rounded-card border border-line hover:border-kadi-blue hover:bg-kadi-blue50/40 transition-colors px-4 py-3 flex items-start gap-3">
                 <span className="w-9 h-9 rounded-full grid place-items-center text-white text-xs font-semibold shrink-0"
@@ -87,6 +108,9 @@ export default function Login() {
                 </span>
                 <ArrowRight size={15} className="text-ink-muted mt-2 shrink-0" />
               </motion.button>
+            ))}
+                </div>
+              </div>
             ))}
           </div>
 

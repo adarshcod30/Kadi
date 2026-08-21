@@ -22,7 +22,7 @@ const NAV = [
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
   { to: '/assistant', icon: MessageSquare, key: 'assistant' },
-  { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['ACP', 'Admin'] },
+  { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin'] },
 ];
 
@@ -133,7 +133,7 @@ function FairnessBanner() {
 function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: Role) => void; label?: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const roles: Role[] = ['SI', 'Inspector', 'ACP', 'Analyst', 'Admin'];
+  const roles: Role[] = ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI'];
   return (
     <div className="relative">
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white/10">

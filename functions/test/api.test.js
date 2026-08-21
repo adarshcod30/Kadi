@@ -19,20 +19,46 @@ test('rbac scope: analyst sees state-wide, SI unit-only', () => {
   const inScope = { unitId: '1', districtId: '1' };
   const outScope = { unitId: '99', districtId: '9' };
   assert.ok(rbac.caseInScope(analyst, outScope), 'analyst = state read');
-  assert.ok(rbac.caseInScope(si, inScope), 'SI sees own unit');
-  assert.ok(!rbac.caseInScope(si, outScope), 'SI blocked from other unit');
+  // SI is district tier now, not unit tier: same district is visible, other district is not.
+  assert.ok(rbac.caseInScope(si, { unitId: '77', districtId: '1' }), 'SI sees own district');
+  assert.ok(!rbac.caseInScope(si, outScope), 'SI blocked from other district');
 });
 
-test('rbac scope: ACP district-level', () => {
-  const acp = { ...rbac.DEMO_USERS.ACP, roleMeta: rbac.ROLES.ACP };
-  assert.ok(rbac.caseInScope(acp, { unitId: '55', districtId: '1' }), 'same district ok');
-  assert.ok(!rbac.caseInScope(acp, { unitId: '55', districtId: '5' }), 'other district blocked');
+test('rbac scope: district tier (SP/DSP/SI) is district-level', () => {
+  for (const role of ['SP', 'DSP', 'SI']) {
+    const u = { ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] };
+    assert.strictEqual(u.roleMeta.tier, 'district', `${role} is district tier`);
+    assert.ok(rbac.caseInScope(u, { unitId: '55', districtId: '1' }), `${role} same district ok`);
+    assert.ok(!rbac.caseInScope(u, { unitId: '55', districtId: '5' }), `${role} other district blocked`);
+  }
+});
+
+test('rbac scope: state tier (Analyst/DGP/Admin) sees everything', () => {
+  for (const role of ['Analyst', 'DGP', 'Admin']) {
+    const u = { ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] };
+    assert.strictEqual(u.roleMeta.tier, 'state', `${role} is state tier`);
+    assert.ok(rbac.caseInScope(u, { unitId: '99', districtId: '9' }), `${role} sees any district`);
+  }
+});
+
+test('rbac: station drill-down narrows but never widens', () => {
+  const analyst = rbac.userFromRequest({ headers: { 'x-kadi-role': 'Analyst' }, query: { unit: '5' } });
+  assert.ok(rbac.caseInScope(analyst, { unitId: '5', districtId: '9' }), 'drilled unit visible');
+  assert.ok(!rbac.caseInScope(analyst, { unitId: '6', districtId: '9' }), 'other unit hidden');
+
+  // a district user asking for another district must not escape their own
+  const si = rbac.userFromRequest({ headers: { 'x-kadi-role': 'SI' }, query: { district: '7' } });
+  assert.strictEqual(si.districtId, '7', 'district tier may switch district');
+  const dgp = rbac.userFromRequest({ headers: { 'x-kadi-role': 'DGP' }, query: { district: '7' } });
+  assert.strictEqual(dgp.districtId, null, 'state tier ignores district switch, stays state-wide');
 });
 
 test('rbac requireRole gates capabilities', () => {
   const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI };
   const admin = { ...rbac.DEMO_USERS.Admin, roleMeta: rbac.ROLES.Admin };
-  assert.throws(() => rbac.requireRole(si, ['ACP', 'Admin']), /Requires role/);
+  assert.throws(() => rbac.requireRole(si, ['Admin']), /Requires role/);
+  // legacy role names in older call sites still resolve
+  assert.doesNotThrow(() => rbac.requireRole({ ...rbac.DEMO_USERS.DSP, roleMeta: rbac.ROLES.DSP }, ['ACP']));
   assert.doesNotThrow(() => rbac.requireRole(admin, ['Admin']));
   assert.strictEqual(rbac.capabilities(si).canViewAudit, false);
   assert.strictEqual(rbac.capabilities(admin).canAdmin, true);
@@ -40,7 +66,10 @@ test('rbac requireRole gates capabilities', () => {
 
 test('userFromRequest defaults to Analyst, honours role header', () => {
   assert.strictEqual(rbac.userFromRequest({ headers: {} }).role, 'Analyst');
-  assert.strictEqual(rbac.userFromRequest({ headers: { 'x-kadi-role': 'ACP' } }).role, 'ACP');
+  // legacy aliases map onto the two-tier model rather than 404ing
+  assert.strictEqual(rbac.userFromRequest({ headers: { 'x-kadi-role': 'ACP' } }).role, 'DSP');
+  assert.strictEqual(rbac.userFromRequest({ headers: { 'x-kadi-role': 'Inspector' } }).role, 'SI');
+  assert.strictEqual(rbac.userFromRequest({ headers: { 'x-kadi-role': 'DGP' } }).role, 'DGP');
 });
 
 test('store + queries: cases scoped, graph carries explanation + fairness', () => {
