@@ -293,6 +293,36 @@ function buildApp() {
     };
   }));
 
+  // Refresh DistrictInsight from the current read-model. Non-destructive: it UPDATEs the
+  // 31 existing rows rather than truncating, so a partial failure leaves the table coherent
+  // rather than empty.
+  //
+  // This table matters more than its size suggests -- it backs the showcase ZCQL that answers
+  // "the why behind the where" directly from the database. It had drifted after the corpus
+  // was regenerated and was reporting Kodagu at 335 cases and rank 30, against the current
+  // 332 and rank 31.
+  r.post('/admin/sync-districts', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin']);
+    const socio = q.socio();
+    const results = { updated: 0, failed: 0, errors: [] };
+    for (const d of (socio.districts || [])) {
+      const sql = `UPDATE DistrictInsight SET TotalCases=${Number(d.total)}, `
+        + `RatePer100k=${Number(d.ratePer100k)}, RankByCount=${Number(d.rankByCount)}, `
+        + `RankByRate=${Number(d.rankByRate)}, RankShift=${Number(d.rankShift)}, `
+        + `Population=${Number(d.population)}, LiteracyPct=${Number(d.literacyPct)}, `
+        + `UrbanPct=${Number(d.urbanPct)}, PopDensity=${Number(d.popDensity)}, `
+        + `Band='${String(d.band).replace(/'/g, "''")}' `
+        + `WHERE DistrictID=${Number(d.districtId)}`;
+      // eslint-disable-next-line no-await-in-loop
+      const out = await datastore.query(req, sql);
+      if (out === null) {
+        results.failed += 1;
+        if (results.errors.length < 3) results.errors.push({ district: d.districtName, err: datastore.diag().httpError });
+      } else results.updated += 1;
+    }
+    return results;
+  }));
+
   r.get('/audit/health', handle(async () => ({
     buffered: audit.list({ limit: 1 }).length ? 'yes' : 'empty',
     persistence: audit.persistence(),
