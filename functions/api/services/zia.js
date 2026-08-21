@@ -40,8 +40,28 @@ function status() {
     kannadaTTS: KN_TTS,
     // What the client should do when Zia cannot serve a language directly.
     fallback: 'browser Web Speech API (client-side), already active',
+    credentialInHeaders: true,
+    note: 'Enable Zia in the console. If the SDK still 401s, use the raw-HTTPS header-token path from services/datastore.js.',
     lastError,
   };
+}
+
+// NOTE for whoever enables Zia in the console: initialize(req) returns 401 PERMISSION_NEEDED
+// for every scope on this project, even though the request carries a full admin credential.
+// It arrives in HEADERS, not environment variables:
+//
+//     x-zc-admin-cred-token      70-char OAuth token
+//     x-zc-project-secret-key    64 chars
+//
+// That is what unblocked Data Store -- see services/datastore.js, which talks to the BaaS
+// endpoint over raw HTTPS with those two headers and works. If the SDK path below still
+// 401s once Zia is switched on, do not spend a day on scopes: copy the httpZcql pattern.
+// Both headers are required; the token alone returns 404 INVALID_RESOURCE.
+function ziaAuth(req) {
+  const h = (req && req.headers) || {};
+  const token = h['x-zc-admin-cred-token'] || h['x-zc-user-cred-token'];
+  const secret = h['x-zc-project-secret-key'];
+  return token && secret ? { token, secret, projectId: h['x-zc-projectid'] } : null;
 }
 
 function zia(req) {
@@ -50,7 +70,8 @@ function zia(req) {
     const app = catalyst.initialize(req, { scope: 'admin' });
     return app.zia();
   } catch (e) {
-    lastError = `initialize: ${e && e.message ? e.message : e}`;
+    lastError = `initialize: ${e && e.message ? e.message : e}`
+      + (ziaAuth(req) ? ' (admin credential IS present in headers - use the raw-HTTPS path)' : '');
     return null;
   }
 }
