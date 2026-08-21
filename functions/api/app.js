@@ -120,6 +120,21 @@ function buildApp() {
   // Sociological + predictive intelligence (problem statement pillar 3). Both are
   // state-wide, area-level aggregates — no person-level rows, so no RBAC scoping.
   r.get('/analytics/socio', handle(async () => q.socio()));
+
+  // How crime behaves on festivals and holidays versus ordinary days. The brief asks for
+  // temporal pattern discovery, and in India the calendar is where the structure is.
+  r.get('/analytics/occasions', handle(async (req) => {
+    const o = q.occasions();
+    if (String(req.query.explain) !== 'true') return o;
+    const { text, source } = await insight.generate(req, 'crime on festivals and holidays vs ordinary days', {
+      baselineCasesPerDay: o.baselineCasesPerDay,
+      byDayClass: (o.classes || []).map((c) => ({ dayClass: c.dayClass, perDay: c.casesPerDay,
+        vsNormal: `${c.vsNormalPct}%`, peakHour: c.peakHour })),
+      topOccasions: (o.occasions || []).slice(0, 4).map((x) => ({ occasion: x.occasion,
+        perDay: x.casesPerDay, vsNormal: `${x.vsNormalPct}%`, topHead: x.topHead })),
+    });
+    return { ...o, insight: text, insightSource: source };
+  }));
   r.get('/analytics/forecast', handle(async () => q.forecast()));
 
   // assistant

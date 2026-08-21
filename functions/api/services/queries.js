@@ -347,6 +347,7 @@ module.exports = {
   FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   stats: (user) => load().stats,
+  occasions: () => load().occasions,   // calendar effects are state-level by nature
   // Zone board. State tier sees every district plus the station alerts; district tier sees
   // only its own district and the stations inside it -- the same two-tier rule as everywhere
   // else, applied to alerting.

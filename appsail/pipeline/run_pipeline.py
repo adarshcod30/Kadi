@@ -34,6 +34,7 @@ import health_metrics
 import anomaly
 import spatial
 import zones
+import occasions
 import evaluate
 import national
 import socio
@@ -99,6 +100,16 @@ def run(data_dir: str):
         [{"districtId": str(k), "districtName": v} for k, v in _dnames.items()],
         unit_district=_unit_district,
     )
+
+    step("special-occasion patterns")
+    _occ_cases = [{
+        "crimeRegisteredDate": row.CrimeRegisteredDate,
+        "crimeHead": _hnames.get(str(row.CrimeMajorHeadID), "Other"),
+        "hour": (int(str(row.IncidentFromDate)[11:13])
+                 if len(str(row.IncidentFromDate)) >= 13 and str(row.IncidentFromDate)[11:13].isdigit()
+                 else None),
+    } for row in cases.itertuples(index=False)]
+    occasion_report = occasions.compute(_occ_cases)
 
     # ---------------- build derived read-model ----------------
     step("assembling read-model")
@@ -223,6 +234,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "hotspots", geo)
     common.write_json(data_dir, "alerts", alerts)
     common.write_json(data_dir, "zones", zone_report)
+    common.write_json(data_dir, "occasions", occasion_report)
     common.write_json(data_dir, "stats", stats)
     common.write_json(data_dir, "district_stats", district_stats)
     common.write_json(data_dir, "national", national_ctx)
