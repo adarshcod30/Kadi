@@ -46,7 +46,16 @@ function userFromRequest(req) {
   // gates on tier, so a district user asking for another district gets their own.
   const q = (req.query || {});
   const user = { ...base, roleMeta: ROLES[role] };
-  if (user.roleMeta.tier === 'district' && q.district) user.districtId = String(q.district);
+
+  // Drill-down, which the brief names as a first-class capability.
+  //
+  // State tier may drill INTO any district and back out again -- that is the whole point of
+  // holding the state view. District tier may switch which district it looks at but can
+  // never widen past one, so ?district= narrows for everyone and widens for nobody.
+  if (q.district) {
+    user.districtId = String(q.district);
+    if (user.roleMeta.tier === 'state') user.drilledFromState = true;
+  }
   if (q.unit) user.drillUnitId = String(q.unit);
   return user;
 }
@@ -55,6 +64,8 @@ function userFromRequest(req) {
 function caseInScope(user, c) {
   const { scope } = user.roleMeta;
   if (user.drillUnitId && String(c.unitId) !== user.drillUnitId) return false;
+  // A state user who has drilled into a district reads as that district until they drill out.
+  if (user.drilledFromState) return String(c.districtId) === String(user.districtId);
   if (scope === 'state') return true;
   if (scope === 'district') return String(c.districtId) === String(user.districtId);
   if (scope === 'unit') return String(c.unitId) === String(user.unitId); // legacy
@@ -72,6 +83,7 @@ function requireRole(user, allowed) {
 
 function capabilities(user) {
   const stateTier = user.roleMeta.tier === 'state';
+  const drilled = Boolean(user.drilledFromState);
   return {
     role: user.role,
     label: user.roleMeta.label,
@@ -82,7 +94,12 @@ function capabilities(user) {
     canViewVulnerability: true,
     canViewAudit: stateTier || user.role === 'SP',
     canAdmin: user.role === 'Admin',
-    canSwitchDistrict: !stateTier,
+    // Everyone can move between districts. Only a state user can step back out to the whole
+    // state, which is the difference the two tiers actually encode.
+    canSwitchDistrict: true,
+    canViewWholeState: stateTier,
+    drilledFromState: drilled,
+    effectiveScope: drilled ? 'district' : user.roleMeta.scope,
   };
 }
 

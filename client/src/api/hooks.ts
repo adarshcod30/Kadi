@@ -1,12 +1,14 @@
 // React Query hooks over the KADI API.
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { api, qs, getRole } from '../lib/api';
+import { api, qs, getRole, districtParam } from '../lib/api';
 import type {
   Me, CaseRow, CaseDetail, Paged, GraphData, Offender, HealthRow, Stats, Alert,
   Hotspot, AssistantResponse, Lookups,
 } from '../lib/types';
 
-const role = () => getRole(); // include role in query keys so switching refetches
+// Role AND drilled district both go in every query key. Without the district, drilling into
+// Kalaburagi would serve Bengaluru's cached rows back.
+const role = () => `${getRole()}:${districtParam() || 'state'}`;
 
 export const useMe = () => useQuery({ queryKey: ['me', role()], queryFn: () => api.get<Me>('/me') });
 export const useLookups = () => useQuery({ queryKey: ['lookups'], queryFn: () => api.get<Lookups>('/lookups'), staleTime: Infinity });
@@ -43,11 +45,11 @@ export const useGeoGrid = (params: Record<string, unknown>, enabled = true) =>
 export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
 export const useFeaturedNetworks = () =>
-  useQuery({ queryKey: ['graph-featured'], queryFn: () => api.get<any>('/graph/featured'), staleTime: Infinity });
+  useQuery({ queryKey: ['graph-featured', role()], queryFn: () => api.get<any>('/graph/featured'), staleTime: Infinity });
 export const useZones = (explain = true) =>
-  useQuery({ queryKey: ['zones', role(), explain], queryFn: () => api.get<any>(`/zones${qs({ explain })}`), staleTime: 300000 });
+  useQuery({ queryKey: ['zones', role(), role(), explain], queryFn: () => api.get<any>(`/zones${qs({ explain })}`), staleTime: 300000 });
 export const useOccasions = (explain = true) =>
-  useQuery({ queryKey: ['occasions', explain], queryFn: () => api.get<any>(`/analytics/occasions${qs({ explain })}`), staleTime: Infinity });
+  useQuery({ queryKey: ['occasions', role(), explain], queryFn: () => api.get<any>(`/analytics/occasions${qs({ explain })}`), staleTime: Infinity });
 
 export const useSocio = () =>
   useQuery({ queryKey: ['socio'], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });

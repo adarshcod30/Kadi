@@ -140,36 +140,52 @@ function ScopeBadge({ me }: { me: any }) {
   const { data: lookups } = useLookups();
   if (!me) return null;
   const cap = me.capabilities || {};
-  const stateTier = cap.tier === 'state';
   const districts = (lookups?.districts || []) as any[];
   const current = districts.find((d: any) => String(d.districtId) === String(cap.districtId));
+  const atState = cap.effectiveScope === 'state';
 
-  if (stateTier) {
-    return (
-      <span className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px]">
-        <Globe size={13} /> All Karnataka
-        <span className="text-white/55">· 31 districts</span>
-      </span>
-    );
-  }
+  // Changing scope is a URL change, not client state: it has to survive a reload and be
+  // shareable, and the server re-derives scope from the query on every request anyway.
+  const go = (districtId: string | null) => {
+    const u = new URL(window.location.href);
+    if (districtId) u.searchParams.set('district', districtId);
+    else u.searchParams.delete('district');
+    window.location.href = u.toString();
+  };
+
   return (
     <div className="relative hidden sm:block">
       <button onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-full bg-kadi-gold/20 border border-kadi-gold/40 px-3 py-1 text-[12px] hover:bg-kadi-gold/30">
-        <MapPin size={13} /> {current?.districtName || `District ${cap.districtId}`}
+        className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border transition-colors ${
+          atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                  : 'bg-kadi-gold/20 border-kadi-gold/40 hover:bg-kadi-gold/30'}`}>
+        {atState ? <Globe size={13} /> : <MapPin size={13} />}
+        {atState ? 'All Karnataka' : (current?.districtName || `District ${cap.districtId}`)}
+        {atState && <span className="text-white/55">· 31 districts</span>}
         <ChevronDown size={12} className="opacity-70" />
       </button>
+
       {open && (
-        <div className="absolute right-0 mt-1 w-60 max-h-80 overflow-auto bg-surface border border-line rounded-card shadow-lg z-50 py-1">
-          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-ink-muted border-b border-line">
-            Drill into a district
+        <div className="absolute right-0 mt-1 w-64 max-h-[420px] overflow-auto bg-surface border border-line rounded-card shadow-lg z-50 py-1">
+          {cap.canViewWholeState && (
+            <>
+              <button onClick={() => go(null)}
+                className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2 hover:bg-kadi-blue50 ${
+                  atState ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
+                <Globe size={13} /> All Karnataka
+                <span className="text-ink-muted text-[11px] ml-auto">state view</span>
+              </button>
+              <div className="border-t border-line my-1" />
+            </>
+          )}
+          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-ink-muted">
+            {cap.canViewWholeState ? 'Drill into a district' : 'Switch district'}
           </div>
           {districts.map((d: any) => (
-            <button key={d.districtId}
-              onClick={() => { const u = new URL(window.location.href);
-                u.searchParams.set('district', String(d.districtId)); window.location.href = u.toString(); }}
+            <button key={d.districtId} onClick={() => go(String(d.districtId))}
               className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-kadi-blue50 ${
-                String(d.districtId) === String(cap.districtId) ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
+                !atState && String(d.districtId) === String(cap.districtId)
+                  ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
               {d.districtName}
             </button>
           ))}

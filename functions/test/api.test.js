@@ -46,11 +46,26 @@ test('rbac: station drill-down narrows but never widens', () => {
   assert.ok(rbac.caseInScope(analyst, { unitId: '5', districtId: '9' }), 'drilled unit visible');
   assert.ok(!rbac.caseInScope(analyst, { unitId: '6', districtId: '9' }), 'other unit hidden');
 
-  // a district user asking for another district must not escape their own
+  // District tier may move between districts but is always confined to exactly one.
   const si = rbac.userFromRequest({ headers: { 'x-kadi-role': 'SI' }, query: { district: '7' } });
   assert.strictEqual(si.districtId, '7', 'district tier may switch district');
+  assert.ok(!si.drilledFromState, 'district tier was never at state scope to drill from');
+  assert.ok(rbac.caseInScope(si, { unitId: '1', districtId: '7' }), 'sees the switched district');
+  assert.ok(!rbac.caseInScope(si, { unitId: '1', districtId: '8' }), 'still cannot see another');
+  assert.strictEqual(rbac.capabilities(si).canViewWholeState, false, 'cannot step out to state');
+
+  // State tier drills IN and can step back OUT -- that is what holding the state view buys.
   const dgp = rbac.userFromRequest({ headers: { 'x-kadi-role': 'DGP' }, query: { district: '7' } });
-  assert.strictEqual(dgp.districtId, null, 'state tier ignores district switch, stays state-wide');
+  assert.strictEqual(dgp.districtId, '7', 'state tier may drill into a district');
+  assert.ok(dgp.drilledFromState, 'and is marked as having drilled in');
+  assert.ok(rbac.caseInScope(dgp, { unitId: '1', districtId: '7' }), 'reads as that district');
+  assert.ok(!rbac.caseInScope(dgp, { unitId: '1', districtId: '8' }),
+    'a drilled state user is genuinely narrowed, not merely labelled');
+  assert.strictEqual(rbac.capabilities(dgp).effectiveScope, 'district');
+  assert.strictEqual(rbac.capabilities(dgp).canViewWholeState, true, 'may drill back out');
+
+  const dgpOut = rbac.userFromRequest({ headers: { 'x-kadi-role': 'DGP' }, query: {} });
+  assert.ok(rbac.caseInScope(dgpOut, { unitId: '1', districtId: '8' }), 'and drilling out restores state scope');
 });
 
 test('rbac requireRole gates capabilities', () => {

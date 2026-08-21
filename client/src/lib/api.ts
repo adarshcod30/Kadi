@@ -24,6 +24,14 @@ function readStoredRole(): Role {
 }
 let currentRole: Role = readStoredRole();
 export function getRole(): Role { return currentRole; }
+
+// Scope lives in the URL so it survives a reload and can be shared. Every request carries it,
+// because the server re-derives scope per request and holds no session.
+export function districtParam(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get('district');
+  } catch { return null; }
+}
 export function setRole(r: Role) {
   currentRole = r;
   try { globalThis.localStorage?.setItem('kadi.role', r); } catch { /* storage unavailable */ }
@@ -35,7 +43,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  // Carry the drilled district on every call. The server holds no session and re-derives
+  // scope from each request, so a scope that lived only in the URL bar would be ignored by
+  // every fetch the page makes.
+  const d = districtParam();
+  let url = `${BASE}${path}`;
+  if (d && !/[?&]district=/.test(url)) url += `${url.includes('?') ? '&' : '?'}district=${encodeURIComponent(d)}`;
+  const res = await fetch(url, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',

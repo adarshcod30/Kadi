@@ -7,7 +7,12 @@ const FAIRNESS_STATEMENT =
   'KADI links cases and scores offenders using evidence and behaviour only — never caste, religion, or occupation. These fields are excluded from every model by design.';
 
 function scoped(user, list) {
-  if (user.roleMeta.scope === 'state') return list;
+  // The fast path must not skip a state user who has drilled into a district. This
+  // short-circuit was defeating drill-down across every query that goes through here: the
+  // response said scope=district while returning all 40,829 rows, because caseInScope --
+  // which knows about the drill -- was never reached.
+  const narrowed = user.roleMeta.scope !== 'state' || user.drilledFromState || user.drillUnitId;
+  if (!narrowed) return list;
   return list.filter((c) => rbac.caseInScope(user, c));
 }
 
@@ -187,7 +192,7 @@ function listOffenders(user, q = {}) {
   // District tier sees offenders with at least one case in their district. An offender who
   // also works elsewhere stays visible -- that cross-jurisdiction reach is the finding, not
   // something to hide from the district that is dealing with them.
-  if (user && user.roleMeta && user.roleMeta.tier === 'district') {
+  if (user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState)) {
     const did = String(user.districtId);
     rows = rows.filter((o) => (o.districts || []).map(String).includes(did));
   }
@@ -365,7 +370,7 @@ module.exports = {
 
   // Units a user may read, or null for state tier (no WHERE clause needed).
   scopeUnitIds: (user) => {
-    if (!user || user.roleMeta.tier === 'state') {
+    if (!user || (user.roleMeta.tier === 'state' && !user.drilledFromState)) {
       return user && user.drillUnitId ? [user.drillUnitId] : null;
     }
     if (user.drillUnitId) return [user.drillUnitId];
@@ -377,7 +382,7 @@ module.exports = {
 
   stats: (user) => {
     const db = load();
-    if (!user || user.roleMeta.tier === 'state') return { ...db.stats, scope: 'state' };
+    if (!user || (user.roleMeta.tier === 'state' && !user.drilledFromState)) return { ...db.stats, scope: 'state' };
 
     const rows = scoped(user, db.caseList);
     const ids = new Set(rows.map((c) => String(c.caseMasterId)));
@@ -448,7 +453,8 @@ module.exports = {
   associations: (user, q = {}) => {
     const db = load();
     const byId = new Map(db.offenders.map((o) => [o.offenderIdentityId, o]));
-    const districtScoped = user && user.roleMeta.tier === 'district' ? String(user.districtId) : null;
+    const districtScoped = user && (user.roleMeta.tier === 'district' || user.drilledFromState)
+      ? String(user.districtId) : null;
 
     const seen = new Set();
     const pairs = [];
@@ -502,7 +508,7 @@ module.exports = {
   zones: (user) => {
     const db = load();
     const z = db.zones || { districts: [], stations: [], summary: {} };
-    if (user.roleMeta.tier === 'state') return z;
+    if (user.roleMeta.tier === 'state' && !user.drilledFromState) return z;
     const did = String(user.districtId);
     return {
       ...z,
@@ -523,7 +529,7 @@ module.exports = {
   // district scope ~12 drawn from that district only.
   featuredNetworks: (limit = 20, user = null) => {
     const db = load();
-    const districtOnly = user && user.roleMeta && user.roleMeta.tier === 'district'
+    const districtOnly = user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState)
       ? String(user.districtId) : null;
 
     const cand = [];
