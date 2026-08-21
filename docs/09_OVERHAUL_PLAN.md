@@ -242,7 +242,34 @@ Fold in while touching adjacent code:
 
 ---
 
-## 3 · Sequence
+## 3 · Status — as of 2026-08-22
+
+| | Workstream | State |
+|---|---|---|
+| W1 | Two access tiers | ✅ done |
+| W2 | AI narrative layer | ✅ done — GLM-4.7 live behind the deterministic engine |
+| W3 | Intelligence in four tabs | ✅ done |
+| W4 | Zone system | ✅ done — computed, served, and on screen |
+| W5 | Curated case variety per scope | ✅ done |
+| W6 | Scoped Cases and Offenders | ✅ done |
+| W7 | Recurring offender population | ✅ done — 601 → 920 merges, 7 → 197 cross-district |
+| W8 | Festival and holiday patterns | ✅ done |
+| W9 | Debt | ◐ partial — endpoint count and bundle comment fixed; audit persistence and frontend tests outstanding |
+
+**Still open, in priority order**
+
+1. **Audit persistence** — the ring buffer still loses everything on cold start. Data Store
+   writes now work, so this is unblocked; it needs an `AuditLog` table creating first.
+2. **Frontend tests** — 4,150 lines with no automated coverage.
+3. **Association detection view** — co-accused is computed and carried on edges, but has no
+   panel of its own. The brief names it explicitly.
+4. **`/cases` onto live ZCQL** — the reader works at `/datastore/cases`; swapping the main
+   route needs a mapper from raw columns to the enriched rows the UI expects.
+5. **48 MB cold start** — every deploy ships it and the first request reads all of it.
+
+---
+
+## 4 · Sequence
 
 **Phase 1 — foundation (do first, everything depends on it)**
 1. **W1** role model → 2 tiers
