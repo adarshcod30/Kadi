@@ -53,6 +53,24 @@ PLANTED_SURNAMES = [
     "Nippani", "Hukkeri", "Sankeshwar",
 ]
 
+# Additional real Karnataka taluk and town names. The pool has to be wide enough that a
+# surname stays under entity_resolution.SURNAME_RARE (20 occurrences) once the recurring
+# offender population draws from it -- below that threshold ER will not merge on name
+# similarity alone, which is what kept the merge count at 601.
+PLANTED_SURNAMES += [
+    "Channagiri", "Honnali", "Harihar", "Jagalur", "Molakalmuru", "Challakere", "Hiriyur",
+    "Holalkere", "Hosadurga", "Sringeri", "Koppa", "Mudigere", "Kadur", "Tarikere",
+    "Ajjampura", "Birur", "Belur", "Arsikere", "Channarayapatna", "Holenarasipur",
+    "Sakleshpur", "Alur", "Arkalgud", "Nagamangala", "Pandavapura", "Malavalli", "Maddur",
+    "Srirangapatna", "Yelandur", "Kollegal", "Gundlupet", "Hunsur", "Periyapatna",
+    "Nanjangud", "Sargur", "Somwarpet", "Virajpet", "Madikeri", "Kushalnagar", "Puttur",
+    "Sullia", "Bantwal", "Belthangady", "Karkala", "Kundapura", "Byndoor", "Bhatkal",
+    "Honnavar", "Kumta", "Ankola", "Karwar", "Yellapur", "Siddapur", "Sirsi", "Mundgod",
+    "Haliyal", "Joida", "Khanapur", "Bailhongal", "Saundatti", "Ramdurg", "Athani",
+    "Raibag", "Chikodi", "Hukkeri", "Gokak", "Mudalgi", "Shikaripura", "Sagara",
+    "Hosanagara", "Thirthahalli", "Soraba", "Bhadravathi",
+]
+
 
 def _pick_unit(b, district_id, rng):
     return rng.choice(b.units_by_district[district_id])

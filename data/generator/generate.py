@@ -30,6 +30,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 import karnataka as K
+from patterns import PLANTED_SURNAMES
 
 SEED = 2026
 DATE_START = date(2023, 1, 1)
@@ -90,6 +91,8 @@ def fmt_d(d) -> str:
 class Builder:
     def __init__(self, rng: Rng):
         self.rng = rng
+        self._recurring = []
+        self._recurring_w = []
         self.rows = defaultdict(list)  # table_name -> list[dict]
         self._ids = defaultdict(int)
         self._serials = defaultdict(int)  # (unitId, category_code, year) -> serial
@@ -127,6 +130,70 @@ class Builder:
         return crime_no, case_no
 
     # --- names ---
+    def name_variant(self, canonical: str) -> str:
+        """One plausible way a constable might write this name on a given day.
+
+        Real registers are messy: initials get added or dropped, compound first names get
+        merged, surnames get transliterated differently. Our corpus was generating a fresh
+        random name for every accused, so entity resolution had almost nothing to merge --
+        36,890 records collapsed to 36,289 identities, only 601 merges. That made a genuine
+        capability look weak. This produces the noise ER is supposed to survive."""
+        toks = canonical.split()
+        if len(toks) < 2:
+            return canonical
+        r = self.rng.random()
+        first, last = toks[0], toks[-1]
+        mid = toks[1] if len(toks) > 2 else ""
+        if r < 0.34:
+            return canonical                                   # written in full
+        if r < 0.46 and mid:
+            return f"{first}{mid.lower()} {last}"              # "Ravi Kumar" -> "Ravikumar"
+        if r < 0.58:
+            return f"{first} {last[0]}"                        # surname to an initial
+        if r < 0.68:
+            return f"{first[0]} {last}"                         # first name to an initial
+        if r < 0.78:
+            return f"{first} {last} {self.rng.choice(K.INITIALS)}"   # trailing initial
+        if r < 0.88:
+            # transliteration drift: doubled consonants collapse, 'th'/'t' swap
+            v = last.replace("dd", "d").replace("tt", "t").replace("th", "t")
+            return f"{first} {v}" if v != last else f"{first} {last}"
+        if mid:
+            return f"{first} {mid[0]} {last}"                   # middle to an initial
+        return f"{first} {last}"
+
+    def recurring_person(self):
+        """Draw someone from the recurring population, or None for a one-time offender.
+
+        Real offending is heavily skewed: a small minority commit a large share of crime.
+        Weighting the draw reproduces that, and it is what makes repeat-offender tracking
+        and association detection have anything to find."""
+        if not self._recurring:
+            return None
+        if self.rng.random() > 0.08:      # keeps distinctive surnames under the rarity gate
+            return None
+        return self.rng.choices(self._recurring, weights=self._recurring_w)[0]
+
+    def build_recurring_pool(self, n: int = 900):
+        """Canonical identities that reappear across the corpus, with a Zipf-ish weight."""
+        self._recurring = []
+        self._recurring_w = []
+        seen = set()
+        while len(self._recurring) < n:
+            g = 1 if self.rng.random() < 0.9 else 2
+            first = self.rng.choice(K.FIRST_NAMES_F if g == 2 else K.FIRST_NAMES_M)
+            # Distinctive (place-derived) surnames, NOT the 30-name common pool. A surname
+            # seen 1,200 times carries no identity signal, so ER correctly refuses to merge
+            # on it; these stay rare enough to be evidence.
+            last = self.rng.choice(PLANTED_SURNAMES)
+            key = (first, last)
+            if key in seen:
+                continue
+            seen.add(key)
+            self._recurring.append({"canonical": f"{first} {last}", "gender": g})
+            # heavy tail: rank 1 appears far more often than rank n
+            self._recurring_w.append(1.0 / ((len(self._recurring)) ** 0.65))
+
     def person_name(self, gender_id: int) -> str:
         if gender_id == 2:
             first = self.rng.choice(K.FIRST_NAMES_F)
@@ -300,6 +367,11 @@ class Builder:
         return vid
 
     def add_accused(self, case_id, name=None, gender_id=None, person_index=1):
+        if name is None:
+            person = self.recurring_person()
+            if person is not None:
+                gender_id = person["gender"]
+                name = self.name_variant(person["canonical"])
         gender_id = gender_id or self.rng.choices([1, 2], weights=[0.9, 0.1])[0]
         aid = self._next("Accused")
         self.add("Accused", {
@@ -597,6 +669,10 @@ def main():
     print(f"[KADI] building reference data ...")
     build_reference(b, rng)
     print(f"       units={len(b.rows['Unit'])} employees={len(b.rows['Employee'])} courts={len(b.rows['Court'])}")
+
+    # Must precede case generation: add_accused draws from this pool.
+    b.build_recurring_pool()
+    print(f"       recurring offender pool={len(b._recurring)}")
 
     print(f"[KADI] generating {args.cases} base FIRs ...")
     generate_base_cases(b, rng, args.cases)

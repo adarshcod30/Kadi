@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-16T19:06:59",
+  "generated": "2026-08-22T03:16:38",
   "seed": 2026,
   "import_order": [
     "State",
@@ -54,13 +54,13 @@
     "CasteMaster": 5,
     "OccupationMaster": 10,
     "Court": 31,
-    "CaseMaster": 40836,
-    "ComplainantDetails": 40836,
-    "Victim": 50656,
-    "Accused": 36890,
-    "ActSectionAssociation": 59943,
-    "ArrestSurrender": 11872,
-    "inv_arrestsurrenderaccused": 11872,
-    "ChargesheetDetails": 22215
+    "CaseMaster": 40829,
+    "ComplainantDetails": 40829,
+    "Victim": 50947,
+    "Accused": 36582,
+    "ActSectionAssociation": 59846,
+    "ArrestSurrender": 11699,
+    "inv_arrestsurrenderaccused": 11699,
+    "ChargesheetDetails": 22293
   }
 }
