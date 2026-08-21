@@ -42,10 +42,15 @@ const RAG_KB_ID = process.env.QUICKML_RAG_KB_ID || '';
 const CONNECTION = process.env.QUICKML_CONNECTION_NAME || 'kadi_quickml';
 const TIMEOUT_MS = Number(process.env.QUICKML_TIMEOUT_MS || 12000);
 // Model id and org header are what the console's own sample request uses.
-const MODEL = process.env.QUICKML_MODEL || 'crm-di-glm47b-30b-it';
+// UNDERSCORES, not hyphens. The console's own sample request reads
+// "model": "crm-di-glm47b_30b_it" -- we had been sending crm-di-glm47b-30b-it,
+// which is what the 400 PATTERN_NOT_MATCHED was actually complaining about.
+const MODEL = process.env.QUICKML_MODEL || 'crm-di-glm47b_30b_it';
 const ORG = process.env.CATALYST_ORG_ID || '60078029367';
 // The console shows 'Zoho-oauthtoken' in Headers but 'Bearer' in the JS sample.
-const AUTH_PREFIX = process.env.QUICKML_AUTH_PREFIX || 'Zoho-oauthtoken';
+// The console is self-inconsistent: the Headers panel shows 'Zoho-oauthtoken' while the
+// JS/Python samples both use 'Bearer'. The samples are the thing that was tested.
+const AUTH_PREFIX = process.env.QUICKML_AUTH_PREFIX || 'Bearer';
 
 // The assistant runs inside a 30s Function. A model call that hangs would burn the whole
 // budget and return nothing, so it is capped well below and falls back on timeout.
@@ -184,6 +189,7 @@ async function phrase(req, { question, facts, lang }) {
     const headers = token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {};
     const body = {
       model: MODEL,
+      chat_template_kwargs: { enable_thinking: false },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: asciiSafe(`FACTS:\n${facts}\n\nQUESTION (${lang}): ${question}`) },
@@ -218,6 +224,7 @@ async function ragAnswer(req, { question, lang }) {
     const headers = token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {};
     const body = {
       model: MODEL,
+      chat_template_kwargs: { enable_thinking: false },
       knowledge_base_id: RAG_KB_ID,
       documents: [RAG_KB_ID],
       messages: [
@@ -241,4 +248,33 @@ async function ragAnswer(req, { question, lang }) {
   }
 }
 
-module.exports = { configured, status, phrase, ragAnswer, SYSTEM_PROMPT };
+// Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant
+// is switched onto it. Returns the raw upstream reply either way.
+async function selfTest(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const headers = { Authorization: `${AUTH_PREFIX} ${token}` };
+  const body = {
+    model: MODEL,
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'Reply with exactly: KADI OK' },
+    ],
+    max_tokens: 32,
+    temperature: 0.2,
+    stream: false,
+    // GLM-4.7 is a reasoning model and narrates its deliberation into the answer unless
+    // this is off. Asked to reply "KADI OK" it returned "1. **Analyze the User's Input:**...".
+    chat_template_kwargs: { enable_thinking: false },
+  };
+  try {
+    const out = await postJson(ENDPOINT, body, headers);
+    return { ok: true, model: MODEL, authPrefix: AUTH_PREFIX, text: extractText(out),
+      raw: JSON.stringify(out).slice(0, 400) };
+  } catch (e) {
+    return { ok: false, stage: 'post', model: MODEL, authPrefix: AUTH_PREFIX,
+      error: (e && e.message ? e.message : String(e)).slice(0, 400) };
+  }
+}
+
+module.exports = { configured, status, phrase, ragAnswer, selfTest, SYSTEM_PROMPT };

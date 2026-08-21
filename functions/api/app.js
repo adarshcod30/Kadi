@@ -158,6 +158,8 @@ function buildApp() {
   }));
 
   // One call to see whether the Catalyst AI services are actually wired.
+  r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
+
   r.get('/ai/status', handle(async () => ({
     quickml: quickml.status(),
     zia: zia.status(),
