@@ -258,14 +258,19 @@ Fold in while touching adjacent code:
 
 **Still open, in priority order**
 
-1. **Audit persistence** — the ring buffer still loses everything on cold start. Data Store
-   writes now work, so this is unblocked; it needs an `AuditLog` table creating first.
-2. **Frontend tests** — 4,150 lines with no automated coverage.
-3. **Association detection view** — co-accused is computed and carried on edges, but has no
-   panel of its own. The brief names it explicitly.
-4. **`/cases` onto live ZCQL** — the reader works at `/datastore/cases`; swapping the main
-   route needs a mapper from raw columns to the enriched rows the UI expects.
-5. **48 MB cold start** — every deploy ships it and the first request reads all of it.
+1. ~~Audit persistence~~ ✅ **done** — AuditLog columns created via MCP, write-through
+   verified, rows readable by ZCQL.
+2. ~~Frontend tests~~ ✅ **done** — vitest + jsdom, 7 tests over the role model and i18n.
+3. ~~Association detection~~ ✅ **done** — `/offenders/associations`, 65 pairs, 12
+   cross-district, ranked with those first.
+4. ~~48 MB cold start~~ ✅ **improved** — 43 MB. `offender_map` (6 MB) was shipped and never
+   read. `graph_adjacency` (12 MB) and `case_health` (11 MB) are the remaining bulk and are
+   genuinely used; shrinking those means narrowing what the pipeline emits.
+5. **`/cases` onto live ZCQL** — the mapper is written and works, but the Data Store copy is
+   a pre-regeneration snapshot, so pointing the register at it would serve slightly wrong
+   data. Blocked on the CaseMaster re-import, not on code.
+6. **CaseMaster re-import** — needs a console-side Stratus upload; see
+   [08](08_CATALYST_LIVE.md).
 
 ---
 

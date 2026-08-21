@@ -82,7 +82,25 @@ The scoping itself is genuinely real and enforced server-side — an out-of-scop
 refused, not hidden. Only the identity check is outstanding. Fix: read the Catalyst token in
 `userFromRequest` and map it to the officer's rank. One function.
 
-**2 · The deployed API reads bundled files, not Data Store.**
+**2 · CaseMaster in Data Store is a snapshot, and the API reads the bundle.**
+
+Data Store holds **40,836** CaseMaster rows against the current corpus's **40,829**, with
+different offenders behind them -- it was never re-imported after the corpus was regenerated.
+The deployed application does not read it, so the staleness is contained to
+`/datastore/cases`, but the row-count claim should be stated as a snapshot.
+
+Re-importing needs a Stratus upload plus a bulk-write job, and the upload is where it stops:
+`Create_Upload_Signature` mints a policy with `content-length: 0` regardless of what is passed
+for the size, so the PUT is rejected with `400 invalid_request_parameter`. Two field names
+were tried. Rather than keep guessing at an undocumented body -- the third time today that
+pattern has cost time -- upload `data/output/CaseMaster.csv` from the console and run the
+bulk write against it.
+
+**DistrictInsight, by contrast, is current.** It is only 31 rows, so `/admin/sync-districts`
+refreshes it in place over ZCQL, and it is the table that matters most: it backs the showcase
+query. Kodagu reads 332 / 51.2 per 100k / #31 to #6, matching the application.
+
+**2b · Historical note: the read path.**
 The rows are in Data Store and are queryable by ZCQL from an authenticated client — but
 **not from the deployed function**, which cannot present a credential (see 5). The ZCQL
 adapter is written (`services/datastore.js`) and the seam to swap against is
