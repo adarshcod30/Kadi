@@ -243,7 +243,7 @@ Stage order, taken from the `step()` calls in the source:
 | 5 | offender risk | `risk_score.py` (130) | transparent additive score with factors |
 | 6 | investigation health | `health_metrics.py` (147) | deterministic flags + peer medians |
 | 7 | anomaly detection | `anomaly.py` (92) | outliers per head/area |
-| 8 | spatial hotspots | `spatial.py` (80) | DBSCAN + emerging-trend baseline |
+| 8 | spatial hotspots | `spatial.py` (150) | Per-district DBSCAN density + time-of-day binomial |
 | 9 | assembling read-model | `run_pipeline.py` | derived JSON |
 | 10 | socio-economic | `socio.py` (207) | per-capita rates, Pearson + Spearman |
 | 11 | forecasting | `forecast.py` (216) | trend × month-of-year seasonality |
@@ -295,7 +295,7 @@ sizes:
 | `anomalies.json` | 330 KB | outliers + station false-case patterns |
 | `forecast.json` | 29 KB | state + district projections |
 | `district_stats.json` | 19 KB | per-district rollups |
-| `hotspots.json` | 17 KB | DBSCAN cells |
+| `hotspots.json` | 60 KB | DBSCAN cells + temporal profile |
 | `socio.json` | 15 KB | correlations + composition |
 | `stats.json` | 6.8 KB | dashboard KPIs |
 | `national.json` | 3.8 KB | India context |
@@ -378,6 +378,78 @@ This scoping is **genuinely enforced** — out-of-scope reads are refused, not h
 *identity check* is missing: the role comes from a header, not a verified JWT.
 
 ---
+
+## Adaptive thresholds — why one constant could not work
+
+Two detectors originally used a single global constant, and both failed the same way: the
+constant encoded Bengaluru's scale, so only Bengaluru could ever trigger it.
+
+### Emerging trend alerts (`zones.py`)
+
+`MIN_ABS_DELTA = 6` gated every district and station alike. Bengaluru City averages ~390
+FIRs a month, so +6 is a 1.5% wobble it clears without trying — the gate never blocked
+anything there. Kodagu averages ~9, so +6 demanded a 67% surge before the district was even
+eligible for a colour. The board read **0 red, 0 yellow, 0 pulsing across all 31 districts**:
+simultaneously too loose for the large and unreachable for the small.
+
+Monthly FIR counts are counts of many largely independent events, so they are approximately
+Poisson — the natural month-to-month variation around a baseline mean λ is `√λ`. Scoring in
+units of that spread makes the bar self-adjusting:
+
+| District | Baseline | σ = √λ | Needs for red (2σ) |
+|---|---|---|---|
+| Bengaluru City | ~390 | 19.7 | ~+40 |
+| Shivamogga | ~21 | 4.6 | ~+9 |
+| Kodagu | ~9 | 3.0 | ~+6 |
+
+Same statistical standard, very different absolute bars. Each area's own bar is **published**
+in the payload (`thresholds.redAt`) and shown in the UI, so an officer can see why their
+district is not lit instead of guessing.
+
+The floor is tiered rather than single. Hassan sat at z=2.01 and was discarded for being
+0.1 cases under a hard floor of 3 — a real 2σ signal lost to a rounding margin. Acting on an
+area now needs a larger rise (`MIN_ABS_FLOOR = 3`) than merely watching it
+(`MIN_ABS_WATCH = 2`).
+
+**Per category, not per total.** The brief asks for an alert when *a specific crime category
+spikes in a region*. Summing every head first averages that away. Each head is now tested
+separately, which finds what aggregate structurally cannot: Mandya is **down 11% overall**
+and still has a body-crime rise 2.25σ outside its own range.
+
+Ranking is on σ, not ratio. Ratio re-ranks by smallness — two extra cases is a huge
+percentage of a tiny baseline.
+
+Result: 2 red, 1 yellow, 28 normal, 15 stations flagged.
+
+### Spatial hotspots (`spatial.py`)
+
+`EPS_DEG = 0.004` (~450 m) with `MIN_SAMPLES = 8` is a metro-shaped assumption. All 52
+hotspots sat in district 1, while Mysuru's 2,538 geocoded FIRs and Bengaluru Rural's 2,150
+produced none — not an absence of hotspots, a density only one district can reach.
+
+The neighbourhood is now sized from each district's own median nearest-neighbour distance,
+and support scales with its volume:
+
+| District | eps | min samples |
+|---|---|---|
+| Bengaluru City | 0.44 km | 8 |
+| Belagavi | 0.83 km | 4 |
+| Raichur / Bidar | 2.22 km | 4 |
+
+A rural district gets a wider net because its incidents are genuinely further apart, not
+because the bar was lowered. **52 hotspots in one district → 190 across 27.**
+
+### Spatiotemporal layering
+
+Clusters carried no time dimension. Incidents are now binned into four six-hour windows —
+roughly a patrol shift, so a finding converts directly into a deployment decision.
+
+Ranked on an **exact binomial tail**, not raw share: with four windows a 4-case cluster lands
+entirely in one about 1.6% of the time, so across 190 clusters ~3 would show a spurious
+"100% concentrated". Ranking on percentage would surface precisely those. Testing against
+chance (p < 0.01, Bonferroni-corrected for the four-window search) leaves **3 of 190**, led
+by a cluster running 70 of 70 incidents in the 18:00–24:00 window.
+
 
 ## 7 · The client
 
