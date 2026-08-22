@@ -918,7 +918,49 @@ module.exports = {
   },
   alerts: (user) => load().alerts,
   evalReport: () => load().evalReport,
-  anomalies: () => load().caseAnomalies,
+  // Behavioural outliers, scoped to the viewer. The pipeline has computed these all along
+  // and only a count ever reached the UI, so the reasoning behind each one -- which is the
+  // useful part for an investigator -- was never shown.
+  anomalies: (user, q = {}) => {
+    const db = load();
+    const src = load().caseAnomalies || {};
+    const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+    const did = narrowed ? String(user.districtId) : null;
+
+    let cases = (src.caseAnomalies || []).map((a) => {
+      const c = db.cases.get(String(a.caseMasterId));
+      return {
+        ...a,
+        districtId: c ? String(c.districtId) : null,
+        districtName: c ? c.districtName : '',
+        unitName: c ? c.unitName : '',
+        crimeHead: c ? c.crimeHead : '',
+        crimeSubHead: c ? c.crimeSubHead : '',
+        status: c ? c.status : '',
+      };
+    });
+    if (did) cases = cases.filter((a) => a.districtId === did);
+    cases.sort((a, b) => b.anomalyScore - a.anomalyScore);
+
+    const unitDistrict = new Map();
+    for (const st of (db.stations || [])) unitDistrict.set(String(st.unitId), st);
+    let stations = (src.stationAnomalies || []).map((a) => {
+      const st = unitDistrict.get(String(a.unitId));
+      return { ...a, unitName: st ? st.unitName : `Station ${a.unitId}`,
+        districtId: st ? String(st.districtId) : null,
+        districtName: st ? st.districtName : '' };
+    });
+    if (did) stations = stations.filter((a) => a.districtId === did);
+    stations.sort((a, b) => (b.falseRate - a.falseRate));
+
+    return {
+      cases: cases.slice(0, Number(q.limit) || 12),
+      caseTotal: cases.length,
+      stations,
+      stationTotal: stations.length,
+      scope: narrowed ? 'district' : 'state',
+    };
+  },
   clusters: () => load().clusters,
   lookups: () => {
     const db = load();

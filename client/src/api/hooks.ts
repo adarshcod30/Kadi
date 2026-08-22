@@ -23,6 +23,15 @@ export const useStations = (params: Record<string, unknown> = {}) =>
     }>(`/stations${qs(params)}`),
   });
 
+export const useAnomalies = (limit = 12) =>
+  useQuery({
+    queryKey: ['anomalies', role(), limit],
+    queryFn: () => api.get<{
+      cases: any[]; caseTotal: number; stations: any[]; stationTotal: number;
+      scope: 'state' | 'district';
+    }>(`/anomalies${qs({ limit })}`),
+  });
+
 export const useEval = () => useQuery({ queryKey: ['eval'], queryFn: () => api.get<any>('/eval') });
 
 export const useCases = (params: Record<string, unknown>) =>

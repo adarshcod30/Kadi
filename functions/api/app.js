@@ -46,6 +46,7 @@ function buildApp() {
 
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));
+  r.get('/anomalies', handle(async (req) => q.anomalies(req.user, req.query)));
   // Round-trips a value through Cache so the read/write path is verifiable from outside
   // rather than inferred from whether /stats felt fast.
   r.get('/diag/cache', handle(async (req) => {

@@ -7,8 +7,8 @@ import {
   ComposedChart, Area, Line, ScatterChart, Scatter, BarChart, Bar, Cell,
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock } from 'lucide-react';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations } from '../api/hooks';
+import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle } from 'lucide-react';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
 
@@ -129,6 +129,71 @@ function WhyHere({ socio }: { socio: any }) {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function Outliers({ anomalies }: { anomalies: any }) {
+  if (!anomalies) return <div className="card"><Skeleton rows={4} /></div>;
+  const cases = anomalies.cases || [];
+  const stations = anomalies.stations || [];
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><AlertTriangle size={15} className="text-warn" />
+        Behavioural outliers — cases that do not look like their peers</span>}
+      action={<Hint text="Each case is compared with others of the same crime type on reporting delay, investigation age, and the number of accused and victims. A high score does not mean wrongdoing — it means this file behaves unlike its peers and is worth a human look. The specific reason is always shown, never just a score." />}>
+      <div className="p-4 space-y-4">
+        {stations.length > 0 && (
+          <div className="rounded-card border border-warn/30 bg-warn/5 px-3 py-2.5">
+            <div className="text-[13px] text-ink mb-1.5">
+              <b>{stations.length} station{stations.length > 1 ? 's' : ''}</b> closing
+              false cases well above their peer group
+            </div>
+            {stations.slice(0, 4).map((a: any) => (
+              <div key={a.unitId} className="text-[12.5px] text-ink-muted flex items-center gap-2">
+                <span className="text-ink">{a.unitName}</span>
+                <span className="text-ink-subtle">{a.districtName}</span>
+                <span className="ml-auto font-num">
+                  {a.falseCases}/{a.totalCases} — <b className="text-danger">{Math.round(a.falseRate * 100)}%</b>
+                  <span className="text-ink-subtle"> vs {Math.round(a.peerMeanRate * 100)}% peer</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div>
+          <div className="label mb-1.5">
+            Most unusual case files — {anomalies.caseTotal.toLocaleString()} flagged
+            {anomalies.scope === 'district' ? ' in this district' : ' state-wide'}
+          </div>
+          {cases.length === 0 && (
+            <div className="text-[12.5px] text-ink-muted">No case here departs from its peers this period.</div>
+          )}
+          <div className="space-y-1.5">
+            {cases.slice(0, 6).map((a: any) => (
+              <div key={a.caseMasterId} className="rounded-card border border-line bg-surface-2 px-3 py-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[12px] text-ink">{a.crimeNo}</span>
+                  <span className="text-[12.5px] text-ink-muted">{a.crimeSubHead || a.crimeHead}</span>
+                  <span className="text-[11.5px] text-ink-subtle">{a.unitName}, {a.districtName}</span>
+                  {/* Score bar, so relative severity is readable without comparing decimals. */}
+                  <span className="ml-auto flex items-center gap-1.5">
+                    <span className="w-16 h-1.5 rounded-full bg-line overflow-hidden">
+                      <span className="block h-full rounded-full bg-warn"
+                        style={{ width: `${Math.round(a.anomalyScore * 100)}%` }} />
+                    </span>
+                    <span className="font-num text-[11.5px] text-ink-muted">
+                      {a.anomalyScore.toFixed(2)}
+                    </span>
+                  </span>
+                </div>
+                <div className="text-[11.5px] text-ink-subtle mt-1">{a.reason}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Section>
@@ -466,6 +531,7 @@ export default function Intelligence() {
   const [tab, setTab] = useState<TabKey>('where');
   const { data: zones } = useZones();
   const { data: hotspots } = useHotspots();
+  const { data: anomalies } = useAnomalies();
   const [stationSort, setStationSort] = useState<'zone'|'cases_desc'|'name'>('zone');
   const [stationQ, setStationQ] = useState('');
   const { data: stations } = useStations({ sort: stationSort, q: stationQ || undefined });
@@ -556,6 +622,9 @@ export default function Intelligence() {
           location, enabling proactive resource deployment" -- this is that panel. */}
       <motion.div variants={rise}>
         <SpatioTemporal hotspots={hotspots} />
+      </motion.div>
+      <motion.div variants={rise}>
+        <Outliers anomalies={anomalies} />
       </motion.div>
       <motion.div variants={rise}>
         <StationRoster stations={stations} sort={stationSort} setSort={setStationSort}
