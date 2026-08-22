@@ -120,9 +120,24 @@ stays authoritative until the re-import lands.
 `services/audit.js` writes through to Data Store over the header-credential path, with the
 in-memory ring buffer kept in front as a read cache. The trail now survives cold start.
 
-**4 · Export returns HTML, not PDF.**
-Call it a **print-ready briefing**. SmartBrowz is not wired. Do not describe it as a PDF
-pipeline.
+**4 · RESOLVED — the briefing exports as a real PDF.**
+
+SmartBrowz is provisioned. The earlier "not provisioned" note came from an MCP Browser Grid
+call that returned `INTERNAL_SERVER_ERROR` for its own reasons — a failing probe is not proof
+a service is absent, which is the same mistake that hid Zia.
+
+Two things had to be worked around:
+
+- The installed SDK is **1.6.0** and has no `smartbrowz` module; it arrives in 3.x. Upgrading
+  a major version on a live application to gain one feature would put the Data Store, Cache
+  and Zia paths at risk, so the contract was **read** from 3.4.0 and called over raw HTTPS:
+  `POST /browser360/v1/project/{id}/convert` with
+  `{ html, output_options: { output_type: 'pdf' } }`.
+- `pdf_options.margin: '14mm'` is rejected with `bottom cannot be less than 0` — the field is
+  numeric, not a CSS length. Options are left empty; the briefing HTML sets its own padding.
+
+Verified: 24,825 bytes, `PDF document, version 1.4, 1 pages`. The client downloads it
+directly instead of opening a window and asking the browser to print.
 
 **5 · RESOLVED — the credential was in the request headers all along.**
 

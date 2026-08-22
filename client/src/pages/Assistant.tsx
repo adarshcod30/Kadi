@@ -114,7 +114,28 @@ export default function Assistant() {
   };
 
   const doExport = async () => {
-    const r = await exp.mutateAsync({ title: 'KADI Assistant Briefing', messages: msgs.map((m) => ({ role: m.role, content: m.content, citations: m.res?.citations })) });
+    const r: any = await exp.mutateAsync({
+      title: 'KADI Assistant Briefing',
+      messages: msgs.map((m) => ({ role: m.role, content: m.content, citations: m.res?.citations })),
+    });
+    // SmartBrowz renders a real PDF. The old path opened a window and asked the browser to
+    // print, which produced whatever that machine's print dialog produced.
+    if (r.format === 'pdf' && r.base64) {
+      const bin = atob(r.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = r.filename || 'KADI_briefing.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoked on a delay: revoking immediately can cancel the download in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      return;
+    }
+    // Fallback keeps the export working when SmartBrowz is unreachable.
     const w = window.open('', '_blank');
     if (w) { w.document.write(r.html); w.document.close(); setTimeout(() => w.print(), 400); }
   };

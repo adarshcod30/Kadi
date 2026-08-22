@@ -14,6 +14,7 @@ const quickml = require('./services/quickml');
 const zia = require('./services/zia');
 const datastore = require('./services/datastore');
 const insight = require('./services/insight');
+const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
 // it must already be language. Shared by /command and /zones.
@@ -359,8 +360,26 @@ function buildApp() {
   r.post('/assistant/export', handle(async (req) => {
     const { title, messages } = req.body || {};
     const html = renderBriefingHtml(title || 'KADI Briefing', messages || [], req.user);
-    // Catalyst path: SmartBrowz -> PDF -> Stratus signed URL. Local: return HTML.
-    return { format: 'html', filename: `KADI_briefing_${Date.now()}.html`, html };
+    const stamp = Date.now();
+    // SmartBrowz renders it properly. If it is unreachable the export still succeeds as
+    // HTML rather than failing -- a briefing an officer cannot open is worse than one in
+    // the wrong format.
+    const pdf = await smartbrowz.convertToPdf(req, html);
+    if (pdf) {
+      return {
+        format: 'pdf',
+        filename: `KADI_briefing_${stamp}.pdf`,
+        contentType: 'application/pdf',
+        base64: pdf.toString('base64'),
+        bytes: pdf.length,
+      };
+    }
+    return {
+      format: 'html',
+      filename: `KADI_briefing_${stamp}.html`,
+      html,
+      pdfUnavailable: smartbrowz.status().lastError,
+    };
   }));
 
   // audit (role-gated)
@@ -460,6 +479,7 @@ function buildApp() {
   r.get('/ai/status', handle(async () => ({
     quickml: quickml.status(),
     zia: zia.status(),
+    smartbrowz: smartbrowz.status(),
     assistant: { grounded: true, fallback: 'deterministic intent engine over the case DB' },
   })));
 

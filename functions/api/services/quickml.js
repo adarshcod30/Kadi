@@ -39,6 +39,13 @@ const ENDPOINT = process.env.QUICKML_LLM_ENDPOINT
   || 'https://api.catalyst.zoho.in/quickml/v1/project/55468000000013048/glm/chat';
 const DEPLOYMENT_ID = process.env.QUICKML_LLM_DEPLOYMENT_ID || '';
 const RAG_KB_ID = process.env.QUICKML_RAG_KB_ID || '';
+// RAG has its own endpoint. The previous code posted the RAG body to the LLM-serving URL,
+// which ignores knowledge_base_id entirely -- so even with a KB configured it would have
+// answered from the model's own weights and looked like RAG was working.
+// Confirmed against the console: POST .../quickml/v1/project/{id}/rag/answer,
+// OAuth scope QuickML.rag.READ.
+const RAG_ENDPOINT = process.env.QUICKML_RAG_ENDPOINT
+  || `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}/rag/answer`;
 const CONNECTION = process.env.QUICKML_CONNECTION_NAME || 'kadi_quickml';
 const TIMEOUT_MS = Number(process.env.QUICKML_TIMEOUT_MS || 12000);
 // Model id and org header are what the console's own sample request uses.
@@ -74,6 +81,7 @@ function status() {
     endpointSet: Boolean(ENDPOINT),
     deploymentIdSet: Boolean(DEPLOYMENT_ID),
     ragKbSet: Boolean(RAG_KB_ID),
+    ragEndpoint: RAG_ENDPOINT,
     connectionSet: Boolean(CONNECTION),
     sdkLoaded: Boolean(catalyst),
     model: MODEL,
@@ -235,7 +243,7 @@ async function ragAnswer(req, { question, lang }) {
       max_tokens: 400,
       stream: false,
     };
-    const out = await postJson(ENDPOINT, body, headers);
+    const out = await postJson(RAG_ENDPOINT, body, headers);
     const text = extractText(out);
     if (text && text.trim()) {
       lastError = null;
