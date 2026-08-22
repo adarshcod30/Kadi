@@ -38,14 +38,22 @@ function buildApp() {
   })));
 
   r.get('/lookups', handle(async () => q.lookups()));
+  // Round-trips a value through Cache so the read/write path is verifiable from outside
+  // rather than inferred from whether /stats felt fast.
+  r.get('/diag/cache', handle(async (req) => {
+    const key = 'kadi:diag';
+    const wrote = await cache.put(req, key, { at: new Date().toISOString() });
+    const readBack = await cache.get(req, key);
+    return { wrote, readBack, roundTrip: !!(wrote && readBack), ...cache.diag() };
+  }));
   // Dashboard KPIs are identical for every user in a role and only change when the
   // pipeline reruns, so they are served through Catalyst Cache. A cache miss (or no
   // Catalyst context at all, e.g. local dev) just computes as before.
   r.get('/stats', handle(async (req) => {
-    // Served through the Catalyst Cache adapter. NOTE: writes currently return 401
-    // PERMISSION_NEEDED because the deployed function runs without a credential that
-    // has Cache scope, so every call is a miss and falls through to compute. The
-    // adapter is a no-op until that permission is granted - see docs/08.
+    // Served through the Catalyst Cache adapter over raw HTTPS with the credential
+    // headers Catalyst puts on the request. The old 401 PERMISSION_NEEDED was never a
+    // missing Cache scope -- it was the SDK failing to find a credential that was in
+    // the headers all along, the same root cause that blocked Data Store.
     const { data } = await cache.through(
       req, `stats:${req.user.role}:${req.user.districtId || 'state'}`, async () => q.stats(req.user),
     );

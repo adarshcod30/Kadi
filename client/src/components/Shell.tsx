@@ -141,7 +141,9 @@ function ScopeBadge({ me }: { me: any }) {
   if (!me) return null;
   const cap = me.capabilities || {};
   const districts = (lookups?.districts || []) as any[];
-  const current = districts.find((d: any) => String(d.districtId) === String(cap.districtId));
+  // /lookups returns {id, name}. Reading districtId/districtName here rendered 31 blank
+  // buttons -- the dropdown looked empty rather than broken, which is why it survived review.
+  const current = districts.find((d: any) => String(d.id) === String(cap.districtId));
   const atState = cap.effectiveScope === 'state';
 
   // Changing scope is a URL change, not client state: it has to survive a reload and be
@@ -160,7 +162,7 @@ function ScopeBadge({ me }: { me: any }) {
           atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
                   : 'bg-kadi-gold/20 border-kadi-gold/40 hover:bg-kadi-gold/30'}`}>
         {atState ? <Globe size={13} /> : <MapPin size={13} />}
-        {atState ? 'All Karnataka' : (current?.districtName || `District ${cap.districtId}`)}
+        {atState ? 'All Karnataka' : (current?.name || `District ${cap.districtId}`)}
         {atState && <span className="text-white/55">· 31 districts</span>}
         <ChevronDown size={12} className="opacity-70" />
       </button>
@@ -182,11 +184,11 @@ function ScopeBadge({ me }: { me: any }) {
             {cap.canViewWholeState ? 'Drill into a district' : 'Switch district'}
           </div>
           {districts.map((d: any) => (
-            <button key={d.districtId} onClick={() => go(String(d.districtId))}
+            <button key={d.id} onClick={() => go(String(d.id))}
               className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-kadi-blue50 ${
-                !atState && String(d.districtId) === String(cap.districtId)
+                !atState && String(d.id) === String(cap.districtId)
                   ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
-              {d.districtName}
+              {d.name}
             </button>
           ))}
         </div>

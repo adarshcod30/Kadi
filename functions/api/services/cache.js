@@ -22,6 +22,56 @@ const TTL_HOURS = 6;
 
 let lastError = null; // surfaced by /diag/cache so a silent miss is debuggable
 
+// The SDK path below returns 401 for every scope, because initialize(req) does not pick up
+// the credential Catalyst actually supplies -- it arrives in REQUEST HEADERS, not the
+// environment. datastore.js proved raw HTTPS with x-zc-admin-cred-token AND
+// x-zc-project-secret-key works; the token alone gives 404 INVALID_RESOURCE.
+const https = require('https');
+
+function creds(req) {
+  const h = (req && req.headers) || {};
+  const token = h['x-zc-admin-cred-token'] || h['x-zc-user-cred-token'];
+  const secret = h['x-zc-project-secret-key'];
+  const projectId = h['x-zc-projectid'] || process.env.CATALYST_PROJECT_ID;
+  if (!token || !secret || !projectId) return null;
+  return { token, secret, projectId, env: h['x-zc-environment'] || 'Development' };
+}
+
+function httpCache(req, method, path, body) {
+  return new Promise((resolve) => {
+    const c = creds(req);
+    if (!c) { lastError = 'no credential headers'; return resolve(null); }
+    const payload = body ? JSON.stringify(body) : null;
+    const headers = {
+      Authorization: `Zoho-oauthtoken ${c.token}`,
+      Environment: c.env,
+      'X-ZC-PROJECT-SECRET-KEY': c.secret,
+    };
+    if (payload) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(payload);
+    }
+    const rq = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${c.projectId}${path}`,
+      method, headers,
+    }, (res) => {
+      let out = '';
+      res.on('data', (d) => { out += d; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try { return resolve(JSON.parse(out)); } catch { return resolve(null); }
+        }
+        lastError = `${method} ${path} -> ${res.statusCode}: ${out.slice(0, 140)}`;
+        resolve(null);
+      });
+    });
+    rq.on('error', (e) => { lastError = `net: ${e.message}`; resolve(null); });
+    if (payload) rq.write(payload);
+    rq.end();
+  });
+}
+
 function segment(req) {
   if (!catalyst) { lastError = 'sdk-not-loaded'; return null; }
   if (!req) { lastError = 'no-request'; return null; }
@@ -45,6 +95,12 @@ function diag() {
 }
 
 async function get(req, key) {
+  const viaHttp = await httpCache(req, 'GET',
+    `/segment/${SEGMENT_ID}/cache?cacheKey=${encodeURIComponent(key)}`);
+  if (viaHttp && viaHttp.data) {
+    const v = viaHttp.data.cache_value ?? viaHttp.data.value;
+    if (v) { try { return JSON.parse(v); } catch { /* fall through */ } }
+  }
   const seg = segment(req);
   if (!seg) return null;
   try {
@@ -57,6 +113,12 @@ async function get(req, key) {
 }
 
 async function put(req, key, value) {
+  const viaHttp = await httpCache(req, 'POST', `/segment/${SEGMENT_ID}/cache`, {
+    cache_name: key, // NOT cache_key -- confirmed against the live segment
+    cache_value: JSON.stringify(value),
+    expiry_in_hours: TTL_HOURS,
+  });
+  if (viaHttp) return true;
   const seg = segment(req);
   if (!seg) return false;
   try {
@@ -80,4 +142,4 @@ async function through(req, key, compute) {
   return { data, cached: false };
 }
 
-module.exports = { get, put, through, diag, SEGMENT_ID, TTL_HOURS };
+module.exports = { get, put, through, diag, httpCache, SEGMENT_ID, TTL_HOURS };
