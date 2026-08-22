@@ -47,6 +47,7 @@ function buildApp() {
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));
   r.get('/anomalies', handle(async (req) => q.anomalies(req.user, req.query)));
+  r.get('/diag/zia', handle(async (req) => zia.probe(req)));
   // Round-trips a value through Cache so the read/write path is verifiable from outside
   // rather than inferred from whether /stats felt fast.
   r.get('/diag/cache', handle(async (req) => {
@@ -190,6 +191,17 @@ function buildApp() {
   r.get('/cases/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
     return q.getCase(req.user, req.params.id);
+  }));
+
+  // Entities pulled out of the FIR's own narrative by Zia. Separate from /cases/:id so the
+  // case view renders immediately and this fills in -- it is a network call to an external
+  // service and must never hold up the page.
+  r.get('/cases/:id/entities', handle(async (req) => {
+    const c = q.getCase(req.user, req.params.id);
+    if (!c) return { entities: {}, keyphrases: [], available: false };
+    const out = await zia.analyseNarrative(req, c.briefFacts || c.BriefFacts || '');
+    if (!out) return { entities: {}, keyphrases: [], available: false, reason: zia.status().lastError };
+    return { ...out, available: true, caseMasterId: String(req.params.id) };
   }));
 
   // graph (the hero)

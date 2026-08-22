@@ -38,6 +38,18 @@ export const useAnomalies = (limit = 12) =>
     }>(`/anomalies${qs({ limit })}`),
   });
 
+// Deliberately its own query: Zia is an external call, and the case view must not wait on it.
+export const useCaseEntities = (id?: string) =>
+  useQuery({
+    queryKey: ['case-entities', id],
+    queryFn: () => api.get<{
+      entities: Record<string, string[]>; keywords: string[]; keyphrases: string[];
+      available: boolean; engine?: string; reason?: string;
+    }>(`/cases/${id}/entities`),
+    enabled: !!id,
+    staleTime: Infinity,
+  });
+
 export const useEval = () => useQuery({ queryKey: ['eval'], queryFn: () => api.get<any>('/eval') });
 
 export const useCases = (params: Record<string, unknown>) =>

@@ -1,7 +1,51 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle } from 'lucide-react';
-import { useCase } from '../api/hooks';
+import { Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react';
+import { useCase, useCaseEntities } from '../api/hooks';
 import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } from '../components/ui';
+
+
+// Zia reads the FIR's own narrative and returns the entities and phrases in it. This is the
+// only place in KADI where a model touches raw case text, so the boundary is stated on the
+// panel itself: it reads the account of the offence, never caste, religion or occupation.
+function NarrativeEntities({ id }: { id: string }) {
+  const { data, isLoading } = useCaseEntities(id);
+  if (isLoading) return null;
+  if (!data?.available) return null;
+  const groups = Object.entries(data.entities || {}).filter(([, v]) => v.length);
+  const phrases = data.keyphrases || [];
+  if (!groups.length && !phrases.length) return null;
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <Sparkles size={14} className="text-kadi-blue" />Read from the narrative</span>}>
+      <div className="p-4 space-y-3">
+        {phrases.length > 0 && (
+          <div>
+            <div className="label mb-1.5">Key phrases</div>
+            <div className="flex flex-wrap gap-1.5">
+              {phrases.map((k) => (
+                <span key={k} className="rounded-full bg-kadi-blue50 text-kadi-blue px-2.5 py-1 text-[12px]">{k}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {groups.map(([label, vals]) => (
+          <div key={label}>
+            <div className="label mb-1.5">{label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {vals.map((v) => (
+                <span key={v} className="rounded-full bg-surface-3 text-ink px-2.5 py-1 text-[12px]">{v}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="text-[11px] text-ink-subtle border-t border-line pt-2">
+          Extracted by Zia text analytics from the account of the offence. Evidence and
+          behaviour only — never caste, religion or occupation.
+        </div>
+      </div>
+    </Section>
+  );
+}
 
 export default function CaseDetail() {
   const { id } = useParams();
@@ -42,6 +86,7 @@ export default function CaseDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <Section title="Brief facts (MO)"><p className="p-4 text-sm leading-relaxed">{c.briefFacts}</p></Section>
+          <NarrativeEntities id={String(c.caseMasterId)} />
 
           <Section title="Parties">
             <div className="grid sm:grid-cols-3 gap-4 p-4">

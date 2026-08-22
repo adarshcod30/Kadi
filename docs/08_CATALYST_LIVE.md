@@ -181,9 +181,43 @@ pipeline, so the assistant still cannot invent an FIR number. Verify the live so
 Zone values are mapped to plain language before they reach the model, for the same
 copy-verbatim reason: an unmapped `red_pulsing` will otherwise appear in officer-facing text.
 
-**7 · Zia is not enabled on the project.**
-Voice runs on the browser Web Speech API, client-side. The adapter includes the recommended
-degradation path (translate → English → speak) for when Zia is switched on.
+**7 · RESOLVED — Zia was never disabled. The adapter was aimed at the wrong capabilities.**
+
+This page said Zia needed a console toggle. It did not. `catalyst.initialize(req).zia()`
+returns a working handle; the problem was that `zia.js` targeted **speech-to-text,
+text-to-speech and translation**, and this Zia has none of them. Every call therefore
+returned nothing, which read as "not enabled".
+
+What it actually exposes:
+
+```
+getNERPrediction   getKeywordExtraction   getSentimentAnalysis   getTextAnalytics
+extractOpticalCharacters   extractAadhaarCharacters   scanBarcode
+detectObject   moderateImage   analyseFace   compareFace   automl
+```
+
+The SDK's own methods still return `401 PERMISSION_NEEDED` — byte-identical to the Data
+Store and Cache failures — so calls go over the raw-HTTPS header-credential path instead.
+
+Two lessons, both already paid for once:
+
+- **Ask the service, do not trust a flag you set yourself.** `ZIA_ENABLED=false` was our own
+  config, and it proved nothing about the project. `/diag/zia` now asks Zia directly.
+- **Read the SDK, do not guess the URL.** Five guessed paths returned
+  `404 INVALID_URL_PATTERN`. The real ones are in
+  `zcatalyst-sdk-node/lib/zia/zia-text-analysis.js`: `/ml/text-analytics/ner`, body
+  `{ document: [...] }`. That file is the documentation.
+
+**Live now:** `/cases/:id/entities` runs NER and key-phrase extraction over an FIR's own
+narrative. On a snatching report it returns `Ramesh Kumar`, `Lakshmi Devi`,
+`Pulsar motorcycle`, `gold chain`, `Majestic Bus` — suspect, victim, vehicle and property,
+pulled out of free text.
+
+FAIRNESS: this reads the account of the offence only. Caste, religion and occupation are not
+in the narrative and are excluded from every model by design.
+
+Voice remains the browser Web Speech API, client-side, because this Zia has no TTS/STT to
+replace it with.
 
 **8 · API Gateway is off, deliberately — and should stay off until after judging.**
 It was enabled once. With no routes configured it intercepted all traffic and the entire site

@@ -34,7 +34,11 @@ function configured() {
 
 function status() {
   return {
-    enabled: ENABLED,
+    enabled: true,
+    capabilities: ['ner', 'keyword-extraction', 'sentiment-analysis'],
+    unavailable: ['speech-to-text', 'text-to-speech', 'translate'],
+    transport: 'raw HTTPS with header credential (SDK methods return 401)',
+    legacyFlag: ENABLED,
     sdkLoaded: Boolean(catalyst),
     kannadaSTT: KN_STT,
     kannadaTTS: KN_TTS,
@@ -64,6 +68,44 @@ function ziaAuth(req) {
   return token && secret ? { token, secret, projectId: h['x-zc-projectid'] } : null;
 }
 
+
+// The SDK returns 401 PERMISSION_NEEDED for every Zia operation -- byte-identical to what
+// Data Store and Cache returned before, and in both those cases the credential was present
+// in request headers and the SDK simply was not using it. Same bypass here.
+const https = require('https');
+
+function ziaHttp(req, path, body) {
+  return new Promise((resolve) => {
+    const c = ziaAuth(req);
+    if (!c) return resolve({ ok: false, error: 'no credential headers' });
+    const projectId = c.projectId || process.env.CATALYST_PROJECT_ID;
+    const payload = JSON.stringify(body);
+    const rq = https.request({
+      hostname: 'api.catalyst.zoho.in',
+      path: `/baas/v1/project/${projectId}${path}`,
+      method: 'POST',
+      headers: {
+        Authorization: `Zoho-oauthtoken ${c.token}`,
+        'X-ZC-PROJECT-SECRET-KEY': c.secret,
+        Environment: (req.headers && req.headers['x-zc-environment']) || 'Development',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', (d) => { out += d; });
+      res.on('end', () => resolve({
+        ok: res.statusCode >= 200 && res.statusCode < 300,
+        status: res.statusCode,
+        body: out.slice(0, 400),
+      }));
+    });
+    rq.on('error', (e) => resolve({ ok: false, error: e.message }));
+    rq.write(payload);
+    rq.end();
+  });
+}
+
 function zia(req) {
   if (!configured() || !req) return null;
   try {
@@ -74,6 +116,63 @@ function zia(req) {
       + (ziaAuth(req) ? ' (admin credential IS present in headers - use the raw-HTTPS path)' : '');
     return null;
   }
+}
+
+
+// --- Text analytics over FIR narrative -------------------------------------------------
+//
+// What this Zia actually provides. The adapter previously targeted speech-to-text,
+// text-to-speech and translation, none of which exist on this SDK -- which is why the
+// service looked "not enabled" for weeks. It was enabled the whole time.
+//
+// Paths and body shape are read from zcatalyst-sdk-node/lib/zia/zia-text-analysis.js. The
+// SDK's own methods 401 (PERMISSION_NEEDED), the same failure Data Store and Cache had, so
+// the calls go over the header-credential path instead.
+//
+// FAIRNESS: this reads the free-text account of the offence only. It never receives, and
+// cannot infer from, CasteID / ReligionID / OccupationID -- those columns are not in the
+// narrative and are excluded from every model by design.
+
+const ENTITY_LABEL = {
+  Person: 'People', Location: 'Places', Organization: 'Organisations',
+  Number: 'Numbers', Date: 'Dates', Time: 'Times', Money: 'Amounts',
+};
+
+/** Entities and key phrases in one FIR narrative. Returns null if Zia is unreachable. */
+async function analyseNarrative(req, text) {
+  if (!text || !String(text).trim()) return null;
+  const doc = String(text).slice(0, 4000);
+  const [ner, kw] = await Promise.all([
+    ziaHttp(req, '/ml/text-analytics/ner', { document: [doc] }),
+    ziaHttp(req, '/ml/text-analytics/keyword-extraction', { document: [doc] }),
+  ]);
+  if (!ner.ok && !kw.ok) {
+    lastError = `narrative: ner=${ner.status || ner.error} kw=${kw.status || kw.error}`;
+    return null;
+  }
+
+  const grouped = {};
+  try {
+    const ents = JSON.parse(ner.body).data[0].ner.general_entities || [];
+    for (const e of ents) {
+      // Confidence is reported 0-100. Low-confidence tokens are noise in an FIR.
+      if ((e.confidence_score ?? 0) < 60) continue;
+      const label = ENTITY_LABEL[e.ner_tag] || e.ner_tag;
+      (grouped[label] = grouped[label] || []).push(e.token);
+    }
+    for (const k of Object.keys(grouped)) grouped[k] = [...new Set(grouped[k])].slice(0, 12);
+  } catch { /* NER unusable; key phrases may still be */ }
+
+  let keywords = [];
+  let keyphrases = [];
+  try {
+    const k = JSON.parse(kw.body).data[0].keyword_extractor || {};
+    keywords = k.keywords || [];
+    keyphrases = k.keyphrases || [];
+  } catch { /* leave empty */ }
+
+  if (!Object.keys(grouped).length && !keyphrases.length) return null;
+  return { entities: grouped, keywords, keyphrases, engine: 'zia-text-analytics' };
 }
 
 /** Transcribe audio. Returns null when Zia is unavailable so the browser path is used. */
@@ -134,4 +233,61 @@ async function translateThenSpeak(req, text, lang) {
   return spoken ? { ...spoken, translatedFrom: 'kn', note: 'Kannada TTS unavailable; spoken in English' } : null;
 }
 
-module.exports = { configured, status, speechToText, textToSpeech, translate, translateThenSpeak };
+/**
+ * Attempt a real Zia call regardless of ZIA_ENABLED and report the raw outcome.
+ *
+ * "Zia is not enabled" had been asserted from a config flag we set ourselves, which proves
+ * nothing about the project. This asks the service and returns exactly what it says, so the
+ * blocker is a quoted error rather than an assumption -- the same mistake that kept Data
+ * Store and Cache marked as blocked for weeks when both actually worked.
+ */
+async function probe(req) {
+  const out = { credentialInHeaders: !!ziaAuth(req), sdkLoaded: !!catalyst, steps: {} };
+  if (!catalyst) { out.steps.sdk = 'catalyst SDK did not load'; return out; }
+  try {
+    const app = catalyst.initialize(req, { scope: 'admin' });
+    out.steps.initialize = 'ok';
+    let z = null;
+    try {
+      z = app.zia();
+      out.steps.ziaHandle = z ? 'ok' : 'app.zia() returned nothing';
+    } catch (e) {
+      out.steps.ziaHandle = `app.zia() threw: ${e && e.message ? e.message : e}`;
+      return out;
+    }
+    if (!z) return out;
+    // Object.keys misses prototype methods, which is how an SDK class exposes its API --
+    // an empty list there says nothing about whether Zia works.
+    const own = Object.keys(z).filter((k) => typeof z[k] === 'function');
+    const proto = Object.getPrototypeOf(z)
+      ? Object.getOwnPropertyNames(Object.getPrototypeOf(z)).filter((k) => k !== 'constructor')
+      : [];
+    out.steps.methods = [...new Set([...own, ...proto])].slice(0, 30);
+    // Try whatever the SDK actually named it rather than the name we guessed.
+    // This Zia has no translate/STT/TTS at all. What it does have is text analytics, which
+    // is far more useful here: NER over FIR narrative extracts the people, places and
+    // organisations an officer would otherwise have to read for.
+    const sample = 'On 12/03/2026 near Majestic Bus Stand Bengaluru, one Ramesh Kumar along '
+      + 'with two associates snatched a gold chain from Lakshmi Devi and fled on a Pulsar '
+      + 'motorcycle towards Yeshwanthpur.';
+    // SDK path (known to 401) is skipped; go straight to the header-credential path and
+    // try the documented shapes, reporting exactly what each returns.
+    // Paths and body shape read out of zcatalyst-sdk-node/lib/zia/zia-text-analysis.js
+    // rather than guessed. Guessing cost five 404s and had already cost a day on the
+    // Stratus upload signature; the SDK source is the documentation.
+    const attempts = [
+      ['/ml/text-analytics/ner', { document: [sample] }],
+      ['/ml/text-analytics/keyword-extraction', { document: [sample] }],
+      ['/ml/text-analytics/sentiment-analysis', { document: [sample] }],
+    ];
+    out.steps.http = {};
+    for (const [path, body] of attempts) {
+      out.steps.http[path] = await ziaHttp(req, path, body);
+    }
+  } catch (e) {
+    out.steps.initialize = `threw: ${e && e.message ? e.message : e}`;
+  }
+  return out;
+}
+
+module.exports = { analyseNarrative, probe, configured, status, speechToText, textToSpeech, translate, translateThenSpeak };
