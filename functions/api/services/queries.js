@@ -644,13 +644,47 @@ module.exports = {
   zones: (user) => {
     const db = load();
     const z = db.zones || { districts: [], stations: [], summary: {} };
-    if (user.roleMeta.tier === 'state' && !user.drilledFromState) return z;
+    // Category rows are what make an alert nameable, so surface them at the top level too:
+    // "Missing / UDR in Bengaluru City, 2.8 sigma above its own baseline" rather than a
+    // district that is merely coloured.
+    const alerts = (rows) => rows.flatMap((d) => (d.categories || []).map((c) => ({
+      ...c, districtId: d.districtId, districtName: d.districtName, month: d.month,
+    }))).sort((a, b) => b.z - a.z);
+
+    if (user.roleMeta.tier === 'state' && !user.drilledFromState) {
+      return { ...z, scope: 'state', alerts: alerts(z.districts) };
+    }
+
     const did = String(user.districtId);
+    const districts = z.districts.filter((d) => String(d.districtId) === did);
+    const stations = z.stations.filter((s) => String(s.districtId) === did);
+
+    // A district officer's summary must count THEIR STATIONS, not the one district they are.
+    // Passing the state summary through is what made a drilled-in Shivamogga view report
+    // "Normal 31" -- a state fact rendered under a district heading.
+    //
+    // zones.stations only carries non-normal entries, so the normal count has to come from
+    // the district's real station roster rather than from the payload.
+    const totalStations = new Set(
+      db.caseList.filter((c) => String(c.districtId) === did).map((c) => String(c.unitId)),
+    ).size;
+    const tally = { red_pulsing: 0, red: 0, yellow: 0 };
+    for (const s of stations) if (tally[s.zone] !== undefined) tally[s.zone] += 1;
+
     return {
       ...z,
-      districts: z.districts.filter((d) => String(d.districtId) === did),
-      stations: z.stations.filter((s) => String(s.districtId) === did),
+      districts,
+      stations,
+      scope: 'district',
       scopedTo: did,
+      unit: 'stations',
+      alerts: alerts(districts),
+      summary: {
+        ...z.summary,
+        ...tally,
+        normal: Math.max(0, totalStations - tally.red_pulsing - tally.red - tally.yellow),
+        totalStations,
+      },
     };
   },
   districtStats: () => load().districtStats,

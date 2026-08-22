@@ -67,8 +67,11 @@ const ZONE_STYLE: Record<string, { dot: string; label: string; ring?: string }> 
 function ZoneBoard({ zones }: { zones: any }) {
   if (!zones) return <div className="card"><Skeleton rows={4} /></div>;
   const s = zones.summary || {};
-  const districts = zones.districts || [];
+  const districtScope = zones.scope === 'district';
+  const rows = districtScope ? (zones.stations || []) : (zones.districts || []);
+  const alerts = zones.alerts || [];
   const pulsing = (zones.stations || []).filter((x: any) => x.zone === 'red_pulsing');
+  const unitWord = districtScope ? 'stations' : 'districts';
   const counts: [string, number][] = [
     ['red_pulsing', s.red_pulsing || 0], ['red', s.red || 0],
     ['yellow', s.yellow || 0], ['normal', s.normal || 0],
@@ -76,8 +79,8 @@ function ZoneBoard({ zones }: { zones: any }) {
   return (
     <Section
       title={<span className="flex items-center gap-2"><Target size={15} className="text-danger" />
-        Zone status — {s.month} vs its own {s.baselineMonths}-month baseline</span>}
-      action={<Hint text="Zones compare each area with its own history, not with other areas. A rise must also be materially large in absolute terms — a station going from 3 cases to 7 is +133% and four extra cases, which is noise wearing a big percentage." />}>
+        Zone status — {s.month} vs each {districtScope ? 'station' : 'district'}&rsquo;s own {s.baselineMonths}-month baseline</span>}
+      action={<Hint text="Every area is judged against its own history and its own natural variation, never against a shared cut-off. Monthly FIR counts behave like counts of independent events, so the expected month-to-month wobble is roughly the square root of the baseline. A district averaging 200 needs about +42 to go red; one averaging 9 needs about +9. Same statistical standard, very different absolute bars — which is the point." />}>
       <div className="p-4 space-y-4">
         <div className="flex flex-wrap gap-2">
           {counts.map(([z, n]) => (
@@ -88,7 +91,45 @@ function ZoneBoard({ zones }: { zones: any }) {
               <span className="font-num text-sm text-ink font-medium">{n}</span>
             </div>
           ))}
+          <div className="flex items-center text-[12px] text-ink-subtle px-1">of {s.totalStations ?? 31} {unitWord}</div>
         </div>
+
+        {/* The brief asks for an alert when a SPECIFIC crime category spikes in a region.
+            A district can sit flat overall while one head doubles underneath it, so the
+            category rows carry the actual signal -- Mandya is DOWN 11% in total and still
+            has a body-crime rise well outside its own range. */}
+        {alerts.length > 0 && (
+          <div>
+            <div className="label mb-1.5">Category alerts — a head moving against its own baseline</div>
+            <div className="space-y-1.5">
+              {alerts.slice(0, 6).map((a: any, i: number) => (
+                <div key={`${a.districtId}-${a.crimeHead}-${i}`}
+                  className="rounded-card border px-3 py-2"
+                  style={{ borderColor: `${ZONE_STYLE[a.zone]?.dot || '#3AA76D'}55`,
+                           background: `${ZONE_STYLE[a.zone]?.dot || '#3AA76D'}0D` }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${ZONE_STYLE[a.zone]?.ring || ''}`}
+                      style={{ background: ZONE_STYLE[a.zone]?.dot }} />
+                    <b className="text-[13px] text-ink">{a.crimeHead}</b>
+                    <span className="text-[12.5px] text-ink-muted">in {a.districtName}</span>
+                    <span className="ml-auto font-num text-[12.5px] text-ink">
+                      {a.current} vs {a.baseline}
+                      <span className={a.changePct > 0 ? 'text-danger ml-1.5' : 'text-kadi-teal ml-1.5'}>
+                        {a.changePct > 0 ? '+' : ''}{a.changePct}%
+                      </span>
+                    </span>
+                  </div>
+                  {/* Publishing the area's own bar is most of the feature: it answers
+                      "why is my district never red?" with a number instead of a shrug. */}
+                  <div className="text-[11.5px] text-ink-subtle mt-1 flex flex-wrap gap-x-3">
+                    <span><b className="text-ink-muted font-num">{a.z}σ</b> above its own average</span>
+                    <span>this category&rsquo;s red line here is <b className="font-num text-ink-muted">+{a.thresholds?.redAt}</b> cases</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {pulsing.length > 0 && (
           <div className="rounded-card border border-danger/30 bg-danger/5 px-3 py-2.5">
@@ -100,20 +141,37 @@ function ZoneBoard({ zones }: { zones: any }) {
               <div key={x.unitId} className="text-[12.5px] text-ink-muted">
                 Station {x.unitId}: <b className="text-ink">{x.current}</b> this month against a
                 baseline of {x.baseline} — <b className="text-danger">{x.changePct > 0 ? '+' : ''}{x.changePct}%</b>
+                {x.z ? <span className="text-ink-subtle"> ({x.z}σ, red line +{x.thresholds?.redAt})</span> : null}
               </div>
             ))}
           </div>
         )}
 
         <div>
-          <div className="label mb-1">Districts, furthest from their own baseline first</div>
-          {districts.slice(0, 8).map((d: any) => (
-            <div key={d.districtId} className="flex items-center gap-3 px-1 py-1.5 border-b border-line/60 last:border-0">
+          <div className="label mb-1">
+            {districtScope
+              ? 'Stations above their own baseline, furthest first'
+              : 'Districts, furthest from their own baseline first'}
+          </div>
+          {rows.length === 0 && (
+            <div className="text-[12.5px] text-ink-muted px-1 py-2">
+              Every station here is inside its normal range this month. That is a real result,
+              not an empty panel — each is measured against its own history.
+            </div>
+          )}
+          {rows.slice(0, 8).map((d: any) => (
+            <div key={d.districtId ? `${d.districtId}-${d.unitId || ''}` : d.unitId}
+              className="flex items-center gap-3 px-1 py-1.5 border-b border-line/60 last:border-0">
               <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE_STYLE[d.zone]?.ring || ''}`}
                 style={{ background: ZONE_STYLE[d.zone]?.dot || '#3AA76D' }} />
-              <span className="text-[13px] text-ink flex-1 truncate">{d.districtName}</span>
+              <span className="text-[13px] text-ink flex-1 truncate">
+                {d.districtName || `Station ${d.unitId}`}
+              </span>
               <span className="text-[11.5px] text-ink-muted w-40 truncate hidden sm:block">{d.driverHead || ''}</span>
               <span className="font-num text-[12.5px] text-ink-muted w-24 text-right">{d.current} vs {d.baseline}</span>
+              <span className="font-num text-[11.5px] text-ink-subtle w-20 text-right hidden md:block">
+                {d.z != null ? `${d.z}σ` : ''}{d.thresholds?.redAt ? ` /+${d.thresholds.redAt}` : ''}
+              </span>
               <span className={`font-num text-[12.5px] w-16 text-right font-medium ${
                 d.changePct > 10 ? 'text-danger' : d.changePct < -5 ? 'text-kadi-teal' : 'text-ink-muted'}`}>
                 {d.changePct > 0 ? '+' : ''}{d.changePct}%
@@ -125,6 +183,7 @@ function ZoneBoard({ zones }: { zones: any }) {
     </Section>
   );
 }
+
 
 function OccasionPanels({ occ }: { occ: any }) {
   if (!occ) return <div className="card"><Skeleton rows={6} /></div>;
@@ -240,7 +299,7 @@ export default function Intelligence() {
           </div>
           <div className="flex gap-3">
             <HeroStat label={districtView ? 'Stations here' : 'Districts analysed'}
-              value={districtView ? (zones?.stations?.length ?? '—') : districts.length} />
+              value={districtView ? (zones?.summary?.totalStations ?? '—') : districts.length} />
             <HeroStat label="Forecast horizon" value={`${fc?.horizonMonths || 3} mo`} />
             <HeroStat label="Backtest MAPE" value={fc?.accuracy ? `${fc.accuracy.mape}%` : '—'} good />
           </div>

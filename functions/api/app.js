@@ -15,6 +15,13 @@ const zia = require('./services/zia');
 const datastore = require('./services/datastore');
 const insight = require('./services/insight');
 
+// Zone values are machine tokens and the model copies facts verbatim, so anything reaching
+// it must already be language. Shared by /command and /zones.
+const ZONE_LABEL_TEXT = {
+  red_pulsing: 'sharply rising', red: 'well above baseline',
+  yellow: 'above baseline', normal: 'at baseline',
+};
+
 function buildApp() {
   const app = express();
   app.use(cors());
@@ -82,13 +89,7 @@ function buildApp() {
     const body = stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
     const out = { view: stateView ? 'state' : 'district', ...body };
     if (String(req.query.explain) !== 'true') return out;
-    // Zone values are machine tokens. The model is instructed to copy facts verbatim, so
-    // an unmapped 'red_pulsing' lands in officer-facing prose exactly as stored.
-    const ZONE_LABEL = {
-      red_pulsing: 'sharply rising', red: 'well above baseline',
-      yellow: 'above baseline', normal: 'at baseline',
-    };
-    const zoneLabel = (z) => ZONE_LABEL[z] || z || 'at baseline';
+    const zoneLabel = (z) => ZONE_LABEL_TEXT[z] || z || 'at baseline';
     const facts = stateView ? {
       scope: 'Karnataka, 31 districts',
       districtsNeedingAttention: body.needsAttention,
@@ -119,19 +120,48 @@ function buildApp() {
     const z = q.zones(req.user);
     if (String(req.query.explain) !== 'true') return z;
     const s = z.summary || {};
-    const top = (z.districts || []).slice(0, 3).map((d) => ({
-      district: d.districtName, change: `${d.changePct}%`, driver: d.driverHead,
-      current: d.current, baseline: d.baseline,
-    }));
+    const districtScope = z.scope === 'district';
     const hot = (z.stations || []).filter((x) => x.zone === 'red_pulsing').slice(0, 3);
-    const { text, source } = await insight.generate(req, 'district and station zone status', {
+    // Category alerts carry the signal a total-volume summary averages away, so they lead.
+    const alerts = (z.alerts || []).slice(0, 4).map((a) => ({
+      category: a.crimeHead, district: a.districtName, status: ZONE_LABEL_TEXT[a.zone] || a.zone,
+      current: a.current, ownAverage: a.baseline, sigmasAboveOwnAverage: a.z,
+      // Self-describing, because a bare "+9 cases" reads as a margin rather than a bar:
+      // the model wrote "exceeds the red line by 9 cases" when the red line WAS +9.
+      // The figure was copied correctly and the relationship invented, so the fix belongs
+      // in the label, not the prompt.
+      redThresholdRule: `in this area a rise of +${a.thresholds && a.thresholds.redAt} or more above its own average counts as red`,
+    }));
+    // A drilled-in officer must not be told about the other 30 districts. Counting units
+    // that are not theirs under their own district heading is how "Normal 31" ended up on
+    // a Shivamogga page.
+    const facts = districtScope ? {
+      scope: `${(z.districts[0] || {}).districtName || 'this district'} only`,
+      month: s.month, baselineMonths: s.baselineMonths,
+      stationsHere: s.totalStations,
+      stationsRed: s.red, stationsPulsing: s.red_pulsing, stationsYellow: s.yellow,
+      stationsNormal: s.normal,
+      categoryAlertsHere: alerts,
+      stationsAboveOwnBaseline: (z.stations || []).slice(0, 3).map((x) => ({
+        unitId: x.unitId, current: x.current, ownAverage: x.baseline,
+        sigmasAboveOwnAverage: x.z, change: `${x.changePct}%`,
+      })),
+    } : {
+      scope: 'Karnataka, 31 districts',
       month: s.month, baselineMonths: s.baselineMonths,
       districtsRed: s.red, districtsPulsing: s.red_pulsing, districtsYellow: s.yellow,
       districtsNormal: s.normal,
-      biggestMovers: top,
+      categoryAlerts: alerts,
+      biggestMovers: (z.districts || []).slice(0, 3).map((d) => ({
+        district: d.districtName, change: `${d.changePct}%`, driver: d.driverHead,
+        current: d.current, ownAverage: d.baseline, sigmasAboveOwnAverage: d.z,
+      })),
       stationsPulsing: hot.map((x) => ({ unitId: x.unitId, current: x.current,
         baseline: x.baseline, change: `${x.changePct}%` })),
-    });
+    };
+    const { text, source } = await insight.generate(
+      req, districtScope ? 'zone status for one district' : 'district and station zone status', facts,
+    );
     return { ...z, insight: text, insightSource: source };
   }));
   r.get('/eval', handle(async () => q.evalReport()));

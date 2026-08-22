@@ -117,3 +117,75 @@ def test_planted_slipping_cases_are_flagged():
     planted = [str(c) for c in gt["slippingCaseIds"]]
     hit = sum(1 for c in planted if c in flagged)
     assert hit / len(planted) >= 0.8, f"only {hit}/{len(planted)} planted slipping cases flagged"
+
+
+# --- zone thresholds scale per area -------------------------------------------------
+# The guarantee under test: a small district must be able to raise an alert on a surge
+# that is large FOR IT, without needing Bengaluru's absolute numbers. A flat threshold
+# broke this in both directions -- it was noise-level for large areas and unreachable
+# for small ones.
+
+def _months(n, value):
+    return {f"2025-{m:02d}": value for m in range(1, n + 1)}
+
+
+def test_small_district_can_reach_red_on_a_proportionate_surge():
+    """A 2.5x surge is red whether the baseline is 8 or 200."""
+    import zones as z
+    # classify is a closure, so exercise it through compute() on synthetic cases.
+    def surge(baseline, factor):
+        cases = []
+        for m in range(1, 13):
+            for _ in range(baseline):
+                cases.append({"crimeRegisteredDate": f"2025-{m:02d}-05",
+                              "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        for _ in range(int(baseline * factor)):
+            cases.append({"crimeRegisteredDate": "2026-01-05",
+                          "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        cases.append({"crimeRegisteredDate": "2026-02-01",
+                      "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        rep = z.compute(cases, [{"districtId": "1", "districtName": "D"}],
+                        unit_district={"1": "1"})
+        return rep["districts"][0]["zone"]
+
+    assert surge(200, 2.5) in ("red", "red_pulsing")
+    assert surge(8, 2.5) in ("red", "red_pulsing"), \
+        "a small district must be able to go red on a surge that is large for its own baseline"
+
+
+def test_large_district_is_not_red_for_a_trivial_absolute_rise():
+    """+6 on a 200 baseline is noise, and must stay normal."""
+    import zones as z
+    cases = []
+    for m in range(1, 13):
+        for _ in range(200):
+            cases.append({"crimeRegisteredDate": f"2025-{m:02d}-05",
+                          "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+    for _ in range(206):
+        cases.append({"crimeRegisteredDate": "2026-01-05",
+                      "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+    cases.append({"crimeRegisteredDate": "2026-02-01",
+                  "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+    rep = z.compute(cases, [{"districtId": "1", "districtName": "D"}], unit_district={"1": "1"})
+    assert rep["districts"][0]["zone"] == "normal"
+
+
+def test_thresholds_are_lower_in_absolute_terms_for_smaller_areas():
+    """The published bar must be smaller for a small area -- the whole point of the change."""
+    import zones as z
+
+    def bar(baseline):
+        cases = []
+        for m in range(1, 13):
+            for _ in range(baseline):
+                cases.append({"crimeRegisteredDate": f"2025-{m:02d}-05",
+                              "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        for _ in range(baseline):
+            cases.append({"crimeRegisteredDate": "2026-01-05",
+                          "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        cases.append({"crimeRegisteredDate": "2026-02-01",
+                      "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        return z.compute(cases, [{"districtId": "1", "districtName": "D"}],
+                         unit_district={"1": "1"})["districts"][0]["thresholds"]["redAt"]
+
+    assert bar(9) < bar(200), "a small district's red line must sit lower in absolute cases"
