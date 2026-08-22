@@ -1,7 +1,7 @@
 # 08 — What is live right now
 
 The honest state of the **KadiLabs** Catalyst project, verified by API call rather than
-recalled from memory. Last verified **2026-07-26**.
+recalled from memory. Last verified **2026-08-22**.
 
 Read this before any demo or interview. Everything in the "not real yet" section is
 something a judge could discover on their own — you want to have said it first.
@@ -24,7 +24,7 @@ limitation you will find in older notes and in some Zoho documentation.
 
 ---
 
-## Running on Catalyst — eight services
+## Running on Catalyst — ten services
 
 | Service | What it runs |
 |---|---|
@@ -36,6 +36,8 @@ limitation you will find in older notes and in some Zoho documentation.
 | **Job Scheduling + Cron** | Nightly recompute, 02:00 IST, last run SUCCESS |
 | **Connections** | `kadi_quickml` OAuth, scope `deployment.READ` |
 | **Authentication** | Provisioned; role model surfaced at sign-in |
+| **Cache** | `kadi-kpi` segment — dashboard KPIs, verified round-trip |
+| **QuickML** | GLM-4.7-Flash — the narrative layer on every command view |
 
 ## Data Store — 11 tables
 
@@ -72,7 +74,11 @@ run this one.
 
 ## Not real yet — do not claim these
 
-Eight things. Each has a diagnosis, because "it does not work" is not an engineering answer.
+Eight things were listed here. **Four are now resolved** (3, 5, 6, and the read path in 2b) —
+they are kept rather than deleted, because how they were diagnosed is the more useful record,
+and because two of them were wrong for weeks in a way worth not repeating.
+
+Each has a diagnosis, because "it does not work" is not an engineering answer.
 
 **1 · Authentication is provisioned, but identity is not bound.**
 The app presents a **role chooser**, not a password gate, and the login page says so in plain
@@ -100,70 +106,91 @@ bulk write against it.
 refreshes it in place over ZCQL, and it is the table that matters most: it backs the showcase
 query. Kodagu reads 332 / 51.2 per 100k / #31 to #6, matching the application.
 
-**2b · Historical note: the read path.**
-The rows are in Data Store and are queryable by ZCQL from an authenticated client — but
-**not from the deployed function**, which cannot present a credential (see 5). The ZCQL
-adapter is written (`services/datastore.js`) and the seam to swap against is
-`services/store.mock.js`; both are waiting on the credential, not on code.
+**2b · RESOLVED — the read path works from the deployed function.**
+ZCQL reads run from the function over the header-credential path in `services/datastore.js`
+(see 5). What remains in item 2 is only the staleness of the CaseMaster snapshot, not the
+ability to read it.
 
-**3 · The audit trail is in-memory.**
-A ring buffer in `services/audit.js`. It is lost on cold start. Moving it to a Data Store
-table is small and worth doing before anyone relies on it for accountability.
+Note the deliberate decision not to serve `/cases` from Data Store yet: the table holds a
+pre-regeneration snapshot, so switching the read path there returned wrong counts and empty
+district scoping. Serving stale data for architectural purity is a bad trade — the bundle
+stays authoritative until the re-import lands.
+
+**3 · RESOLVED — the audit trail persists.**
+`services/audit.js` writes through to Data Store over the header-credential path, with the
+in-memory ring buffer kept in front as a read cache. The trail now survives cold start.
 
 **4 · Export returns HTML, not PDF.**
 Call it a **print-ready briefing**. SmartBrowz is not wired. Do not describe it as a PDF
 pipeline.
 
-**5 · Cache writes return 401 — and so does everything else. One root cause.**
+**5 · RESOLVED — the credential was in the request headers all along.**
 
-This was recorded for a long time as a Cache-specific bug. It is not.
+This page previously stated that the function "receives no credential of any kind" and that
+Cache, ZCQL and user management were all blocked pending a console action. That diagnosis was
+wrong, and it was wrong in the expensive direction: it closed off work that was possible.
 
-Hitting `/datastore/probe` on the deployed function shows ZCQL returning **byte-for-byte the
-same** `401 PERMISSION_NEEDED`, and so does `userManagement().getCurrentUser()`. All three
-SDK scopes — default, `admin`, `user` — fail identically.
-
-The environment tells you why. The function receives **no credential of any kind**:
+The environment does lack a credential — that part was right. But Catalyst supplies one on
+**each request, as headers**:
 
 ```
-CATALYST_PROJECT_ID, CATALYST_RESOURCE_ID, CATALYST_FUNCTION_TYPE,
-X_ZOHO_CATALYST_ACCOUNTS_URL, X_ZOHO_CATALYST_CONSOLE_URL, ...
+x-zc-admin-cred-token      (70 chars)
+x-zc-project-secret-key    (64 chars)
+x-zc-user-type: admin
 ```
 
-Identifiers and URLs only. `X_ZOHO_CATALYST_PROJECT_KEY` is **absent**, and there is no
-token or secret anywhere in the environment.
+`initialize(req)` in the SDK does not pick these up, which is why every scope returned an
+identical `401 PERMISSION_NEEDED`. Raw HTTPS to `api.catalyst.zoho.in` presenting **both**
+headers works. The token alone gives `404 INVALID_RESOURCE` — both are required.
 
-The SPA calls `/server/api/...` as a public, anonymous HTTP request, so `initialize(req)`
-has nothing to resolve a credential from. Every project-owned service call therefore fails:
-Cache, ZCQL and user management alike.
+The identical error across unrelated services was the clue: five services failing the same
+way is one cause, not five.
 
-**This single cause sits under three of the limitations on this page — 1, 2 and 5.** Fixing
-it once would unblock the Data Store read path, the Cache adapter, and the identity binding
-together. It needs a project credential made available to the function (a project key set as
-an environment variable, or a Connection carrying Data Store scopes), which is a console
-action.
+Now working over that path:
+- **Data Store** — live ZCQL reads from the deployed function (`services/datastore.js`)
+- **Cache** — read and write both verified; check `/diag/cache` for a live round-trip
+- **Audit** — write-through to Data Store, so the trail survives cold start
 
-Verify any of this yourself at `/datastore/status` and `/datastore/probe`.
+Cache field names, since they are not obvious and cost a deploy cycle to learn: the POST body
+wants `cache_name` (**not** `cache_key`), and the GET query parameter is `cacheKey`.
 
-Zero user impact today — the KPI query recomputes in about a millisecond, so every Cache
-call is simply a miss that falls through to compute.
+Still genuinely outstanding on this path: **DDL**. Row writes and ZCQL reads succeed, but
+schema changes return `401 OAUTH_SCOPE_MISMATCH`. Create columns through the console or MCP —
+and note that MCP wants `audit_consent`, `is_unique`, `is_mandatory` and
+`search_index_enabled` as the **strings** `"true"`/`"false"`, not booleans.
 
-**6 · QuickML rejects the request body.**
-`400 PATTERN_NOT_MATCHED` mentioning `zoho-inputstream`. The endpoint, model id
-(`crm-di-glm47b-30b-it`), org header and a valid OAuth token are all in place. Ruled out:
-non-ASCII content, `Content-Length`, missing token, auth prefix. Gated off behind
-`QUICKML_ENABLED`.
+**6 · RESOLVED — QuickML is live.** GLM-4.7-Flash generates the narrative layer.
 
-The assistant runs a deterministic intent engine instead — which has a real upside worth
-stating: **it cannot hallucinate an FIR number.**
+The `400 PATTERN_NOT_MATCHED` was a model id with hyphens. It is
+`crm-di-glm47b_30b_it` — **underscores**. Auth prefix `Bearer`, plus
+`CATALYST-ORG: 60078029367`.
+
+Two things had to be handled beyond getting a 200 back:
+
+- **Reasoning leaked into output.** Asked to reply "KADI OK" the model returned
+  "1. **Analyze the User's Input:**...". Fixed with
+  `chat_template_kwargs: { enable_thinking: false }`.
+- **Numbers were mangled** — 256 came back as "2,56". Numbers are now pre-rendered as
+  strings by `humanise()` in `services/insight.js` so the model copies rather than reformats.
+
+The governing rule is unchanged and worth stating to a judge: **the model never produces a
+fact.** It receives computed figures and returns prose. Every number on screen came from the
+pipeline, so the assistant still cannot invent an FIR number. Verify the live source at
+`/stats?explain=true` — it reports `insightSource`.
+
+Zone values are mapped to plain language before they reach the model, for the same
+copy-verbatim reason: an unmapped `red_pulsing` will otherwise appear in officer-facing text.
 
 **7 · Zia is not enabled on the project.**
 Voice runs on the browser Web Speech API, client-side. The adapter includes the recommended
 degradation path (translate → English → speak) for when Zia is switched on.
 
-**8 · API Gateway is off, deliberately.**
+**8 · API Gateway is off, deliberately — and should stay off until after judging.**
 It was enabled once. With no routes configured it intercepted all traffic and the entire site
-returned `INVALID_URL`. It needs route configuration before it is safe to turn on again.
-Leave it off until then.
+returned `INVALID_URL`. The API is submitted at a fixed URL, so an outage here is not a
+recoverable experiment. Configure routes first, verify in a throwaway project, and only then
+enable. There is no partial-credit version of this: until routes exist, enabling it takes the
+whole site down.
 
 ---
 

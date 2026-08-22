@@ -100,7 +100,13 @@ export default function Dashboard() {
         className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kadi-navy via-kadi-navy700 to-[#0a2547] text-white p-6 md:p-7">
         <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none hidden sm:block"><SiloToGraph className="w-[420px]" /></div>
         <div className="relative max-w-xl">
-          <div className="text-xs text-white/60 uppercase tracking-wider">{me?.capabilities.label} · {me?.capabilities.scope} scope</div>
+          {/* capabilities.scope is the role's static scope, so a state user drilled into a
+              district still read "STATE SCOPE" over district numbers. effectiveScope
+              reflects the drill. */}
+          <div className="text-xs text-white/60 uppercase tracking-wider">
+            {me?.capabilities.label} · {stats?.scope === 'district' && stats?.districtName
+              ? stats.districtName : `${me?.capabilities.effectiveScope || me?.capabilities.scope} scope`}
+          </div>
           <h1 className="text-2xl md:text-3xl font-bold mt-1">Command Dashboard</h1>
           <p className="text-white/80 text-sm mt-1.5">Thousands of siloed FIRs, connected into one living graph — with slipping investigations, offender networks and emerging hotspots surfaced up front. <button onClick={() => nav('/about')} className="underline underline-offset-2 hover:text-white">What is KADI?</button></p>
           <div className="flex flex-wrap gap-2 mt-4">

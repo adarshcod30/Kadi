@@ -55,7 +55,11 @@ function buildApp() {
     // missing Cache scope -- it was the SDK failing to find a credential that was in
     // the headers all along, the same root cause that blocked Data Store.
     const { data } = await cache.through(
-      req, `stats:${req.user.role}:${req.user.districtId || 'state'}`, async () => q.stats(req.user),
+      // Every axis scoped() filters on must appear in the key. drillUnitId was missing:
+      // two SIs in different stations of one district would have shared a cache entry.
+      req,
+      `stats:${req.user.role}:${req.user.districtId || 'state'}:${req.user.drillUnitId || 'all'}`,
+      async () => q.stats(req.user),
     );
     if (String(req.query.explain) !== 'true') return data;
     const sb = data.statusBreakdown || {};
@@ -78,13 +82,20 @@ function buildApp() {
     const body = stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
     const out = { view: stateView ? 'state' : 'district', ...body };
     if (String(req.query.explain) !== 'true') return out;
+    // Zone values are machine tokens. The model is instructed to copy facts verbatim, so
+    // an unmapped 'red_pulsing' lands in officer-facing prose exactly as stored.
+    const ZONE_LABEL = {
+      red_pulsing: 'sharply rising', red: 'well above baseline',
+      yellow: 'above baseline', normal: 'at baseline',
+    };
+    const zoneLabel = (z) => ZONE_LABEL[z] || z || 'at baseline';
     const facts = stateView ? {
       scope: 'Karnataka, 31 districts',
       districtsNeedingAttention: body.needsAttention,
       zoneSummary: body.zoneSummary,
       stationsPulsing: body.stationsPulsing.length,
       topByConcern: body.districts.slice(0, 4).map((d) => ({
-        district: d.districtName, zone: d.zone, change: `${d.changePct}%`,
+        district: d.districtName, zone: zoneLabel(d.zone), change: `${d.changePct}%`,
         driver: d.driverHead, seriousFlags: d.seriousFlags })),
     } : {
       district: body.districtName,
@@ -93,7 +104,7 @@ function buildApp() {
       stationsAboveBaseline: body.stationsFlagged,
       casesLinkedInFromOtherDistricts: body.linkedInTotal,
       busiestStations: body.stations.slice(0, 3).map((s) => ({
-        station: s.unitName, cases: s.total, open: s.open, zone: s.zone })),
+        station: s.unitName, cases: s.total, open: s.open, zone: zoneLabel(s.zone) })),
     };
     const kind = stateView ? 'state command picture' : 'district command picture';
     const { text, source } = await insight.generate(req, kind, facts, { maxTokens: 200 });

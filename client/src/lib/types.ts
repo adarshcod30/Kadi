@@ -95,6 +95,9 @@ export interface HealthRow {
 }
 
 export interface Stats {
+  // /stats returns these whenever the viewer is scoped to (or drilled into) a district.
+  scope?: 'state' | 'district';
+  districtName?: string;
   totalCases: number; openCases: number; chargeSheeted: number; undetected: number;
   flaggedCases: number; seriousFlaggedCases: number; activeNetworks: number;
   crossDistrictNetworks: number; resolvedOffenders: number; highRiskOffenders: number;
