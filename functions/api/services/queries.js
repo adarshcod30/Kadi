@@ -811,7 +811,60 @@ module.exports = {
       },
     };
   },
-  socio: () => load().socio,
+  // State tier gets the whole correlation picture. A district officer gets that plus where
+  // THEY sit -- the "why here" question only has an answer relative to comparable places.
+  // Previously this ignored `user` entirely, so the socio-economic capability was simply
+  // hidden from district tier rather than answered for it.
+  socio: (user) => {
+    const base = load().socio;
+    const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+    if (!narrowed) return base;
+
+    const did = String(user.districtId);
+    const rows = base.districts || [];
+    const me = rows.find((d) => String(d.districtId) === did);
+    if (!me) return base;
+
+    // Percentile among all 31, so "high" and "low" are stated rather than implied.
+    const pct = (key) => {
+      const vals = rows.map((d) => d[key]).filter((v) => typeof v === 'number').sort((a, b) => a - b);
+      if (!vals.length) return null;
+      const below = vals.filter((v) => v < me[key]).length;
+      return Math.round((100 * below) / vals.length);
+    };
+
+    // Peers are districts of the same urbanisation band. Comparing Bengaluru City with
+    // Kodagu explains nothing -- they are different kinds of place. Comparing it with other
+    // urban districts is the comparison an officer can actually act on.
+    const peers = rows
+      .filter((d) => d.band === me.band && String(d.districtId) !== did)
+      .sort((a, b) => Math.abs(a.popDensity - me.popDensity) - Math.abs(b.popDensity - me.popDensity))
+      .slice(0, 5)
+      .map((d) => ({
+        districtId: d.districtId, districtName: d.districtName,
+        ratePer100k: d.ratePer100k, total: d.total, popDensity: d.popDensity,
+      }));
+    const peerRates = peers.map((p) => p.ratePer100k).filter((v) => typeof v === 'number');
+    const peerMedian = peerRates.length
+      ? peerRates.slice().sort((a, b) => a - b)[Math.floor(peerRates.length / 2)] : null;
+
+    return {
+      ...base,
+      scope: 'district',
+      focus: {
+        ...me,
+        percentiles: {
+          ratePer100k: pct('ratePer100k'), urbanPct: pct('urbanPct'),
+          literacyPct: pct('literacyPct'), popDensity: pct('popDensity'),
+        },
+        band: me.band,
+        peers,
+        peerMedianRate: peerMedian,
+        vsPeerMedian: peerMedian != null
+          ? Math.round((me.ratePer100k - peerMedian) * 10) / 10 : null,
+      },
+    };
+  },
   // Forecast rows are keyed by districtId only; join the name here so the client never
   // has to hold a second lookup just to label a chart.
   forecast: () => {

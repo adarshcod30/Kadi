@@ -267,7 +267,7 @@ function buildApp() {
   r.get('/analytics/vulnerability', handle(async (req) => q.vulnerability(req.user)));
   // Sociological + predictive intelligence (problem statement pillar 3). Both are
   // state-wide, area-level aggregates — no person-level rows, so no RBAC scoping.
-  r.get('/analytics/socio', handle(async () => q.socio()));
+  r.get('/analytics/socio', handle(async (req) => q.socio(req.user)));
 
   // How crime behaves on festivals and holidays versus ordinary days. The brief asks for
   // temporal pattern discovery, and in India the calendar is where the structure is.

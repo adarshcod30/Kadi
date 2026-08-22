@@ -19,6 +19,8 @@ type TabKey = 'where' | 'why' | 'when' | 'next';
 const DISTRICT_TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
   { key: 'where', label: 'My stations', icon: MapPin,
     blurb: 'Which stations in this district sit above their own baseline, and what is driving it.' },
+  { key: 'why', label: 'Why here', icon: HelpCircle,
+    blurb: 'Where this district sits against comparable districts, and on the indicators crime rate tracks with.' },
   { key: 'when', label: 'When', icon: CalendarDays,
     blurb: 'How offending here moves through the calendar — festivals and holidays are not ordinary days.' },
   { key: 'next', label: 'What next', icon: Sparkles,
@@ -64,6 +66,75 @@ const ZONE_STYLE: Record<string, { dot: string; label: string; ring?: string }> 
 // historical averages". Every area is measured against its OWN trailing baseline, so a
 // consistently busy district does not sit permanently red -- which is what would happen if
 // this ranked by volume, and is exactly the failure per-capita analysis exists to correct.
+function WhyHere({ socio }: { socio: any }) {
+  const f = socio?.focus;
+  if (!f) return <div className="card"><Skeleton rows={4} /></div>;
+  const pc = f.percentiles || {};
+  const worse = (f.vsPeerMedian ?? 0) > 0;
+  const bars: { label: string; pct: number | null; value: string }[] = [
+    { label: 'Crime rate per 100k', pct: pc.ratePer100k, value: `${f.ratePer100k}` },
+    { label: 'Urbanisation', pct: pc.urbanPct, value: `${f.urbanPct}%` },
+    { label: 'Literacy', pct: pc.literacyPct, value: `${f.literacyPct}%` },
+    { label: 'Population density', pct: pc.popDensity, value: `${Math.round(f.popDensity)}/km²` },
+  ];
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><HelpCircle size={15} className="text-kadi-blue" />
+        Where {f.districtName} sits — against 31 districts, and against its peers</span>}
+      action={<Hint text="Percentile is the district's rank among all 31 on that indicator. The peer group is districts in the same urbanisation band, closest by population density — comparing a metro with a hill district explains nothing, comparing it with places of similar character does." />}>
+      <div className="p-4 space-y-4">
+        <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5">
+          <div className="text-[13px] text-ink">
+            <b>{f.districtName}</b> is a <b>{f.band}</b> district recording{' '}
+            <b className="font-num">{f.ratePer100k}</b> FIRs per 100,000 residents.
+            {f.peerMedianRate != null && (
+              <> Its peer median is <b className="font-num">{f.peerMedianRate}</b> —{' '}
+                <b className={worse ? 'text-danger' : 'text-kadi-teal'}>
+                  {worse ? '+' : ''}{f.vsPeerMedian} {worse ? 'above' : 'below'}
+                </b> comparable districts.</>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {bars.map((b) => (
+            <div key={b.label}>
+              <div className="flex justify-between text-[12.5px] mb-1">
+                <span className="text-ink-muted">{b.label}</span>
+                <span className="text-ink font-num">
+                  {b.value}
+                  {b.pct != null && <span className="text-ink-subtle ml-2">{b.pct}th pct</span>}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-line overflow-hidden">
+                <div className="h-full rounded-full transition-all"
+                  style={{ width: `${b.pct ?? 0}%`,
+                           background: (b.pct ?? 0) >= 70 ? '#C0392B' : (b.pct ?? 0) >= 40 ? '#E0A106' : '#2FA8A0' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <div className="label mb-1">Peer districts — same band, nearest by density</div>
+          {(f.peers || []).map((p: any) => (
+            <div key={p.districtId} className="flex items-center gap-3 px-1 py-1.5 border-b border-line/60 last:border-0">
+              <span className="text-[13px] text-ink flex-1 truncate">{p.districtName}</span>
+              <span className="font-num text-[12.5px] text-ink-muted w-24 text-right">
+                {p.total.toLocaleString()} FIRs
+              </span>
+              <span className={`font-num text-[12.5px] w-20 text-right font-medium ${
+                p.ratePer100k > f.ratePer100k ? 'text-danger' : 'text-kadi-teal'}`}>
+                {p.ratePer100k}/100k
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function SpatioTemporal({ hotspots }: { hotspots: any }) {
   if (!hotspots) return null;
   const rows = hotspots.spatiotemporal || [];
@@ -452,6 +523,10 @@ export default function Intelligence() {
       </motion.div>
       )}
       </>}
+
+      {tab === 'why' && districtView && (
+        <motion.div variants={rise}><WhyHere socio={socio} /></motion.div>
+      )}
 
       {tab === 'why' && !districtView && <>
       {/* ---- Correlation ---- */}
