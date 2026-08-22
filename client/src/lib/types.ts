@@ -43,13 +43,18 @@ export interface CaseDetail extends CaseRow {
   offenders: { offenderIdentityId: string; canonicalName: string; riskScore: number; band: string }[];
 }
 
-export interface Paged<T> { items: T[]; total: number; page: number; pageSize: number; fairness?: string }
+export interface Paged<T> { items: T[]; total: number; page: number; pageSize: number; fairness?: string   // offender list, district scope: how the list splits by where they are based
+  scope?: 'state' | 'district';
+  reachingIn?: number | null;
+  basedHere?: number | null;
+}
 
 export interface GraphNode {
   id: string; type: 'case' | 'offender'; label: string;
   caseId?: string; offenderId?: string; crimeHead?: string; crimeSubHead?: string;
   district?: string; unit?: string; status?: string; gravity?: string; date?: string;
   clusterId?: string | null; isCenter?: boolean; riskScore?: number; band?: string; cases?: number;
+  outsideScope?: boolean;
 }
 export interface EvidenceItem { type: string; detail: string; offenderIds?: string[] }
 export interface GraphEdge {
@@ -69,6 +74,10 @@ export interface Offender {
   confidence: number; lowConfidence: boolean; nameVariants: string[];
   riskScore: number; band: string; factors: RiskFactor[]; protectedAttributesUsed: number;
   coOffenders: { offenderIdentityId: string; canonicalName: string; sharedCases: number }[];
+  // District scope only: whether this person works solely here, or is based elsewhere and
+  // reaches in. The second group is the reason a district needs a state-linked system.
+  basedHere?: boolean;
+  reachesIn?: boolean;
   arrests: { date: string; districtId: string; unitId: string; typeId: string }[];
   arrestCount: number; firstSeen: string | null; lastSeen: string | null;
   clusterIds: string[]; linkedCaseCount: number;

@@ -101,6 +101,13 @@ function graphForCase(user, id, opts = {}) {
   const maxNeighbors = Math.min(80, opts.maxNeighbors || 60);
   const adj = (db.adjacency[String(id)] || []).slice().sort((a, b) => b.strength - a.strength).slice(0, maxNeighbors);
 
+  // A district viewer needs to see which nodes are OUTSIDE their district. Those are the
+  // ones their own register cannot show them, and they should be visually obvious rather
+  // than hidden among the local cases. Marked, never removed: a link that leaves the
+  // district is the finding, not something to filter away.
+  const homeDistrict = (user && ((user.roleMeta && user.roleMeta.tier === 'district')
+    || user.drilledFromState)) ? String(user.districtId) : null;
+
   const nodes = new Map();
   const edges = [];
   const addCaseNode = (cid, isCenter = false) => {
@@ -111,6 +118,7 @@ function graphForCase(user, id, opts = {}) {
       crimeHead: c.crimeHead, crimeSubHead: c.crimeSubHead, district: c.districtName,
       unit: c.unitName, status: c.status, gravity: c.gravity, date: c.crimeRegisteredDate,
       clusterId: c.clusterId, isCenter,
+      outsideScope: Boolean(homeDistrict && String(c.districtId) !== homeDistrict),
     });
   };
   addCaseNode(id, true);
@@ -192,9 +200,19 @@ function listOffenders(user, q = {}) {
   // District tier sees offenders with at least one case in their district. An offender who
   // also works elsewhere stays visible -- that cross-jurisdiction reach is the finding, not
   // something to hide from the district that is dealing with them.
-  if (user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState)) {
-    const did = String(user.districtId);
+  const did = user && user.districtId ? String(user.districtId) : null;
+  const narrowed = user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState);
+  if (narrowed && did) {
     rows = rows.filter((o) => (o.districts || []).map(String).includes(did));
+    // Two very different people share this list. One is based here and works only here. The
+    // other is based elsewhere and reaches in -- and that second group is the whole reason a
+    // district needs a state-linked system, so it should not be buried among the locals.
+    rows = rows.map((o) => {
+      const ds = (o.districts || []).map(String);
+      return { ...o, basedHere: ds.length === 1 && ds[0] === did, reachesIn: ds.length > 1 };
+    });
+    if (q.origin === 'visiting') rows = rows.filter((o) => o.reachesIn);
+    if (q.origin === 'local') rows = rows.filter((o) => o.basedHere);
   }
   if (q.crossDistrict === 'true') rows = rows.filter((o) => (o.distinctDistricts || 0) >= 2);
   if (q.band) rows = rows.filter((o) => o.band === q.band);
@@ -207,8 +225,13 @@ function listOffenders(user, q = {}) {
   const total = rows.length;
   const page = Math.max(1, parseInt(q.page || '1', 10));
   const pageSize = Math.min(200, parseInt(q.pageSize || '50', 10));
-  return { items: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize,
-    fairness: FAIRNESS_STATEMENT };
+  return {
+    items: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize,
+    scope: narrowed ? 'district' : 'state',
+    reachingIn: narrowed ? rows.filter((o) => o.reachesIn).length : null,
+    basedHere: narrowed ? rows.filter((o) => o.basedHere).length : null,
+    fairness: FAIRNESS_STATEMENT,
+  };
 }
 
 function getOffender(user, id) {

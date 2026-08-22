@@ -65,6 +65,7 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
             ? (n.band === 'High' ? '#C0392B' : n.band === 'Medium' ? '#C9820A' : '#3A7' )
             : headColor(n.crimeHead),
           size: n.type === 'offender' ? 30 + Math.min(deg, 8) * 2 : 26 + Math.min(deg, 8) * 3,
+          outside: n.outsideScope ? 1 : 0,
           raw: n,
         },
       });
@@ -109,6 +110,12 @@ export function GraphCanvas({ data, filters, onSelectNode, onSelectEdge, reduced
             'text-wrap': 'wrap', 'border-width': 3, 'border-color': '#FFFFFF',
           } as any,
         },
+        // Cases registered outside the viewer's district: dashed border, so the reach beyond
+        // the local register is visible at a glance rather than buried in a tooltip.
+        { selector: 'node[outside=1]', style: {
+          'border-width': 3, 'border-color': '#C9820A', 'border-style': 'dashed',
+          'border-opacity': 0.95,
+        } as any },
         { selector: 'node[isCenter=1]', style: { 'border-width': 4, 'border-color': '#E8871E' } },
         {
           selector: 'edge',
