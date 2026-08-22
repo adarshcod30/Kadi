@@ -8,6 +8,12 @@ import type {
 
 // Role AND drilled district both go in every query key. Without the district, drilling into
 // Kalaburagi would serve Bengaluru's cached rows back.
+//
+// This applies to anything the server scopes -- which is now most endpoints. socio and
+// forecast were the dangerous pair: both became district-aware while still keyed on a bare
+// name with staleTime: Infinity, so a drilled-in officer would have been shown the previous
+// district's figures under their own heading, permanently. Global lookups (the district
+// list, national outlines, map geometry) are the only ones that legitimately omit it.
 const role = () => `${getRole()}:${districtParam() || 'state'}`;
 
 export const useMe = () => useQuery({ queryKey: ['me', role()], queryFn: () => api.get<Me>('/me') });
@@ -40,14 +46,14 @@ export const useCase = (id?: string) =>
   useQuery({ queryKey: ['case', id], queryFn: () => api.get<CaseDetail>(`/cases/${id}`), enabled: !!id });
 
 export const useGraphCase = (id?: string) =>
-  useQuery({ queryKey: ['graph', 'case', id], queryFn: () => api.get<GraphData>(`/graph/case/${id}`), enabled: !!id });
+  useQuery({ queryKey: ['graph', role(), 'case', id], queryFn: () => api.get<GraphData>(`/graph/case/${id}`), enabled: !!id });
 export const useGraphCluster = (id?: string) =>
-  useQuery({ queryKey: ['graph', 'cluster', id], queryFn: () => api.get<GraphData & { cluster: any }>(`/graph/cluster/${id}`), enabled: !!id });
+  useQuery({ queryKey: ['graph', role(), 'cluster', id], queryFn: () => api.get<GraphData & { cluster: any }>(`/graph/cluster/${id}`), enabled: !!id });
 
 export const useOffenders = (params: Record<string, unknown>) =>
-  useQuery({ queryKey: ['offenders', params], queryFn: () => api.get<Paged<Offender>>(`/offenders${qs(params)}`) });
+  useQuery({ queryKey: ['offenders', role(), params], queryFn: () => api.get<Paged<Offender>>(`/offenders${qs(params)}`) });
 export const useOffender = (id?: string) =>
-  useQuery({ queryKey: ['offender', id], queryFn: () => api.get<Offender>(`/offenders/${id}`), enabled: !!id });
+  useQuery({ queryKey: ['offender', role(), id], queryFn: () => api.get<Offender>(`/offenders/${id}`), enabled: !!id });
 
 export const useHealthCases = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['health', role(), params], queryFn: () => api.get<Paged<HealthRow>>(`/health/cases${qs(params)}`) });
@@ -83,13 +89,13 @@ export const useOccasions = (explain = true) =>
   useQuery({ queryKey: ['occasions', role(), explain], queryFn: () => api.get<any>(`/analytics/occasions${qs({ explain })}`), staleTime: Infinity });
 
 export const useSocio = () =>
-  useQuery({ queryKey: ['socio'], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });
+  useQuery({ queryKey: ['socio', role()], queryFn: () => api.get<any>('/analytics/socio'), staleTime: Infinity });
 export const useForecast = () =>
-  useQuery({ queryKey: ['forecast'], queryFn: () => api.get<any>('/analytics/forecast'), staleTime: Infinity });
+  useQuery({ queryKey: ['forecast', role()], queryFn: () => api.get<any>('/analytics/forecast?explain=true'), staleTime: Infinity });
 export const useNational = () =>
   useQuery({ queryKey: ['national'], queryFn: () => api.get<any>('/geo/national'), staleTime: Infinity });
 export const useVulnerability = (enabled: boolean) =>
-  useQuery({ queryKey: ['vulnerability'], queryFn: () => api.get<any>('/analytics/vulnerability'), enabled });
+  useQuery({ queryKey: ['vulnerability', role()], queryFn: () => api.get<any>('/analytics/vulnerability'), enabled });
 export const useAudit = (enabled: boolean) =>
   useQuery({ queryKey: ['audit', role()], queryFn: () => api.get<{ items: any[] }>('/audit?limit=200'), enabled });
 

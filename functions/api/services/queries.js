@@ -907,14 +907,45 @@ module.exports = {
   },
   // Forecast rows are keyed by districtId only; join the name here so the client never
   // has to hold a second lookup just to label a chart.
-  forecast: () => {
+  // Took no user at all, so a district officer's "what next" tab showed the state
+  // projection -- the one number they cannot act on. Scoped, it leads with their own.
+  forecast: (user) => {
     const db = load();
     const names = db.lookups.districts;
     const withNames = (db.forecast.districts || []).map((d) => ({
       ...d,
       districtName: (names.get(String(d.districtId)) || {}).DistrictName || `District ${d.districtId}`,
     }));
-    return { ...db.forecast, districts: withNames };
+    const base = { ...db.forecast, districts: withNames };
+
+    // Ranked movers are useful at both tiers: state needs to know where to look, a
+    // district needs to know where it stands among comparable places.
+    const rising = withNames.filter((d) => d.direction === 'rising')
+      .sort((a, b) => b.changePct - a.changePct);
+    const falling = withNames.filter((d) => d.direction !== 'rising')
+      .sort((a, b) => a.changePct - b.changePct);
+    base.movers = { rising: rising.slice(0, 6), falling: falling.slice(0, 6) };
+
+    const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+    if (!narrowed) return { ...base, scope: 'state' };
+
+    const did = String(user.districtId);
+    const me = withNames.find((d) => String(d.districtId) === did);
+    if (!me) return { ...base, scope: 'state' };
+    const rank = [...withNames].sort((a, b) => b.changePct - a.changePct)
+      .findIndex((d) => String(d.districtId) === did) + 1;
+
+    return {
+      ...base,
+      scope: 'district',
+      focus: {
+        ...me,
+        rankByChange: rank,
+        ofDistricts: withNames.length,
+        // A projection is only actionable next to what it is projecting from.
+        vsStateChangePct: Math.round((me.changePct - (base.state?.changePct ?? 0)) * 10) / 10,
+      },
+    };
   },
   alerts: (user) => load().alerts,
   evalReport: () => load().evalReport,

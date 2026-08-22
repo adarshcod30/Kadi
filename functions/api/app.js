@@ -285,7 +285,41 @@ function buildApp() {
     });
     return { ...o, insight: text, insightSource: source };
   }));
-  r.get('/analytics/forecast', handle(async () => q.forecast()));
+  r.get('/analytics/forecast', handle(async (req) => {
+    const f = q.forecast(req.user);
+    if (String(req.query.explain) !== 'true') return f;
+    const districtView = f.scope === 'district';
+    const facts = districtView ? {
+      scope: `${f.focus.districtName} only`,
+      horizonMonths: f.horizonMonths,
+      recentMonthlyAverage: f.focus.recentAvg,
+      nextMonthProjection: f.focus.nextMonth,
+      changeVsRecentAverage: `${f.focus.changePct}%`,
+      direction: f.focus.direction,
+      rankAmongDistrictsByChange: `${f.focus.rankByChange} of ${f.focus.ofDistricts}`,
+      comparedWithStateTrend: `${f.focus.vsStateChangePct}% points`,
+      backtestErrorPct: f.accuracy && f.accuracy.mape,
+    } : {
+      scope: 'Karnataka, 31 districts',
+      horizonMonths: f.horizonMonths,
+      stateNextMonth: f.state && f.state.nextMonth,
+      stateChange: f.state && `${f.state.changePct}%`,
+      backtestErrorPct: f.accuracy && f.accuracy.mape,
+      districtsRising: (f.movers.rising || []).length,
+      fastestRising: (f.movers.rising || []).slice(0, 4).map((d) => ({
+        district: d.districtName, nextMonth: d.nextMonth,
+        recentAverage: d.recentAvg, change: `${d.changePct}%`,
+      })),
+      fastestFalling: (f.movers.falling || []).slice(0, 3).map((d) => ({
+        district: d.districtName, change: `${d.changePct}%`,
+      })),
+    };
+    const { text, source } = await insight.generate(
+      req, districtView ? 'three-month projection for one district'
+        : 'three-month crime projection across Karnataka', facts, { maxTokens: 220 },
+    );
+    return { ...f, insight: text, insightSource: source };
+  }));
 
   // assistant
   r.post('/assistant/query', handle(async (req) => {

@@ -135,6 +135,86 @@ function WhyHere({ socio }: { socio: any }) {
   );
 }
 
+function WhatNextBrief({ fc, districtView }: { fc: any; districtView: boolean }) {
+  if (!fc) return <div className="card"><Skeleton rows={4} /></div>;
+  const f = fc.focus;
+  const movers = fc.movers || { rising: [], falling: [] };
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-kadi-blue" />
+        What this means — {districtView && f ? f.districtName : 'Karnataka'}</span>}
+      action={<Hint text="A projection is only useful next to what it is projecting from, and next to how wrong the model has been. The backtest error is measured by hiding the last three months, predicting them, and scoring against what actually happened." />}>
+      <div className="p-4 space-y-4">
+        {districtView && f && (
+          <div className="grid sm:grid-cols-3 gap-2">
+            <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5">
+              <div className="label mb-0.5">Next month here</div>
+              <div className="font-num text-xl text-ink">{f.nextMonth}</div>
+              <div className="text-[11.5px] text-ink-muted">
+                against a recent average of {f.recentAvg}
+              </div>
+            </div>
+            <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5">
+              <div className="label mb-0.5">Direction</div>
+              <div className={`font-num text-xl ${f.changePct > 0 ? 'text-danger' : 'text-kadi-teal'}`}>
+                {f.changePct > 0 ? '+' : ''}{f.changePct}%
+              </div>
+              <div className="text-[11.5px] text-ink-muted">
+                {f.vsStateChangePct > 0 ? '+' : ''}{f.vsStateChangePct} pts vs the state trend
+              </div>
+            </div>
+            <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5">
+              <div className="label mb-0.5">Among districts</div>
+              <div className="font-num text-xl text-ink">#{f.rankByChange}</div>
+              <div className="text-[11.5px] text-ink-muted">
+                of {f.ofDistricts}, ranked by change
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <div className="label mb-1 flex items-center gap-1.5">
+              <TrendingUp size={12} className="text-danger" /> Rising fastest
+            </div>
+            {(movers.rising || []).length === 0 && (
+              <div className="text-[12.5px] text-ink-muted">No district is projected to rise.</div>
+            )}
+            {(movers.rising || []).slice(0, 5).map((d: any) => (
+              <div key={d.districtId} className="flex items-center gap-2 py-1 border-b border-line/50 last:border-0">
+                <span className="text-[12.5px] text-ink flex-1 truncate">{d.districtName}</span>
+                <span className="font-num text-[12px] text-ink-muted">{d.recentAvg} → {d.nextMonth}</span>
+                <span className="font-num text-[12px] text-danger w-14 text-right">+{d.changePct}%</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="label mb-1 flex items-center gap-1.5">
+              <TrendingDown size={12} className="text-kadi-teal" /> Falling fastest
+            </div>
+            {(movers.falling || []).slice(0, 5).map((d: any) => (
+              <div key={d.districtId} className="flex items-center gap-2 py-1 border-b border-line/50 last:border-0">
+                <span className="text-[12.5px] text-ink flex-1 truncate">{d.districtName}</span>
+                <span className="font-num text-[12px] text-ink-muted">{d.recentAvg} → {d.nextMonth}</span>
+                <span className="font-num text-[12px] text-kadi-teal w-14 text-right">{d.changePct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {fc.accuracy && (
+          <div className="text-[11.5px] text-ink-subtle border-t border-line pt-2">
+            Read these against the model&rsquo;s measured error: <b className="font-num text-ink-muted">
+            {fc.accuracy.mape}% MAPE</b> on {fc.accuracy.holdoutMonths} withheld months. A
+            projected move smaller than that is inside the noise.
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function Outliers({ anomalies }: { anomalies: any }) {
   if (!anomalies) return <div className="card"><Skeleton rows={4} /></div>;
   const cases = anomalies.cases || [];
@@ -553,11 +633,14 @@ export default function Intelligence() {
 
   // History and forecast share one series so the confidence band joins the actual line.
   const stateSeries = useMemo(() => {
-    const hist = (fc?.state?.history || []).map((h: any) => ({
+    // A district officer needs their OWN curve here. The chart was hard-wired to fc.state,
+    // so the "what next" tab projected Karnataka at someone running one district.
+    const src = fc?.scope === 'district' && fc?.focus ? fc.focus : fc?.state;
+    const hist = (src?.history || []).map((h: any) => ({
       month: h.month, actual: h.count, band: null as any,
     }));
     const last = hist[hist.length - 1];
-    const proj = (fc?.state?.forecast || []).map((p: any) => ({
+    const proj = (src?.forecast || []).map((p: any) => ({
       month: p.month, predicted: p.predicted, band: [p.lower, p.upper],
     }));
     // stitch: repeat the last actual as the forecast's first anchor so the line connects
@@ -807,10 +890,16 @@ export default function Intelligence() {
       {tab === 'when' && <OccasionPanels occ={occ} />}
 
       {tab === 'next' && <>
+      {/* The Sparkles icon promises intelligence, so the tab has to lead with a reading of
+          the projection rather than a chart the viewer must interpret unaided. */}
+      {tab === 'next' && <AiNote kind="forecast" text={fc?.insight} />}
+      <motion.div variants={rise}>
+        <WhatNextBrief fc={fc} districtView={districtView} />
+      </motion.div>
       {/* ---- Forecast ---- */}
       <motion.div variants={rise}>
         <Section
-          title={<span className="flex items-center gap-2"><Target size={15} className="text-kadi-blue" />State-wide forecast — next {fc?.horizonMonths || 3} months</span>}
+          title={<span className="flex items-center gap-2"><Target size={15} className="text-kadi-blue" />{fc?.scope === 'district' && fc?.focus ? `${fc.focus.districtName} forecast` : 'State-wide forecast'} — next {fc?.horizonMonths || 3} months</span>}
           action={<Hint text="Linear trend plus month-of-year seasonality. The shaded band is the 95% interval. Accuracy is a hold-out backtest: the last 3 months were hidden from the model, then predicted and scored." />}
         >
           <div className="p-4">
