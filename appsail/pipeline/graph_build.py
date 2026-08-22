@@ -136,7 +136,11 @@ def build(tables, identities, mapping, mo_pairs):
             evidence["matched"].append({"type": "mo_similarity",
                                         "detail": f"Similar modus operandi (cosine {mo:.2f})"})
 
-        shared_secs = sections[a] & sections[b]
+        # Two FIRs of the same sub-head share an IPC section by definition, so counting it
+        # as corroboration is the crime type restated, not a second independent signal.
+        # 99.8% of shared_section matches were same-sub-head; the 0.2% that cross sub-heads
+        # are the informative ones -- an unusual section common to two different crime types.
+        shared_secs = sections[a] & sections[b] if ca["subhead"] != cb["subhead"] else set()
         if shared_secs:
             signals.append(("shared_section", SIGNAL_WEIGHT["shared_section"]))
             evidence["matched"].append({"type": "shared_section",

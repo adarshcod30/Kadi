@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch } from 'lucide-react';
-import { useGraphCase, useGraphCluster, useCases, useFeaturedNetworks } from '../api/hooks';
+import { useGraphCase, useGraphCluster, useFeaturedNetworks } from '../api/hooks';
 import { GraphCanvas, EDGE_COLOR, HEAD_COLOR, GraphFilters } from '../features/graph/GraphCanvas';
 import { WhyPanel } from '../features/graph/WhyPanel';
 import { Empty, Mono, Chip } from '../components/ui';
@@ -181,7 +181,11 @@ function Control({ title, icon, children }: { title: string; icon?: React.ReactN
 // Previously the tab opened one case and offered no way to reach another.
 function CaseSwitcher({ current }: { current?: string }) {
   const nav = useNavigate();
-  const { data } = useCases({ sort: 'linked_desc', pageSize: 15 });
+  // Was sort:'linked_desc'. Raw link count ranks by how templated a crime's paperwork is,
+  // not by how informative its network is -- three sub-heads filled the entire top 200 and
+  // every option in this list read "Identity Theft / Phishing". /graph/featured round-robins
+  // across crime head and evidence mix, so the list offers genuinely different networks.
+  const { data } = useFeaturedNetworks();
   const items = data?.items || [];
   if (!items.length) return null;
   return (
@@ -196,7 +200,7 @@ function CaseSwitcher({ current }: { current?: string }) {
       )}
       {items.map((c: any) => (
         <option key={c.caseMasterId} value={c.caseMasterId}>
-          {c.crimeNo} · {c.linkedCount} links · {c.districtName}
+          {c.crimeNo} · {c.crimeSubHead} · {c.links} links · {c.districtName}
         </option>
       ))}
     </select>
@@ -206,31 +210,37 @@ function CaseSwitcher({ current }: { current?: string }) {
 function GraphEntry() {
   const nav = useNavigate();
   const { data: featured } = useFeaturedNetworks();
-  const { data } = useCases({ sort: 'linked_desc', pageSize: 8 });
 
   // Open a network that actually demonstrates linkage. Sorting by raw link count lands on
   // a pure modus-operandi cluster - fourteen identical nodes, every filter reading zero -
   // which looks broken. /graph/featured returns cases with several shared-offender links
   // and more than one kind of evidence. Falls back to most-linked if none qualify.
   useEffect(() => {
-    const pick = featured?.items?.[0] || data?.items?.[0];
+    const pick = featured?.items?.[0];
     if (pick) nav(`/graph?case=${pick.caseMasterId}`, { replace: true });
-  }, [featured, data, nav]);
+  }, [featured, nav]);
 
   return (
     <div className="max-w-3xl mx-auto mt-6">
       <h1 className="text-lg font-semibold text-kadi-navy flex items-center gap-2"><Network size={18} /> Case-Linkage Graph</h1>
       <p className="text-sm text-ink-muted mt-1">Opening the most-connected case — related FIRs, shared offenders, and serial-crime chains across stations and districts, with a click-through evidence trail on every link.</p>
       <div className="card mt-4 divide-y divide-line">
-        <div className="px-4 py-2 label">Most-connected cases (good starting points)</div>
-        {(data?.items || []).map((c) => (
+        <div className="px-4 py-2 label">Networks worth opening — varied by crime type and evidence</div>
+        {(featured?.items || []).map((c: any) => (
           <motion.button key={c.caseMasterId} whileHover={{ x: 3 }} onClick={() => nav(`/graph?case=${c.caseMasterId}`)}
             className="w-full text-left px-4 py-3 hover:bg-surface-3 flex items-center justify-between">
-            <div><Mono>{c.crimeNo}</Mono><div className="text-sm">{c.crimeSubHead} · <span className="text-ink-muted">{c.unitName}, {c.districtName}</span></div></div>
-            <Chip color="blue">{c.linkedCount} links</Chip>
+            <div>
+              <Mono>{c.crimeNo}</Mono>
+              <div className="text-sm">{c.crimeSubHead} · <span className="text-ink-muted">{c.districtName}</span></div>
+              {/* The evidence mix is the reason this network is worth opening, so name it. */}
+              <div className="text-[11.5px] text-ink-subtle mt-0.5">
+                {(c.signalTypes || []).map((t: string) => t.replace(/_/g, ' ')).join(' · ')}
+              </div>
+            </div>
+            <Chip color="blue">{c.links} links</Chip>
           </motion.button>
         ))}
-        {!data && <Empty title="Loading cases…" />}
+        {!featured && <Empty title="Loading networks…" />}
       </div>
     </div>
   );

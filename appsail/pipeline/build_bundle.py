@@ -40,7 +40,11 @@ SMALL = ["socio", "forecast", "stats", "zones", "occasions", "district_stats", "
 LOOKUPS = ["District", "Unit", "CrimeHead", "CrimeSubHead", "CaseStatusMaster",
            "CaseCategory", "GravityOffence", "GenderMaster", "Court", "Section", "Act"]
 
-MAX_NEIGHBOURS = 14   # ego networks are unreadable past this; the UI caps well below it
+# Sized to hold a whole ego network rather than truncate it. The cap used to be 14 while
+# case_linked_count was written from the UNCAPPED graph, so the switcher advertised "125
+# links" and the canvas drew 14. With MO boilerplate no longer generating mega-hubs the
+# busiest case has 21 neighbours, so this now shows the real network for every case but one.
+MAX_NEIGHBOURS = 24
 
 
 def size_mb(p):
