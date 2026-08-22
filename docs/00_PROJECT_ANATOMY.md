@@ -379,6 +379,54 @@ This scoping is **genuinely enforced** — out-of-scope reads are refused, not h
 
 ---
 
+## Link quality — distinctiveness as the governing rule
+
+The case switcher once offered fifteen networks that all read "Identity Theft / Phishing",
+and opening one drew a star of identical nodes: `Shared offender 0, Similar MO 14, Shared
+section 14`. Two signals were carrying no information:
+
+| Signal | Measurement | Meaning |
+|---|---|---|
+| `mo_similarity` | **92.3%** scored cosine exactly 1.00 | Character-identical text, not similar method |
+| `shared_section` | **99.8%** were same-sub-head | The section is implied by the crime type |
+
+A "2 kinds of corroborating evidence" badge on such an edge meant one boilerplate text match
+plus the crime type restated. This is also why 89% of edges scored exactly 1.0 and why the
+raw strength slider had to become a corroboration filter.
+
+Both now follow the rule entity resolution already applies to surnames through
+`SURNAME_RARE`: **a feature is evidence only if it is distinctive.** A name shared by half
+the state identifies nobody; neither does a narrative shared by 140 FIRs.
+
+- `MO_TEMPLATE_MAX = 20` — MO text appearing in more than 20 cases of a sub-head is
+  boilerplate and generates no edge, whatever the cosine.
+- `shared_section` counts only across **differing** sub-heads. An unusual section common to
+  two different crime types is informative; the same section on two cases of one type is not.
+
+| | Before | After |
+|---|---|---|
+| Highest link count | 140 | 21 |
+| Cases with >50 links | 105 | 0 |
+| Distinct sub-heads in top 200 | 3 | 11 |
+| `shared_section` signals | 137,596 | 338 |
+
+**Headline figures are untouched** — 127 networks, 197 cross-district, 441 offenders, 18,901
+flagged, ground-truth recovery 100%. Those run on shared-offender relationships, so what was
+removed was noise, not intelligence. That invariance is the evidence the gate is surgical.
+
+### Two display defects found in the same investigation
+
+`case_linked_count` was written from the **uncapped** graph while `build_bundle.py` capped
+adjacency at 14 neighbours, so the switcher advertised "125 links" and the canvas drew 14.
+With mega-hubs gone the busiest case has 21 neighbours; `MAX_NEIGHBOURS` is now 24 and the
+label matches what renders.
+
+Both graph lists sorted by raw link count — which ranks by how templated a crime's paperwork
+is, not how informative its network is. They now use `/graph/featured`, which round-robins
+across crime head and evidence mix. The page had imported that hook already and used it only
+to pick which case to auto-open.
+
+
 ## Adaptive thresholds — why one constant could not work
 
 Two detectors originally used a single global constant, and both failed the same way: the

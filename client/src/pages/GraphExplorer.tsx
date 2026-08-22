@@ -113,14 +113,19 @@ export default function GraphExplorer() {
           </Control>
 
           <Control title={`Corroborating evidence · ${minEvidence}+ kind${minEvidence > 1 ? 's' : ''}`}>
-            <input type="range" min={1} max={4} step={1} value={minEvidence}
+            {/* Max is 3, not 4. Since shared_section stopped counting between cases of the
+                same sub-head — where the section is implied by the crime type — no edge
+                carries four independent kinds. A slider position nothing can satisfy reads
+                as a broken filter. */}
+            <input type="range" min={1} max={3} step={1} value={minEvidence}
               onChange={(e) => setMinEvidence(Number(e.target.value))}
               className="w-full accent-kadi-blue" />
             <p className="text-[11px] text-ink-muted mt-1">
-              How many independent kinds of evidence back each link. Two cases sharing an
-              offender <em>and</em> a modus operandi is a stronger claim than either alone.
-              Raw match scores do not discriminate here — 89% of edges score exactly 1.0 — so
-              this filters on corroboration instead.
+              How many <em>independent</em> kinds of evidence back each link. Two cases sharing
+              an offender <em>and</em> a modus operandi is a stronger claim than either alone.
+              Raw match scores cannot separate these — 86% of edges score exactly 1.0 — so this
+              filters on corroboration instead. Across the state 3,860 links carry two kinds or
+              more; those are the ones that survive a defence lawyer.
             </p>
           </Control>
 
