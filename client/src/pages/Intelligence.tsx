@@ -7,8 +7,8 @@ import {
   ComposedChart, Area, Line, ScatterChart, Scatter, BarChart, Bar, Cell,
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles } from 'lucide-react';
-import { useSocio, useForecast, useOccasions, useZones, useMe } from '../api/hooks';
+import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock } from 'lucide-react';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
 
@@ -64,6 +64,77 @@ const ZONE_STYLE: Record<string, { dot: string; label: string; ring?: string }> 
 // historical averages". Every area is measured against its OWN trailing baseline, so a
 // consistently busy district does not sit permanently red -- which is what would happen if
 // this ranked by volume, and is exactly the failure per-capita analysis exists to correct.
+function SpatioTemporal({ hotspots }: { hotspots: any }) {
+  if (!hotspots) return null;
+  const rows = hotspots.spatiotemporal || [];
+  const total = (hotspots.hotspots || []).length;
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Clock size={15} className="text-kadi-blue" />
+        Spatiotemporal clusters — where, layered with when</span>}
+      action={<Hint text="A hotspot on a map tells a commander where to go but not when to be there. Each cluster's incidents are binned into six-hour shifts and tested against chance: with four windows, a small cluster lands entirely in one of them often enough that ranking on percentage alone would surface noise first. Only clusters that beat that test (p < 0.01) are listed." />}>
+      <div className="p-4">
+        {rows.length === 0 ? (
+          <div className="text-[12.5px] text-ink-muted">
+            None of the {total} spatial clusters here offend on a schedule tighter than chance
+            would produce. They are places, not places-at-a-time.
+          </div>
+        ) : (
+          <>
+            <div className="text-[12.5px] text-ink-muted mb-3">
+              {rows.length} of {total} clusters offend in a specific shift far more than an even
+              spread would give — these convert directly into a patrol window.
+            </div>
+            <div className="space-y-2">
+              {rows.map((h: any) => {
+                const t = h.temporal;
+                return (
+                  <div key={h.cellId} className="rounded-card border border-line bg-surface-2 px-3 py-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <b className="text-[13px] text-ink font-num">{t.peakWindow}</b>
+                      <span className="text-[12.5px] text-ink-muted">
+                        {h.districtName || `District ${h.districtId}`}
+                      </span>
+                      <span className="ml-auto font-num text-[12.5px] text-ink">
+                        <b>{t.peakCount}</b> of {h.count} incidents
+                        <span className="text-danger ml-1.5">{t.peakShare}%</span>
+                      </span>
+                    </div>
+                    {/* Four bars, one per shift, so the shape is visible without a chart. */}
+                    <div className="flex gap-1 mt-2">
+                      {t.windows.map((w: any) => (
+                        <div key={w.window} className="flex-1">
+                          <div className="h-1.5 rounded-full bg-line overflow-hidden">
+                            <div className="h-full rounded-full"
+                              style={{ width: `${Math.min(100, w.share)}%`,
+                                       background: w.window === t.peakWindow ? '#C0392B' : '#9AA8B8' }} />
+                          </div>
+                          <div className="text-[10px] text-ink-subtle mt-0.5 text-center">
+                            {w.window.slice(0, 2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[11.5px] text-ink-subtle mt-1.5 flex flex-wrap gap-x-3">
+                      <span>p = <b className="font-num text-ink-muted">{t.pValue}</b></span>
+                      <span>weekend skew <b className="font-num text-ink-muted">×{t.weekendSkew}</b></span>
+                      <span>night share <b className="font-num text-ink-muted">{t.nightShare}%</b></span>
+                      {h.clusterParams && (
+                        <span>clustered at <b className="font-num text-ink-muted">
+                          {(h.clusterParams.epsDeg * 111).toFixed(2)} km</b> for this district</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function ZoneBoard({ zones }: { zones: any }) {
   if (!zones) return <div className="card"><Skeleton rows={4} /></div>;
   const s = zones.summary || {};
@@ -244,6 +315,7 @@ const AXIS = { fontSize: 10, fill: '#5B6B7E' };
 export default function Intelligence() {
   const [tab, setTab] = useState<TabKey>('where');
   const { data: zones } = useZones();
+  const { data: hotspots } = useHotspots();
   const { data: occ } = useOccasions();
   const { data: me } = useMe();
   const districtView = me?.capabilities?.effectiveScope === 'district';
@@ -326,6 +398,11 @@ export default function Intelligence() {
       {tab === 'where' && <>
       <motion.div variants={rise}>
         <ZoneBoard zones={zones} />
+      </motion.div>
+      {/* "Spatiotemporal Clusters: identification of hotspots by layering time of day with
+          location, enabling proactive resource deployment" -- this is that panel. */}
+      <motion.div variants={rise}>
+        <SpatioTemporal hotspots={hotspots} />
       </motion.div>
       {/* Per-capita ranking across districts is a state question. Under "My stations" it
           would answer something the reader did not ask. */}

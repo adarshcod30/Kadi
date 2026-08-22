@@ -38,10 +38,20 @@ export const useHealthSummary = () =>
 
 export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });
+// role() carries the drilled district, and these two were the hooks missing it -- without
+// it a drilled-in officer would be served the previous scope's clusters from cache.
 export const useHotspots = (emerging?: boolean) =>
-  useQuery({ queryKey: ['hotspots', emerging], queryFn: () => api.get<{ hotspots: Hotspot[]; districtCounts: Record<string, number> }>(`/geo/hotspots${qs({ emerging })}`) });
+  useQuery({
+    queryKey: ['hotspots', role(), emerging],
+    queryFn: () => api.get<{
+      hotspots: Hotspot[];
+      districtCounts: Record<string, number>;
+      scope?: 'state' | 'district';
+      spatiotemporal?: Hotspot[];
+    }>(`/geo/hotspots${qs({ emerging })}`),
+  });
 export const useGeoGrid = (params: Record<string, unknown>, enabled = true) =>
-  useQuery({ queryKey: ['geo-grid', params], queryFn: () => api.get<any>(`/geo/grid${qs(params)}`), enabled });
+  useQuery({ queryKey: ['geo-grid', role(), params], queryFn: () => api.get<any>(`/geo/grid${qs(params)}`), enabled });
 export const useDistricts = () =>
   useQuery({ queryKey: ['districts-geo'], queryFn: () => api.get<any>('/geo/districts'), staleTime: Infinity });
 export const useFeaturedNetworks = () =>

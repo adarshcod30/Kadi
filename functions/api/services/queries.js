@@ -354,8 +354,48 @@ function geoGrid(user, q = {}) {
 function hotspots(user, q = {}) {
   const db = load();
   let hs = db.hotspots.hotspots || [];
+
+  // districtId is now assigned during clustering, since the density parameters are
+  // per district. Older bundles lack it, so fall back to the cases inside the cluster.
+  const districtOf = (h) => {
+    if (h.districtId != null && h.districtId !== '') return String(h.districtId);
+    for (const id of (h.caseIds || [])) {
+      const c = db.cases.get(String(id));
+      if (c && c.districtId != null) return String(c.districtId);
+    }
+    return null;
+  };
+  hs = hs.map((h) => {
+    const did = districtOf(h);
+    let districtName = '';
+    for (const id of (h.caseIds || [])) {
+      const c = db.cases.get(String(id));
+      if (c && c.districtName) { districtName = c.districtName; break; }
+    }
+    return { ...h, districtId: did, districtName };
+  });
+
+  const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+  if (narrowed) {
+    const did = String(user.districtId);
+    hs = hs.filter((h) => h.districtId === did);
+  }
   if (q.emerging === 'true') hs = hs.filter((h) => h.emergingFlag);
-  return { hotspots: hs, districtCounts: db.hotspots.districtCounts || {} };
+  if (q.window) hs = hs.filter((h) => h.temporal && h.temporal.peakWindow === q.window);
+
+  return {
+    hotspots: hs,
+    scope: narrowed ? 'district' : 'state',
+    districtCounts: db.hotspots.districtCounts || {},
+    // A spatial cluster answers "where". Adding "when to be there" is the deployable half.
+    // Filtered on the binomial test rather than raw share: with 190 clusters and four
+    // windows, several small ones land entirely in one window by chance, and ranking on
+    // percentage would put exactly those at the top.
+    spatiotemporal: [...hs]
+      .filter((h) => h.temporal && h.temporal.timeConcentrated)
+      .sort((a, b) => a.temporal.pValue - b.temporal.pValue || b.count - a.count)
+      .slice(0, 8),
+  };
 }
 
 // ---------------- vulnerability (analyst/ACP) ----------------
