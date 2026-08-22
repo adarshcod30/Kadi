@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock } from 'lucide-react';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots } from '../api/hooks';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
 
@@ -129,6 +129,85 @@ function WhyHere({ socio }: { socio: any }) {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+function StationRoster({ stations, sort, setSort, q, setQ }: any) {
+  if (!stations) return <div className="card"><Skeleton rows={5} /></div>;
+  const items = stations.items || [];
+  const s = stations.summary || {};
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Building2 size={15} className="text-kadi-blue" />
+        Police stations — all {stations.total}{stations.scope === 'district' ? ' in this district' : ' in Karnataka'}</span>}
+      action={<Hint text="Every station, not only the ones in trouble. Each row shows the station's own bar: the rise that would take it to yellow or red, derived from its own twelve months. Two stations with the same average can have very different bars — a station that never moves is doing something unusual at a smaller rise than one that swings every month." />}>
+      <div className="p-4 space-y-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          <input value={q} onChange={(e: any) => setQ(e.target.value)}
+            placeholder="Filter stations…" className="input text-[13px] flex-1 min-w-[160px]" />
+          <select value={sort} onChange={(e: any) => setSort(e.target.value)}
+            className="input text-[13px] w-auto">
+            <option value="zone">Sort: status</option>
+            <option value="cases_desc">Sort: caseload</option>
+            <option value="name">Sort: name</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(['red_pulsing', 'red', 'yellow', 'normal'] as const).map((z) => (
+            <div key={z} className="flex items-center gap-1.5 rounded-ctl border border-line px-2.5 py-1">
+              <span className={`w-2 h-2 rounded-full ${ZONE_STYLE[z].ring || ''}`}
+                style={{ background: ZONE_STYLE[z].dot }} />
+              <span className="text-[12px] text-ink-muted">{ZONE_STYLE[z].label}</span>
+              <span className="font-num text-[12.5px] text-ink font-medium">{s[z] || 0}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="max-h-[420px] overflow-y-auto -mx-1">
+          <table className="w-full text-[12.5px]">
+            <thead className="sticky top-0 bg-surface">
+              <tr className="text-ink-subtle text-[11px] uppercase tracking-wide">
+                <th className="text-left font-medium py-1.5 px-1">Station</th>
+                <th className="text-right font-medium px-1">FIRs</th>
+                <th className="text-right font-medium px-1">This month</th>
+                <th className="text-right font-medium px-1 hidden sm:table-cell">Its average</th>
+                <th className="text-right font-medium px-1 hidden md:table-cell">Its own bar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((r: any) => (
+                <tr key={r.unitId} className="border-b border-line/50 last:border-0">
+                  <td className="py-1.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE_STYLE[r.zone]?.ring || ''}`}
+                        style={{ background: ZONE_STYLE[r.zone]?.dot || '#3AA76D' }} />
+                      <span className="text-ink truncate">{r.unitName}</span>
+                      {stations.scope !== 'district' && (
+                        <span className="text-ink-subtle text-[11px] truncate hidden lg:inline">
+                          {r.districtName}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="text-right font-num px-1 text-ink-muted">{r.cases?.toLocaleString()}</td>
+                  <td className="text-right font-num px-1 text-ink">{r.current ?? '—'}</td>
+                  <td className="text-right font-num px-1 text-ink-muted hidden sm:table-cell">{r.baseline ?? '—'}</td>
+                  <td className="text-right font-num px-1 text-ink-subtle hidden md:table-cell">
+                    {r.thresholds?.redAt ? `+${r.thresholds.redAt}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-[11.5px] text-ink-subtle">
+          &ldquo;Its own bar&rdquo; is the rise that would make this station red. It differs
+          between stations with the same average, because it is built from how much each one
+          actually varies.
         </div>
       </div>
     </Section>
@@ -387,6 +466,9 @@ export default function Intelligence() {
   const [tab, setTab] = useState<TabKey>('where');
   const { data: zones } = useZones();
   const { data: hotspots } = useHotspots();
+  const [stationSort, setStationSort] = useState<'zone'|'cases_desc'|'name'>('zone');
+  const [stationQ, setStationQ] = useState('');
+  const { data: stations } = useStations({ sort: stationSort, q: stationQ || undefined });
   const { data: occ } = useOccasions();
   const { data: me } = useMe();
   const districtView = me?.capabilities?.effectiveScope === 'district';
@@ -474,6 +556,10 @@ export default function Intelligence() {
           location, enabling proactive resource deployment" -- this is that panel. */}
       <motion.div variants={rise}>
         <SpatioTemporal hotspots={hotspots} />
+      </motion.div>
+      <motion.div variants={rise}>
+        <StationRoster stations={stations} sort={stationSort} setSort={setStationSort}
+          q={stationQ} setQ={setStationQ} />
       </motion.div>
       {/* Per-capita ranking across districts is a state question. Under "My stations" it
           would answer something the reader did not ask. */}

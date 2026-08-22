@@ -164,6 +164,7 @@ function load() {
   const alerts = readJson('alerts', []);
   const stats = readJson('stats', {});
   const zones = readJson('zones', { districts: [], stations: [], summary: {} });
+  const stations = readJson('stations', []);
   const occasions = readJson('occasions', { classes: [], occasions: [] });
   const evalReport = readJson('eval_report', {});
   const districtStats = readJson('district_stats', { districts: [], maxCount: 0 });
@@ -182,7 +183,7 @@ function load() {
     clusters, clustersById,
     hotspots, caseAnomalies, alerts, stats, zones, occasions, evalReport, districtStats, national,
     socio, forecast,
-    healthList, healthByCase, linkedCount,
+    healthList, healthByCase, linkedCount, stations,
   };
   console.log(`[store.mock] loaded ${cases.size} cases, ${offenders.length} offenders in ${DB.loadedMs}ms`);
   return DB;

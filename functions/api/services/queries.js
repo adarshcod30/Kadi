@@ -1,6 +1,9 @@
 // queries.js — read queries over the store, with RBAC scoping + explanation payloads.
 const { load } = require('./store.mock');
 const rbac = require('./rbac');
+
+// Zone severity order, shared wherever zones are ranked.
+const ZONE_RANK = { red_pulsing: 0, red: 1, yellow: 2, normal: 3 };
 const { notFound, forbidden } = require('../lib/envelope');
 
 const FAIRNESS_STATEMENT =
@@ -725,6 +728,43 @@ module.exports = {
         normal: Math.max(0, totalStations - tally.red_pulsing - tally.red - tally.yellow),
         totalStations,
       },
+    };
+  },
+  // The full police-station roster, scoped to the viewer. Every station appears, including
+  // quiet ones -- a list that only shows stations in trouble cannot answer "how is my
+  // district doing overall", and an SI looking for their own station would not find it.
+  stations: (user, q = {}) => {
+    const db = load();
+    let rows = db.stations || [];
+    const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+    if (narrowed) {
+      const did = String(user.districtId);
+      rows = rows.filter((r) => String(r.districtId) === did);
+    }
+    if (q.zone && q.zone !== 'all') rows = rows.filter((r) => r.zone === q.zone);
+    if (q.q) {
+      const needle = String(q.q).toLowerCase();
+      rows = rows.filter((r) => (r.unitName || '').toLowerCase().includes(needle)
+        || (r.districtName || '').toLowerCase().includes(needle));
+    }
+    const sort = q.sort || 'cases_desc';
+    const cmp = {
+      cases_desc: (a, b) => b.cases - a.cases,
+      cases_asc: (a, b) => a.cases - b.cases,
+      name: (a, b) => String(a.unitName).localeCompare(String(b.unitName)),
+      // Severity first, then how far outside its own range it sits.
+      zone: (a, b) => (ZONE_RANK[a.zone] - ZONE_RANK[b.zone]) || (b.zoneZ - a.zoneZ),
+    }[sort] || ((a, b) => b.cases - a.cases);
+    rows = [...rows].sort(cmp);
+    const tally = { red_pulsing: 0, red: 0, yellow: 0, normal: 0 };
+    for (const r of rows) if (tally[r.zone] !== undefined) tally[r.zone] += 1;
+    return {
+      items: rows,
+      total: rows.length,
+      scope: narrowed ? 'district' : 'state',
+      districtId: narrowed ? String(user.districtId) : null,
+      summary: tally,
+      mappable: rows.filter((r) => r.lat != null).length,
     };
   },
   districtStats: () => load().districtStats,

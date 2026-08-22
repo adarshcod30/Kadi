@@ -101,6 +101,56 @@ def run(data_dir: str):
         unit_district=_unit_district,
     )
 
+    # --- police-station roster -------------------------------------------------------
+    # Units carry no coordinates, so a station's map position is the centroid of its own
+    # geocoded FIRs -- its operational centre rather than a building address we do not have.
+    # Stations with no geocoded case still appear in the list; they simply cannot be plotted,
+    # and the payload says so rather than dropping them silently.
+    step("police-station roster")
+    _st_agg = {}
+    for row in cases.itertuples(index=False):
+        u = str(row.PoliceStationID)
+        e = _st_agg.setdefault(u, {"n": 0, "lat": 0.0, "lng": 0.0, "geo": 0, "open": 0})
+        e["n"] += 1
+        try:
+            la, lo = float(row.latitude), float(row.longitude)
+            e["lat"] += la
+            e["lng"] += lo
+            e["geo"] += 1
+        except (TypeError, ValueError):
+            pass
+    # stationBaselines covers every station; zone_report["stations"] only the flagged ones.
+    _zone_by_unit = dict(zone_report.get("stationBaselines", {}))
+    for z in zone_report.get("stations", []):
+        _zone_by_unit[str(z["unitId"])] = z
+    # NOT `stations` -- a later block in this same function rebinds that name to a set(),
+    # which silently replaced this list before it reached write_json 90 lines below.
+    station_roster = []
+    for _, urow in tables["Unit"].iterrows():
+        u = str(urow["UnitID"])
+        agg = _st_agg.get(u, {"n": 0, "geo": 0, "lat": 0.0, "lng": 0.0})
+        did = str(urow.get("DistrictID", ""))
+        z = _zone_by_unit.get(u)
+        station_roster.append({
+            "unitId": u,
+            "unitName": urow.get("UnitName", u),
+            "districtId": did,
+            # _dnames may be keyed by str or int depending on how the CSV parsed; try both
+            # rather than silently emitting an empty name.
+            "districtName": _dnames.get(did) or _dnames.get(int(did) if str(did).isdigit() else did, ""),
+            "cases": agg["n"],
+            "geocoded": agg["geo"],
+            "lat": round(agg["lat"] / agg["geo"], 5) if agg["geo"] else None,
+            "lng": round(agg["lng"] / agg["geo"], 5) if agg["geo"] else None,
+            "zone": (z or {}).get("zone", "normal"),
+            "zoneZ": (z or {}).get("z", 0.0),
+            "current": (z or {}).get("current"),
+            "baseline": (z or {}).get("baseline"),
+            "changePct": (z or {}).get("changePct"),
+            "thresholds": (z or {}).get("thresholds", {}),
+        })
+    station_roster.sort(key=lambda r: (-r["cases"], r["unitName"]))
+
     step("special-occasion patterns")
     _occ_cases = [{
         "crimeRegisteredDate": row.CrimeRegisteredDate,
@@ -234,6 +284,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "hotspots", geo)
     common.write_json(data_dir, "alerts", alerts)
     common.write_json(data_dir, "zones", zone_report)
+    common.write_json(data_dir, "stations", station_roster)
     common.write_json(data_dir, "occasions", occasion_report)
     common.write_json(data_dir, "stats", stats)
     common.write_json(data_dir, "district_stats", district_stats)

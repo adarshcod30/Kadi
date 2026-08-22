@@ -189,3 +189,36 @@ def test_thresholds_are_lower_in_absolute_terms_for_smaller_areas():
                          unit_district={"1": "1"})["districts"][0]["thresholds"]["redAt"]
 
     assert bar(9) < bar(200), "a small district's red line must sit lower in absolute cases"
+
+
+def test_steady_area_is_more_sensitive_than_a_volatile_one():
+    """Same baseline, same rise — the station that never moves should alert first.
+
+    This is what using each area's own observed spread buys over an assumed Poisson
+    variance: 177 of 298 real stations are under-dispersed, and for those sqrt(baseline)
+    overstates the natural swing and hides genuine surges.
+    """
+    import zones as z
+
+    def build(monthly, spike):
+        cases = []
+        for i, n in enumerate(monthly, start=1):
+            for _ in range(n):
+                cases.append({"crimeRegisteredDate": f"2025-{i:02d}-05",
+                              "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        for _ in range(spike):
+            cases.append({"crimeRegisteredDate": "2026-01-05",
+                          "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        cases.append({"crimeRegisteredDate": "2026-02-01",
+                      "districtId": "1", "unitId": "1", "crimeHead": "Theft"})
+        return z.compute(cases, [{"districtId": "1", "districtName": "D"}],
+                         unit_district={"1": "1"})["districts"][0]
+
+    steady = [4] * 12                       # mean 4, sd 0
+    volatile = [1, 7, 2, 8, 1, 6, 3, 7, 2, 8, 1, 6]   # mean ~4, sd ~2.7
+
+    assert abs(sum(steady) / 12 - sum(volatile) / 12) < 0.6, "baselines must match for the test"
+    assert build(steady, 8)["zone"] != "normal", \
+        "a station steady at 4 for a year must alert at 8"
+    assert build(volatile, 8)["z"] < build(steady, 8)["z"], \
+        "the same rise must score lower where that swing is routine"

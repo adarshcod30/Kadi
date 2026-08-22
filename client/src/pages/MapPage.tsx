@@ -9,8 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3 } from 'lucide-react';
-import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe } from '../api/hooks';
+import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3, Building2 } from 'lucide-react';
+import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe, useStations } from '../api/hooks';
 import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
@@ -55,6 +55,7 @@ export default function MapPage() {
   // A district officer should land on their district, not on all Karnataka with their own
   // area as one polygon among 31. State tier still opens on the whole state.
   const [selDistrict, setSelDistrict] = useState<string | null>(null);
+  const [showStations, setShowStations] = useState(false);
   useEffect(() => {
     const cap = me?.capabilities;
     if (cap && cap.effectiveScope === 'district' && cap.districtId && selDistrict === null) {
@@ -66,6 +67,7 @@ export default function MapPage() {
   const { data: national } = useNational();
   const { data: points } = useGeoPoints({ head, limit: 9000 });
   const { data: hotspots } = useHotspots();
+  const { data: stations } = useStations({ sort: 'zone' });
   const { data: lookups } = useLookups();
   // binned density over the FULL dataset (only fetched when the heat layer is showing)
   const { data: grid } = useGeoGrid(
@@ -232,6 +234,67 @@ export default function MapPage() {
     });
   }, [ready, hotspots]);
 
+
+  // ---- police stations, toggled ----
+  // Drawn as circles rather than the square incident markers so the two never read as the
+  // same thing: a station is a fixed place that exists whether or not crime happened there.
+  // Colour carries its zone, so the layer doubles as a status map instead of just dots.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    const feats = (stations?.items || [])
+      .filter((r: any) => r.lat != null && r.lng != null)
+      .map((r: any) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [r.lng, r.lat] },
+        properties: {
+          unitName: r.unitName, districtName: r.districtName, zone: r.zone,
+          cases: r.cases, current: r.current ?? 0, baseline: r.baseline ?? 0,
+          redAt: r.thresholds?.redAt ?? 0,
+        },
+      }));
+    const data = { type: 'FeatureCollection' as const, features: feats };
+    if (!m.getSource('stations')) {
+      m.addSource('stations', { type: 'geojson', data: data as any });
+      m.addLayer({
+        id: 'stations-dot', type: 'circle', source: 'stations',
+        paint: {
+          // Size by caseload so the busy stations are findable at state zoom.
+          'circle-radius': ['interpolate', ['linear'], ['zoom'],
+            5, ['interpolate', ['linear'], ['get', 'cases'], 0, 2.5, 250, 6],
+            11, ['interpolate', ['linear'], ['get', 'cases'], 0, 5, 250, 14]],
+          'circle-color': ['match', ['get', 'zone'],
+            'red_pulsing', '#C0392B', 'red', '#C0392B', 'yellow', '#E0A106', '#2FA8A0'],
+          'circle-stroke-width': 1.4,
+          'circle-stroke-color': '#FFFFFF',
+          'circle-opacity': 0.92,
+        },
+      });
+      m.on('click', 'stations-dot', (e: any) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const p = f.properties;
+        new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div style="font:13px/1.45 system-ui"><b>${p.unitName}</b><br/>`
+            + `<span style="color:#5B6B7F">${p.districtName}</span><br/>`
+            + `${Number(p.cases).toLocaleString()} FIRs total<br/>`
+            + `<b>${p.current}</b> this month vs an average of ${p.baseline}<br/>`
+            + `<span style="color:#5B6B7F">Its own red line: +${p.redAt}</span></div>`,
+          )
+          .addTo(m);
+      });
+      m.on('mouseenter', 'stations-dot', () => { m.getCanvas().style.cursor = 'pointer'; });
+      m.on('mouseleave', 'stations-dot', () => { m.getCanvas().style.cursor = ''; });
+    } else {
+      (m.getSource('stations') as any).setData(data);
+    }
+    if (m.getLayer('stations-dot')) {
+      m.setLayoutProperty('stations-dot', 'visibility', showStations ? 'visible' : 'none');
+    }
+  }, [ready, stations, showStations]);
+
   // ---- drill-down highlight + fly ----
   useEffect(() => {
     const m = map.current;
@@ -267,6 +330,25 @@ export default function MapPage() {
             <option value="">All crime heads</option>
             {lookups?.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </select>
+          {/* Stations are a separate concern from incidents: they are fixed places that
+              exist whether or not anything happened there, so they get their own toggle
+              rather than being folded into the layer switch. */}
+          <button
+            onClick={() => setShowStations((v) => !v)}
+            aria-pressed={showStations}
+            title="Show or hide every police station, coloured by its own status"
+            className={`btn text-sm gap-1.5 ${showStations
+              ? 'bg-kadi-navy text-white hover:bg-kadi-navy700'
+              : 'border border-line text-ink-muted hover:bg-surface-3'}`}
+          >
+            <Building2 size={15} />
+            {showStations ? 'Hide' : 'Show'} stations
+            {stations?.mappable ? (
+              <span className={`font-num text-[11.5px] ${showStations ? 'text-white/70' : 'text-ink-subtle'}`}>
+                {stations.mappable}
+              </span>
+            ) : null}
+          </button>
         </div>
       </div>
 

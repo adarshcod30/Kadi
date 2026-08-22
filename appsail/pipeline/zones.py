@@ -25,39 +25,37 @@ import statistics
 RECENT_DAYS = 60
 BASELINE_MONTHS = 12
 
-# Each area is judged against its OWN natural variation, not one shared constant.
+# Each area is judged against its OWN observed variability -- not one shared constant, and
+# not an assumed distribution either.
 #
-# The previous MIN_ABS_DELTA = 6 was a flat floor applied to every area alike, and it failed
-# in both directions at once. Bengaluru City runs a baseline near 200 FIRs a month, so +6 is
-# a 3% wobble it clears without trying -- the gate never blocked anything there. Kodagu runs
-# near 9, so +6 demanded a 67% surge before the district was even eligible for a colour. A
-# real 40% rise in a small district was silently discarded. The board read 0 red, 0 yellow,
-# 0 pulsing across all 31 districts, which is not calm policing -- it is a dead alert system.
+# Two earlier attempts both failed the same way. A flat MIN_ABS_DELTA = 6 was noise for
+# Bengaluru (~390/month) and demanded a 67% surge from Kodagu (~9). Replacing it with a
+# Poisson bar, sigma = sqrt(baseline), fixed the scaling but kept an assumption that the data
+# does not support: Poisson requires variance == mean, and 177 of 298 stations are
+# UNDER-dispersed (median observed_sd / sqrt(baseline) = 0.96, 10th percentile 0.72). For
+# those, sqrt(baseline) overstates the natural swing and sets the bar too high -- Belagavi
+# Industrial Area scored 2.65 sigma under Poisson but 3.87 against its own actual history.
+# The board stayed almost entirely normal outside Bengaluru as a result.
 #
-# Monthly FIR counts are counts of many largely independent events, so they are approximately
-# Poisson: the natural month-to-month variation around a baseline mean is sqrt(baseline).
-# Scoring in units of that spread makes the bar self-adjusting --
+# So the spread now comes from each area's own twelve months. A station that has held steady
+# at 4 for a year is doing something genuinely unusual at 7; a station that swings 2-9
+# routinely is not. Only its own record can tell those apart.
 #
-#     Bengaluru  baseline 200 -> sigma 14.1 -> red needs roughly +42
-#     Shivamogga baseline  21 -> sigma  4.6 -> red needs roughly +14
-#     Kodagu     baseline   9 -> sigma  3.0 -> red needs roughly +9
+#     Belagavi Industrial   base 2.7  own sd 1.11  ->  7 cases is 3.9 sigma
+#     Davanagere North      base 3.8  own sd 1.53  ->  7 cases is 2.1 sigma
+#     Bengaluru Gate PS     base 4.0  own sd 2.45  -> 47 cases is 17.6 sigma
 #
-# Small districts get a far lower bar in absolute cases while being held to the SAME
-# statistical standard. That is the point: a surge is newsworthy relative to what that area
-# normally looks like, which is the same argument per-capita analysis makes about volume.
-Z_RED = 3.0        # ~3 sigma -- would occur by chance in well under 1% of quiet months
-Z_YELLOW = 2.0     # ~2 sigma -- elevated, worth a look
-Z_WATCH = 1.5      # early warning
-# sqrt() alone is too permissive at the very bottom: a baseline of 1 gives sigma 1, so +2
-# would score 2 sigma on what is almost certainly noise. Two extra FIRs is not an operation.
-#
-# But a single hard floor makes yellow unreachable, because yellow's whole job is small
-# genuine movement. Hassan sat at z=2.01 (5 body-crime cases against a 2.1 baseline) and was
-# discarded for being 0.1 cases under the floor -- a real 2-sigma signal lost to a rounding
-# margin. So the floor is tiered: acting on an area needs a materially larger rise than
-# merely watching it.
-MIN_ABS_FLOOR = 3        # required to go red / pulsing -- something worth deploying against
-MIN_ABS_WATCH = 2        # required to go yellow -- worth an eye, not a van
+Z_RED = 2.5        # acted on
+Z_YELLOW = 1.5     # watched
+# A perfectly flat history gives sd 0, which would make any rise infinitely significant.
+# This floor is a guard against that degenerate case, not a scale.
+SD_FLOOR = 0.8
+# Significance alone is not enough at small baselines, so a rise must also be materially
+# large FOR THIS AREA. A relative test keeps that per-area: 25% of Bengaluru's 390 is ~98
+# cases, 25% of a rural station's 4 is 1. That is the point -- the old flat floor of 3 was
+# still a common scale wearing a different name.
+MIN_RELATIVE_RISE = 0.25
+MIN_ABS_RISE = 1.0   # it must actually go up; blocks rounding noise on tiny baselines        # required to go yellow -- worth an eye, not a van
 
 
 def _month(d):
@@ -92,14 +90,12 @@ def compute(cases, districts, unit_district=None, last_month=None):
     hist = [m for m in months if m < last][-BASELINE_MONTHS:]
     prev = hist[-1] if hist else last
 
-    def classify(current, baseline, previous):
-        """Zone from how far above its OWN baseline an area sits, measured in Poisson sigma.
+    def classify(current, baseline, previous, spread=None):
+        """Zone from how far above its OWN normal an area sits, measured in its own sigma.
 
         Ratio alone cannot decide this. A station going 2.7 -> 7 is +162% and four extra
-        cases; Bengaluru going 200 -> 240 is +20% and forty. The percentage says the small
-        one is the emergency. Sigma says the opposite, and sigma is right: four extra cases
-        is an ordinary month for a station that averages three, while forty extra is well
-        outside anything Bengaluru normally does.
+        cases; Bengaluru going 390 -> 430 is +10% and forty. The percentage says the small
+        one is the emergency. Its own history says both are -- and says why.
 
         Escalation to pulsing needs the rise to still be climbing. A spike that has already
         turned over needs review; one still accelerating needs someone today."""
@@ -107,37 +103,35 @@ def compute(cases, districts, unit_district=None, last_month=None):
             return "normal", 0.0, 0.0
         ratio = current / baseline
         delta = current - baseline
-        sigma = math.sqrt(baseline)
-        z = delta / sigma if sigma > 0 else 0.0
-        rising = current > previous
-        if delta >= MIN_ABS_FLOOR:
-            if z >= Z_RED:
-                return ("red_pulsing" if rising else "red"), ratio, z
-            if z >= Z_YELLOW:
-                return ("red" if rising else "yellow"), ratio, z
-            if z >= Z_WATCH:
-                return "yellow", ratio, z
+        sigma = max(spread if spread is not None else math.sqrt(baseline), SD_FLOOR)
+        z = delta / sigma
+        if delta < MIN_ABS_RISE or (ratio - 1) < MIN_RELATIVE_RISE:
             return "normal", ratio, z
-        # Below the action floor a strong signal can still be watched, never actioned.
-        if delta >= MIN_ABS_WATCH and z >= Z_YELLOW:
+        # Acceleration separates red from pulsing red, and nothing else. Letting it also
+        # promote yellow to red emptied the yellow tier entirely -- 5 pulsing, 3 red, 0
+        # yellow -- because almost everything above baseline is, by definition, rising.
+        rising = current > previous
+        if z >= Z_RED:
+            return ("red_pulsing" if rising else "red"), ratio, z
+        if z >= Z_YELLOW:
             return "yellow", ratio, z
         return "normal", ratio, z
 
-    def thresholds(baseline):
-        """The absolute rise this area needs for each colour, so the UI can show its bar.
+    def thresholds(baseline, spread=None):
+        """The rise this area needs for each colour, so the UI can show its own bar.
 
-        Publishing this is most of the point. An officer in Shivamogga should be able to see
-        that their red line sits at +14 and Bengaluru's at +42, rather than wondering why
-        their district never lights up."""
+        Publishing this is most of the point. An officer should be able to read that their
+        station's red line sits at +3 while Bengaluru City's sits at +98, instead of
+        wondering why their district never lights up."""
         if baseline <= 0:
             return {}
-        sigma = math.sqrt(baseline)
+        sigma = max(spread if spread is not None else math.sqrt(baseline), SD_FLOOR)
+        rel = baseline * MIN_RELATIVE_RISE
         return {
             "baseline": round(baseline, 1),
             "sigma": round(sigma, 2),
-            "yellowAt": max(MIN_ABS_WATCH, round(Z_WATCH * sigma)),
-            "redAt": max(MIN_ABS_FLOOR, round(Z_YELLOW * sigma)),
-            "pulsingAt": max(MIN_ABS_FLOOR, round(Z_RED * sigma)),
+            "yellowAt": max(MIN_ABS_RISE, round(max(Z_YELLOW * sigma, rel), 1)),
+            "redAt": max(MIN_ABS_RISE, round(max(Z_RED * sigma, rel), 1)),
         }
 
     name_of = {str(d.get("districtId")): d.get("districtName") for d in districts}
@@ -148,8 +142,9 @@ def compute(cases, districts, unit_district=None, last_month=None):
         if not base_vals:
             continue
         baseline = statistics.mean(base_vals)
+        spread = statistics.pstdev(base_vals) if len(base_vals) > 1 else None
         current = per_month.get(last, 0)
-        zone, ratio, z = classify(current, baseline, per_month.get(prev, 0))
+        zone, ratio, z = classify(current, baseline, per_month.get(prev, 0), spread)
         # which crime head moved most, so the alert can name a cause rather than a number
         cur_heads = by_district_head[d].get(last, {})
         base_heads = defaultdict(list)
@@ -175,16 +170,17 @@ def compute(cases, districts, unit_district=None, last_month=None):
             if len(hist_vals) < 3:
                 continue                      # too little history to have a baseline
             h_base = statistics.mean(hist_vals)
+            h_spread = statistics.pstdev(hist_vals) if len(hist_vals) > 1 else None
             h_cur = cur_heads.get(h, 0)
             h_prev = by_district_head[d].get(prev, {}).get(h, 0)
-            h_zone, h_ratio, h_z = classify(h_cur, h_base, h_prev)
+            h_zone, h_ratio, h_z = classify(h_cur, h_base, h_prev, h_spread)
             if h_zone == "normal":
                 continue
             cat_rows.append({
                 "crimeHead": h, "zone": h_zone, "current": h_cur,
                 "baseline": round(h_base, 1), "z": round(h_z, 2),
                 "changePct": round((h_ratio - 1) * 100, 1),
-                "thresholds": thresholds(h_base),
+                "thresholds": thresholds(h_base, h_spread),
             })
         cat_rows.sort(key=lambda r: -r["z"])
 
@@ -202,7 +198,7 @@ def compute(cases, districts, unit_district=None, last_month=None):
             "baseline": round(baseline, 1),
             "ratio": round(ratio, 2),
             "z": round(z, 2),
-            "thresholds": thresholds(baseline),
+            "thresholds": thresholds(baseline, spread),
             "changePct": round((ratio - 1) * 100, 1) if baseline else 0.0,
             "driverHead": driver,
             "driverDelta": round(driver_delta, 1),
@@ -216,20 +212,30 @@ def compute(cases, districts, unit_district=None, last_month=None):
     out_d.sort(key=lambda r: -max(r["z"], r.get("categoryZ", 0.0)))
 
     out_s = []
+    all_s = {}
     for u, per_month in by_unit.items():
         base_vals = [per_month.get(m, 0) for m in hist]
         if not base_vals or statistics.mean(base_vals) < 2:   # too small to be meaningful
             continue
         baseline = statistics.mean(base_vals)
+        spread = statistics.pstdev(base_vals) if len(base_vals) > 1 else None
         current = per_month.get(last, 0)
-        zone, ratio, z = classify(current, baseline, per_month.get(prev, 0))
+        zone, ratio, z = classify(current, baseline, per_month.get(prev, 0), spread)
+        # Every station's own bar, whether or not it is lit. An officer whose station is
+        # quiet still needs to see what would count as a rise here -- "why is my station
+        # never red" deserves a number, not a shrug.
+        all_s[u] = {
+            "unitId": u, "zone": zone, "current": current, "z": round(z, 2),
+            "baseline": round(baseline, 1), "changePct": round((ratio - 1) * 100, 1),
+            "thresholds": thresholds(baseline, spread),
+        }
         if zone == "normal":
             continue
         out_s.append({
             "unitId": u,
             "districtId": (unit_district or {}).get(u, ""),
             "zone": zone, "current": current, "z": round(z, 2),
-            "thresholds": thresholds(baseline),
+            "thresholds": thresholds(baseline, spread),
             "baseline": round(baseline, 1), "ratio": round(ratio, 2),
             "changePct": round((ratio - 1) * 100, 1), "month": last,
         })
@@ -241,6 +247,7 @@ def compute(cases, districts, unit_district=None, last_month=None):
     return {
         "districts": out_d,
         "stations": out_s[:60],
+        "stationBaselines": all_s,
         "summary": {
             "month": last,
             "baselineMonths": len(hist),

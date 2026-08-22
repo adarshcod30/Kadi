@@ -14,6 +14,15 @@ export const useMe = () => useQuery({ queryKey: ['me', role()], queryFn: () => a
 export const useLookups = () => useQuery({ queryKey: ['lookups'], queryFn: () => api.get<Lookups>('/lookups'), staleTime: Infinity });
 export const useStats = () => useQuery({ queryKey: ['stats', role()], queryFn: () => api.get<Stats>('/stats') });
 export const useAlerts = () => useQuery({ queryKey: ['alerts', role()], queryFn: () => api.get<Alert[]>('/alerts') });
+export const useStations = (params: Record<string, unknown> = {}) =>
+  useQuery({
+    queryKey: ['stations', role(), params],
+    queryFn: () => api.get<{
+      items: any[]; total: number; scope: 'state' | 'district';
+      summary: Record<string, number>; mappable: number;
+    }>(`/stations${qs(params)}`),
+  });
+
 export const useEval = () => useQuery({ queryKey: ['eval'], queryFn: () => api.get<any>('/eval') });
 
 export const useCases = (params: Record<string, unknown>) =>
