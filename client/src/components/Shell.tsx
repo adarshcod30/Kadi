@@ -38,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data: alerts } = useAlerts();
   const role = getRole();
 
-  const alertsRef = useDismiss<HTMLDivElement>(showAlerts, () => setShowAlerts(false));
+  const alerts_ = useDismiss<HTMLDivElement>(showAlerts, () => setShowAlerts(false), { closeOnLeave: true });
 
   const [search, setSearch] = useState('');
   const doSearch = (e: React.FormEvent) => {
@@ -74,7 +74,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
         <ScopeBadge me={me} />
-        <div className="relative" ref={alertsRef}>
+        <div className="relative" ref={alerts_.ref} {...alerts_.hoverProps}>
           <button onClick={() => setShowAlerts((s) => !s)} className="relative p-1.5 rounded hover:bg-white/10">
             <Bell size={18} />
             {alerts && alerts.length > 0 && (
@@ -154,7 +154,7 @@ function FairnessBanner() {
 // chrome, and the only difference was in figures nobody was comparing side by side.
 function ScopeBadge({ me }: { me: any }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
+  const dismiss = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
   const { data: lookups } = useLookups();
   if (!me) return null;
   const cap = me.capabilities || {};
@@ -174,7 +174,7 @@ function ScopeBadge({ me }: { me: any }) {
   };
 
   return (
-    <div className="relative hidden sm:block" ref={ref}>
+    <div className="relative hidden sm:block" ref={dismiss.ref} {...dismiss.hoverProps}>
       <button onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border transition-colors ${
           atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
@@ -228,12 +228,12 @@ function SidebarFooter({ role, label, scopeLabel, collapsed, onToggleCollapse, o
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
+  const dismiss = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
   const roles: Role[] = ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI'];
   const signOut = () => { localStorage.removeItem('kadi.role'); window.location.href = '/app/login'; };
 
   return (
-    <div className="border-t border-line bg-surface-2/40" ref={ref}>
+    <div className="border-t border-line bg-surface-2/40" ref={dismiss.ref} {...dismiss.hoverProps}>
       <div className={`relative flex items-center ${collapsed ? 'flex-col gap-1 py-2' : 'gap-1 p-2'}`}>
         {/* Opens upward: this sits at the bottom of the viewport, so a menu dropping
             downward would be clipped off-screen. */}
