@@ -6,12 +6,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
-  Globe, MapPin, ChevronDown,
+  Globe, MapPin, ChevronDown, ChevronUp, Check, LogOut,
 } from 'lucide-react';
 import { useMe, useAlerts, useLookups } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
 import { setRole, getRole, Role } from '../lib/api';
 import { SeverityDot } from './ui';
+import { useDismiss } from '../lib/useDismiss';
 
 const NAV = [
   { to: '/', icon: Home, key: 'home', end: true },
@@ -36,6 +37,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data: me } = useMe();
   const { data: alerts } = useAlerts();
   const role = getRole();
+
+  const alertsRef = useDismiss<HTMLDivElement>(showAlerts, () => setShowAlerts(false));
 
   const [search, setSearch] = useState('');
   const doSearch = (e: React.FormEvent) => {
@@ -71,7 +74,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
         <ScopeBadge me={me} />
-        <div className="relative">
+        <div className="relative" ref={alertsRef}>
           <button onClick={() => setShowAlerts((s) => !s)} className="relative p-1.5 rounded hover:bg-white/10">
             <Bell size={18} />
             {alerts && alerts.length > 0 && (
@@ -85,29 +88,35 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar — icon-only below md, labelled (collapsible) from md up */}
         <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all w-14 ${collapsed ? 'md:w-14' : 'md:w-52'}`}>
-          <nav className="flex-1 py-3">
+          <nav className={`flex-1 py-2 space-y-0.5 overflow-y-auto ${collapsed ? 'px-1.5' : 'px-1.5 md:px-2'}`}>
             {visibleNav.map((n) => (
               <NavLink key={n.key} to={n.to} end={n.end} title={t(n.key)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    isActive ? 'text-kadi-blue bg-kadi-blue50 border-r-2 border-kadi-blue' : 'text-ink-muted hover:bg-surface-3'
+                  // Pill-shaped active state rather than a full-bleed band with a right rule.
+                  // The inset pill reads as a selected item; the edge-to-edge band read as a
+                  // section header, which is why the current page never looked current.
+                  `group relative flex items-center gap-3 rounded-ctl px-2.5 py-2 text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-kadi-blue text-white shadow-sm'
+                      : 'text-ink-muted hover:bg-kadi-blue50 hover:text-kadi-navy700'
                   }`}>
-                <n.icon size={20} className="shrink-0" />
-                {!collapsed && <span className="hidden md:inline">{t(n.key)}</span>}
+                {({ isActive }) => (
+                  <>
+                    <n.icon size={19} className={`shrink-0 transition-transform ${isActive ? '' : 'group-hover:scale-110'}`} />
+                    {!collapsed && <span className="hidden md:inline truncate">{t(n.key)}</span>}
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
-          {/* Account control lives here, not the header -- it is the one action that ends
-              the session, so it belongs next to the other chrome-level control (collapse),
-              not mixed in with alerts/search/language which act on the page above it. */}
-          <div className="border-t border-line">
-            <RoleMenu current={role} onChange={(r) => { setRole(r); window.location.reload(); }}
-              label={me?.capabilities.label} collapsed={collapsed} />
-            <button onClick={() => setCollapsed((c) => !c)}
-              className="w-full p-3 text-ink-muted hover:bg-surface-3 border-t border-line hidden md:flex items-center justify-center">
-              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </button>
-          </div>
+          {/* One footer bar, not two stacked strips. The account control and the collapse
+              toggle are both chrome-level -- they act on the session and the sidebar itself,
+              never on the page -- so they share a single row instead of each claiming its own. */}
+          <SidebarFooter
+            role={role} label={me?.capabilities.label} scopeLabel={me?.capabilities.scope}
+            collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)}
+            onChangeRole={(r) => { setRole(r); window.location.reload(); }}
+          />
         </aside>
 
         {/* Main */}
@@ -145,6 +154,7 @@ function FairnessBanner() {
 // chrome, and the only difference was in figures nobody was comparing side by side.
 function ScopeBadge({ me }: { me: any }) {
   const [open, setOpen] = useState(false);
+  const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   const { data: lookups } = useLookups();
   if (!me) return null;
   const cap = me.capabilities || {};
@@ -164,7 +174,7 @@ function ScopeBadge({ me }: { me: any }) {
   };
 
   return (
-    <div className="relative hidden sm:block">
+    <div className="relative hidden sm:block" ref={ref}>
       <button onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border transition-colors ${
           atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
@@ -205,35 +215,76 @@ function ScopeBadge({ me }: { me: any }) {
   );
 }
 
-function RoleMenu({ current, onChange, label, collapsed }: { current: Role; onChange: (r: Role) => void; label?: string; collapsed: boolean }) {
+// The sidebar's footer: who you are signed in as, and the control that collapses the rail.
+//
+// These were two stacked strips -- an identity row above a lone chevron button -- which read
+// as two unrelated features and wasted a whole row on a single icon. Merged into one bar:
+// identity on the left opens the account menu, the chevron on the right collapses. When the
+// rail is collapsed the row reduces to the avatar alone, with the chevron moving beneath it
+// so neither control is lost.
+function SidebarFooter({ role, label, scopeLabel, collapsed, onToggleCollapse, onChangeRole }: {
+  role: Role; label?: string; scopeLabel?: string; collapsed: boolean;
+  onToggleCollapse: () => void; onChangeRole: (r: Role) => void;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   const roles: Role[] = ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI'];
+  const signOut = () => { localStorage.removeItem('kadi.role'); window.location.href = '/app/login'; };
+
   return (
-    <div className="relative">
-      {/* Opens upward, not downward -- this control sits at the bottom of the sidebar, so a
-          menu dropping below it would run off the viewport. */}
-      {open && (
-        <div className="absolute left-2 bottom-full mb-1 w-56 card p-1 z-30 text-ink">
-          <div className="px-3 py-2 text-xs text-ink-muted">{t('switchRole')}</div>
-          {roles.map((r) => (
-            <button key={r} onClick={() => onChange(r)}
-              className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-surface-3 ${r === current ? 'text-kadi-blue font-medium' : ''}`}>{r}</button>
-          ))}
-          <div className="border-t border-line mt-1 pt-1">
-            <button
-              onClick={() => { localStorage.removeItem('kadi.role'); window.location.href = '/app/login'; }}
-              className="w-full text-left px-3 py-2 rounded text-sm text-ink-muted hover:bg-surface-3">
-              {t('signOut')}
-            </button>
+    <div className="border-t border-line bg-surface-2/40" ref={ref}>
+      <div className={`relative flex items-center ${collapsed ? 'flex-col gap-1 py-2' : 'gap-1 p-2'}`}>
+        {/* Opens upward: this sits at the bottom of the viewport, so a menu dropping
+            downward would be clipped off-screen. */}
+        {open && (
+          <div className="absolute left-2 bottom-full mb-2 w-60 card p-1 z-40 text-ink shadow-lg">
+            <div className="px-3 pt-2 pb-1.5 border-b border-line mb-1">
+              <div className="text-[11px] uppercase tracking-wide text-ink-muted">Signed in as</div>
+              <div className="text-sm font-medium text-kadi-navy">{label || role}</div>
+              <div className="text-[11.5px] text-ink-muted capitalize">{scopeLabel === 'state' ? 'State-wide access' : 'District access'}</div>
+            </div>
+            <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-ink-muted">{t('switchRole')}</div>
+            {roles.map((r) => (
+              <button key={r} onClick={() => { setOpen(false); onChangeRole(r); }}
+                className={`w-full text-left px-3 py-1.5 rounded text-sm hover:bg-surface-3 flex items-center gap-2 ${
+                  r === role ? 'text-kadi-blue font-medium' : ''}`}>
+                <span className="w-5 h-5 rounded-full bg-surface-3 grid place-items-center text-[10px] font-semibold shrink-0">{r[0]}</span>
+                {r}
+                {r === role && <Check size={13} className="ml-auto" />}
+              </button>
+            ))}
+            <div className="border-t border-line mt-1 pt-1">
+              <button onClick={signOut}
+                className="w-full text-left px-3 py-2 rounded text-sm text-danger hover:bg-red-50 flex items-center gap-2">
+                <LogOut size={14} /> {t('signOut')}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-      <button onClick={() => setOpen((o) => !o)} title={label || current}
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-ink-muted hover:bg-surface-3 transition-colors">
-        <span className="w-7 h-7 rounded-full bg-kadi-blue50 text-kadi-blue grid place-items-center text-xs font-semibold shrink-0">{current[0]}</span>
-        {!collapsed && <span className="hidden md:inline truncate">{label || current}</span>}
-      </button>
+        )}
+
+        <button onClick={() => setOpen((o) => !o)} title={`${label || role} — account and role`}
+          aria-expanded={open}
+          className={`flex items-center gap-2.5 rounded-ctl transition-colors hover:bg-surface-3 ${
+            collapsed ? 'p-1.5' : 'flex-1 min-w-0 px-2 py-1.5'} ${open ? 'bg-surface-3' : ''}`}>
+          <span className="w-8 h-8 rounded-full bg-kadi-navy text-white grid place-items-center text-xs font-semibold shrink-0">
+            {role[0]}
+          </span>
+          {!collapsed && (
+            <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
+              <span className="text-[13px] font-medium text-ink truncate max-w-[104px]">{label || role}</span>
+              <span className="text-[11px] text-ink-muted">Account &amp; role</span>
+            </span>
+          )}
+          {!collapsed && <ChevronUp size={14} className={`hidden md:block ml-auto shrink-0 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />}
+        </button>
+
+        <button onClick={onToggleCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="hidden md:grid place-items-center w-8 h-8 rounded-ctl text-ink-muted hover:bg-surface-3 hover:text-ink shrink-0">
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      </div>
     </div>
   );
 }

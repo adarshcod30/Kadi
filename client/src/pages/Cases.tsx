@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCases, useLookups, useMe, useCommand } from '../api/hooks';
-import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager } from '../components/ui';
-import { Share2, Download, Loader2 } from 'lucide-react';
-import { api, qs, clampPage, clampPageSize } from '../lib/api';
-import { toCsv, downloadCsv, stamp, collectForExport } from '../lib/csv';
-import type { CaseRow, Paged } from '../lib/types';
+import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager, QuickFilters } from '../components/ui';
+import { Share2 } from 'lucide-react';
+import { clampPage, clampPageSize } from '../lib/api';
 
 const SORTS: [string, string][] = [
   ['date_desc', 'Newest first'],
@@ -16,29 +14,11 @@ const SORTS: [string, string][] = [
   ['crimeno_asc', 'CrimeNo'],
 ];
 
-const EXPORT_CAP = 2000;
-const EXPORT_COLUMNS = [
-  { key: 'crimeNo', label: 'CrimeNo', get: (c: CaseRow) => c.crimeNo },
-  { key: 'registered', label: 'Registered', get: (c: CaseRow) => c.crimeRegisteredDate },
-  { key: 'head', label: 'Crime head', get: (c: CaseRow) => c.crimeHead },
-  { key: 'subhead', label: 'Crime', get: (c: CaseRow) => c.crimeSubHead },
-  { key: 'station', label: 'Station', get: (c: CaseRow) => c.unitName },
-  { key: 'district', label: 'District', get: (c: CaseRow) => c.districtName },
-  { key: 'io', label: 'Investigating officer', get: (c: CaseRow) => c.ioName },
-  { key: 'status', label: 'Status', get: (c: CaseRow) => c.status },
-  { key: 'gravity', label: 'Gravity', get: (c: CaseRow) => c.gravity },
-  { key: 'links', label: 'Linked cases', get: (c: CaseRow) => c.linkedCount },
-  { key: 'health', label: 'Health flag', get: (c: CaseRow) => c.healthSeverity || '' },
-  { key: 'flags', label: 'Flag reasons', get: (c: CaseRow) => (c.healthFlags || []).join('; ') },
-];
-
 export default function Cases() {
   const [params, setParams] = useSearchParams();
   const nav = useNavigate();
   const { data: lookups } = useLookups();
   const { data: me } = useMe();
-  const [exporting, setExporting] = useState(false);
-  const [exportNote, setExportNote] = useState<string | null>(null);
   const q = Object.fromEntries(params.entries());
   const page = clampPage(q.page);
   const pageSize = clampPageSize(q.pageSize, 25);
@@ -103,27 +83,6 @@ export default function Cases() {
     setParams(p);
   };
 
-  // Export follows the filter, not the page -- a supervisor exporting "ageing heinous cases
-  // at my station" wants all of them, not the 25 that happen to be on screen.
-  const doExport = async () => {
-    setExporting(true);
-    setExportNote(null);
-    try {
-      const { rows, total, truncated } = await collectForExport<CaseRow>(
-        (page, size) => api.get<Paged<CaseRow>>(`/cases${qs({ ...q, page, pageSize: size })}`),
-        EXPORT_CAP,
-      );
-      downloadCsv(`KADI_cases_${stamp()}.csv`, toCsv(rows, EXPORT_COLUMNS));
-      // Say so when the file is not the whole filtered set. A CSV named after the filter that
-      // silently holds only its first slice is worse than no export at all.
-      setExportNote(truncated
-        ? `Exported the first ${rows.length.toLocaleString()} of ${total.toLocaleString()} matching cases. Narrow the filter to export the rest.`
-        : `Exported all ${rows.length.toLocaleString()} matching cases.`);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const summary = data?.summary;
 
   return (
@@ -133,57 +92,56 @@ export default function Cases() {
           <h1 className="text-xl font-semibold text-kadi-navy">Cases</h1>
           <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in your scope` : 'Loading…'} · filter by crime head, district, status or gravity. The <b>Links</b> column shows how many other cases each FIR connects to; open any row for its full detail + network.</p>
         </div>
-        <button onClick={doExport} disabled={exporting || !data?.total} className="btn-outline flex items-center gap-1.5 disabled:opacity-40">
-          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          Export CSV
-        </button>
       </div>
-      {exportNote && (
-        <p className="text-[12.5px] text-ink-muted bg-surface-3 border border-line rounded-ctl px-3 py-1.5">{exportNote}</p>
-      )}
 
-      {/* What the current filter actually selected, over the whole result set rather than the
-          page. Each one is a filter in its own right, so they are clickable. */}
+      {/* These read as passive statistics, so they are labelled as the controls they are.
+          Each count is computed over the whole filtered set, and clicking it narrows the
+          register to exactly the cases it counts. */}
       {summary && data && data.total > 0 && (
-        <div className="flex flex-wrap gap-2 text-[12.5px]">
-          {([
-            ['linked', `${summary.linked.toLocaleString()} connect to another case`, q.linked === 'true'],
-            ['flagged', `${summary.flagged.toLocaleString()} carry a health flag`, q.flagged === 'true'],
-            ['severity', `${summary.highSeverity.toLocaleString()} high risk`, q.severity === 'high'],
-            ['gravity', `${summary.heinous.toLocaleString()} heinous`, q.gravity === '1'],
-          ] as const).map(([k, label, on]) => (
-            <button key={k}
-              onClick={() => set(k, on ? '' : k === 'severity' ? 'high' : k === 'gravity' ? '1' : 'true')}
-              className={`px-2.5 py-1 rounded-full border transition-colors ${
-                on ? 'bg-kadi-navy text-white border-kadi-navy' : 'bg-surface-3 text-ink-muted border-line hover:bg-kadi-blue50'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <QuickFilters
+          hint="One click narrows the register to just those cases."
+          items={[
+            { k: 'linked', on: q.linked === 'true', value: 'true',
+              n: summary.linked, label: 'connect to another case',
+              title: 'FIRs sharing an offender, co-accused, MO, location, time window or act & section with at least one other case' },
+            { k: 'flagged', on: q.flagged === 'true', value: 'true',
+              n: summary.flagged, label: 'carry a health flag',
+              title: 'Cases flagged for reporting delay, investigation ageing, pendency, undetected risk or a false-case pattern' },
+            { k: 'severity', on: q.severity === 'high', value: 'high',
+              n: summary.highSeverity, label: 'need attention now',
+              title: 'Cases carrying a high-severity health flag — the subset a supervisor should act on first' },
+            { k: 'gravity', on: q.gravity === '1', value: '1',
+              n: summary.heinous, label: 'are heinous offences',
+              title: 'Offences classified Heinous under the KSP gravity scale' },
+          ]}
+          onToggle={(k, on, value) => set(k, on ? '' : value)}
+        />
       )}
 
-      {/* Filters */}
+      {/* Filters — a grid, not a wrap. Wrapping left "Any gravity" stranded alone on a second
+          row whenever the viewport landed between breakpoints; fixed tracks keep the six
+          controls in one band and reflow them together. */}
       <div className="card p-3 space-y-2">
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
           <input defaultValue={q.search || ''} onKeyDown={(e) => { if (e.key === 'Enter') set('search', (e.target as HTMLInputElement).value); }}
-            placeholder="Search CrimeNo / MO / IO…" className="input w-56" />
-          <select value={q.head || ''} onChange={(e) => set('head', e.target.value)} className="input">
+            placeholder="Search CrimeNo / MO / IO…" className="input w-full min-w-0" />
+          <select value={q.head || ''} onChange={(e) => set('head', e.target.value)} className="input w-full min-w-0">
             <option value="">All crime heads</option>
             {lookups?.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </select>
-          <select value={q.subhead || ''} onChange={(e) => set('subhead', e.target.value)} className="input">
+          <select value={q.subhead || ''} onChange={(e) => set('subhead', e.target.value)} className="input w-full min-w-0">
             <option value="">{q.head ? 'All in this head' : 'All crime types'}</option>
             {subheadOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <select value={q.district || ''} onChange={(e) => set('district', e.target.value)} className="input">
+          <select value={q.district || ''} onChange={(e) => set('district', e.target.value)} className="input w-full min-w-0">
             <option value="">{scope && scope !== 'state' ? 'My district' : 'All districts'}</option>
             {districtOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select value={q.status || ''} onChange={(e) => set('status', e.target.value)} className="input">
+          <select value={q.status || ''} onChange={(e) => set('status', e.target.value)} className="input w-full min-w-0">
             <option value="">Any status</option>
             {lookups?.statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <select value={q.gravity || ''} onChange={(e) => set('gravity', e.target.value)} className="input">
+          <select value={q.gravity || ''} onChange={(e) => set('gravity', e.target.value)} className="input w-full min-w-0">
             <option value="">Any gravity</option>
             {lookups?.gravities.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
@@ -269,11 +227,11 @@ export default function Cases() {
                 <th className="text-left px-4 py-2 font-medium">Crime</th>
                 <th className="text-left px-4 py-2 font-medium">Station / District</th>
                 <th className="text-left px-4 py-2 font-medium">Investigating officer</th>
-                <th className="text-left px-4 py-2 font-medium">Registered</th>
-                <th className="text-left px-4 py-2 font-medium">Status</th>
-                <th className="text-left px-4 py-2 font-medium">Gravity</th>
-                <th className="text-center px-4 py-2 font-medium">Links</th>
-                <th className="text-center px-4 py-2 font-medium">Health</th>
+                <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Registered</th>
+                <th className="text-center px-3 py-2 font-medium">Status</th>
+                <th className="text-center px-3 py-2 font-medium">Gravity</th>
+                <th className="text-center px-3 py-2 font-medium">Links</th>
+                <th className="text-center px-3 py-2 font-medium">Health</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -283,11 +241,13 @@ export default function Cases() {
                   <td className="px-4 py-2.5">{c.crimeSubHead}<div className="text-xs text-ink-muted">{c.crimeHead}</div></td>
                   <td className="px-4 py-2.5">{c.unitName}<div className="text-xs text-ink-muted">{c.districtName}</div></td>
                   <td className="px-4 py-2.5">{c.ioName || '—'}{c.ioRank && <div className="text-xs text-ink-muted">{c.ioRank}</div>}</td>
-                  <td className="px-4 py-2.5 font-num text-ink-muted">{c.crimeRegisteredDate}</td>
-                  <td className="px-4 py-2.5"><StatusChip status={c.status} /></td>
-                  <td className="px-4 py-2.5"><GravityChip gravity={c.gravity} /></td>
-                  <td className="px-4 py-2.5 text-center">{c.linkedCount > 0 ? <Chip color="blue">{c.linkedCount}</Chip> : <span className="text-ink-muted">—</span>}</td>
-                  <td className="px-4 py-2.5 text-center" title={(c.healthFlags || []).join(', ')}><SeverityDot severity={c.healthSeverity} /></td>
+                  {/* An ISO date is one token, not two -- without this the column broke it
+                      across lines as "2026-07-" / "13" and made every row two lines tall. */}
+                  <td className="px-3 py-2.5 font-num text-ink-muted whitespace-nowrap">{c.crimeRegisteredDate}</td>
+                  <td className="px-3 py-2.5 text-center"><StatusChip status={c.status} /></td>
+                  <td className="px-3 py-2.5 text-center"><GravityChip gravity={c.gravity} /></td>
+                  <td className="px-3 py-2.5 text-center">{c.linkedCount > 0 ? <Chip color="blue">{c.linkedCount}</Chip> : <span className="text-ink-muted">—</span>}</td>
+                  <td className="px-3 py-2.5 text-center" title={(c.healthFlags || []).join(', ')}><SeverityDot severity={c.healthSeverity} /></td>
                 </tr>
               ))}
             </tbody>

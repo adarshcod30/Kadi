@@ -32,7 +32,9 @@ h1, h2, h3 { font-family: Ubuntu, 'Open Sans', system-ui, sans-serif; }
   .btn-primary { @apply btn bg-kadi-navy text-white hover:bg-kadi-navy700; }
   .btn-ghost { @apply btn text-ink-muted hover:bg-surface-3; }
   .btn-outline { @apply btn border border-line text-ink hover:bg-surface-3; }
-  .chip { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium; }
+  /* nowrap: status labels like "Under Investigation" were breaking across two lines inside
+     the pill, which made every affected table row twice as tall as its neighbours. */
+  .chip { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap; }
   .input { @apply px-3 py-2 rounded-ctl border border-line bg-surface text-sm focus:border-kadi-blue outline-none; }
   .label { @apply text-xs font-medium text-ink-muted uppercase tracking-wide; }
   .link { @apply text-kadi-blue hover:underline cursor-pointer; }

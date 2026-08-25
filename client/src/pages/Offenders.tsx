@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ShieldCheck, Download, Loader2, Share2 } from 'lucide-react';
+import { ShieldCheck, Share2 } from 'lucide-react';
 import { useOffenders } from '../api/hooks';
-import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager } from '../components/ui';
-import { api, qs, clampPage, clampPageSize } from '../lib/api';
-import { toCsv, downloadCsv, stamp, collectForExport } from '../lib/csv';
-import type { Offender, Paged } from '../lib/types';
+import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager, QuickFilters } from '../components/ui';
+import { clampPage, clampPageSize } from '../lib/api';
 
 const SORTS: [string, string][] = [
   ['risk_desc', 'Highest risk'],
@@ -15,21 +13,6 @@ const SORTS: [string, string][] = [
   ['network_desc', 'Largest network'],
   ['arrests_desc', 'Most arrests'],
   ['name_asc', 'Name (A–Z)'],
-];
-
-const EXPORT_CAP = 1000;
-const EXPORT_COLUMNS = [
-  { key: 'name', label: 'Offender', get: (o: Offender) => o.canonicalName },
-  { key: 'aka', label: 'Known aliases', get: (o: Offender) => (o.nameVariants || []).filter((v) => v !== o.canonicalName).join('; ') },
-  { key: 'risk', label: 'Risk score', get: (o: Offender) => o.riskScore },
-  { key: 'band', label: 'Risk band', get: (o: Offender) => o.band },
-  { key: 'cases', label: 'Cases', get: (o: Offender) => o.distinctCases },
-  { key: 'districts', label: 'Districts', get: (o: Offender) => o.distinctDistricts },
-  { key: 'network', label: 'Known co-offenders', get: (o: Offender) => (o.coOffenders || []).length },
-  { key: 'arrests', label: 'Arrests', get: (o: Offender) => o.arrestCount },
-  { key: 'first', label: 'First seen', get: (o: Offender) => o.firstSeen || '' },
-  { key: 'last', label: 'Last active', get: (o: Offender) => o.lastSeen || '' },
-  { key: 'confidence', label: 'ER confidence', get: (o: Offender) => `${Math.round((o.confidence || 0) * 100)}%` },
 ];
 
 // Days between an ISO date and the corpus's own latest activity date.
@@ -47,8 +30,6 @@ export default function Offenders() {
   // shares with the officer who has to act on it -- "the cross-district high-risk group,
   // sorted by reach" has to survive being pasted into a message.
   const [params, setParams] = useSearchParams();
-  const [exporting, setExporting] = useState(false);
-  const [exportNote, setExportNote] = useState<string | null>(null);
   const q = Object.fromEntries(params.entries());
   const page = clampPage(q.page);
   const pageSize = clampPageSize(q.pageSize, 50);
@@ -89,25 +70,6 @@ export default function Offenders() {
     q.activeDays && { k: 'activeDays', label: `Active in last ${q.activeDays}d` },
   ].filter(Boolean) as { k: string; label: string }[];
 
-  const doExport = async () => {
-    setExporting(true);
-    setExportNote(null);
-    try {
-      const { rows, total, truncated } = await collectForExport<Offender>(
-        (page, size) => api.get<Paged<Offender>>(`/offenders${qs({ ...q, page, pageSize: size })}`),
-        EXPORT_CAP,
-      );
-      downloadCsv(`KADI_watchlist_${stamp()}.csv`, toCsv(rows, EXPORT_COLUMNS));
-      // Say so when the file is not the whole filtered set. A CSV named after the filter that
-      // silently holds only its first slice is worse than no export at all.
-      setExportNote(truncated
-        ? `Exported the first ${rows.length.toLocaleString()} of ${total.toLocaleString()} matching offenders. Narrow the filter to export the rest.`
-        : `Exported all ${rows.length.toLocaleString()} matching offenders.`);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -115,14 +77,7 @@ export default function Offenders() {
           <h1 className="text-xl font-semibold text-kadi-navy">Offender watchlist</h1>
           <p className="text-sm text-ink-muted flex items-center gap-1.5"><ShieldCheck size={14} className="text-kadi-blue" /> Behaviour-based risk only — no caste, religion, or occupation.</p>
         </div>
-        <button onClick={doExport} disabled={exporting || !data?.total} className="btn-outline flex items-center gap-1.5 disabled:opacity-40">
-          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          Export CSV
-        </button>
       </div>
-      {exportNote && (
-        <p className="text-[12.5px] text-ink-muted bg-surface-3 border border-line rounded-ctl px-3 py-1.5">{exportNote}</p>
-      )}
 
       <p className="text-[12.5px] text-ink-muted -mt-1">
         Every person here has <b>two or more</b> cases resolved to one identity — this is the
@@ -131,20 +86,24 @@ export default function Offenders() {
 
       {/* Counts over the whole filtered set, each one a filter in its own right. */}
       {summary && data && data.total > 0 && (
-        <div className="flex flex-wrap gap-2 text-[12.5px]">
-          {([
-            ['band', `${summary.high.toLocaleString()} high risk`, q.band === 'High', 'High'],
-            ['crossDistrict', `${summary.crossDistrict.toLocaleString()} work across districts`, q.crossDistrict === 'true', 'true'],
-            ['networked', `${summary.networked.toLocaleString()} operate in a group`, q.networked === 'true', 'true'],
-            ['lowConfidence', `${summary.needsReview.toLocaleString()} need ER review`, q.lowConfidence === 'true', 'true'],
-          ] as const).map(([k, label, on, val]) => (
-            <button key={k} onClick={() => set(k, on ? '' : val)}
-              className={`px-2.5 py-1 rounded-full border transition-colors ${
-                on ? 'bg-kadi-navy text-white border-kadi-navy' : 'bg-surface-3 text-ink-muted border-line hover:bg-kadi-blue50'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <QuickFilters
+          hint="One click narrows the watchlist to just those offenders."
+          items={[
+            { k: 'band', on: q.band === 'High', value: 'High',
+              n: summary.high, label: 'are high risk',
+              title: 'Behaviour-based risk score of 70 or above — driven by prior count, offence gravity, recency, re-offending after arrest and network centrality. Never caste, religion or occupation.' },
+            { k: 'crossDistrict', on: q.crossDistrict === 'true', value: 'true',
+              n: summary.crossDistrict, label: 'work across districts',
+              title: 'Offenders with cases in two or more districts — the pattern a single station register can never surface' },
+            { k: 'networked', on: q.networked === 'true', value: 'true',
+              n: summary.networked, label: 'operate in a group',
+              title: 'Offenders with at least one known co-offender. This is the same figure the dashboard reports as active networks.' },
+            { k: 'lowConfidence', on: q.lowConfidence === 'true', value: 'true',
+              n: summary.needsReview, label: 'need identity review',
+              title: 'Identities merged from name variants with lower confidence — surfaced for a human to confirm rather than hidden' },
+          ]}
+          onToggle={(k, on, value) => set(k, on ? '' : value)}
+        />
       )}
 
       <div className="card p-3 space-y-2">

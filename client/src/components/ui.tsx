@@ -155,3 +155,43 @@ export function Pager({ page, pageSize, total, onPage, onPageSize }: {
     </div>
   );
 }
+
+// Headline counts that are also filters.
+//
+// Rendered as bare pills these read as passive statistics -- people saw "60 high risk" as a
+// label and never discovered it was the fastest way to isolate those 60. So the row states
+// what it is, the number is given visual weight over its wording, and the active one is
+// filled rather than merely tinted. Each count is computed over the whole filtered set, not
+// the current page, so clicking one always yields exactly the number it shows.
+export function QuickFilters({ items, hint, onToggle }: {
+  items: { k: string; n: number; label: string; on: boolean; value: string; title?: string }[];
+  hint?: string;
+  onToggle: (k: string, on: boolean, value: string) => void;
+}) {
+  const anyOn = items.some((i) => i.on);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-[11px] uppercase tracking-wide text-ink-muted font-medium">Quick filters</span>
+        {hint && <span className="text-[12px] text-ink-muted">{hint}</span>}
+        {anyOn && <span className="text-[11.5px] text-kadi-blue font-medium">· click again to clear</span>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((i) => (
+          <button key={i.k} onClick={() => onToggle(i.k, i.on, i.value)} title={i.title}
+            aria-pressed={i.on}
+            className={`group flex items-baseline gap-1.5 rounded-full border px-3 py-1.5 transition-all ${
+              i.on
+                ? 'bg-kadi-navy text-white border-kadi-navy shadow-sm'
+                : 'bg-surface border-line text-ink-muted hover:border-kadi-blue hover:bg-kadi-blue50 hover:text-kadi-navy700'}`}>
+            <span className={`font-num font-semibold text-[13.5px] ${i.on ? 'text-white' : 'text-kadi-navy'}`}>
+              {i.n.toLocaleString()}
+            </span>
+            <span className="text-[12.5px]">{i.label}</span>
+            {i.on && <X size={11} className="ml-0.5 self-center" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
