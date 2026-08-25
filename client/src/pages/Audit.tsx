@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useMe, useAudit } from '../api/hooks';
+import { useMe, useAudit, AUDIT_LIMIT } from '../api/hooks';
 import { Section, Chip, Skeleton, Empty, Mono, KpiCard } from '../components/ui';
 import { Select } from '../components/Select';
 
@@ -47,7 +47,7 @@ export default function Audit() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-kadi-navy">Audit Log</h1>
-          <p className="text-sm text-ink-muted">Every sensitive read and AI query is recorded — who, what, when.</p>
+          <p className="text-sm text-ink-muted">Every sensitive read and AI query is recorded — who, what, when. Showing the {AUDIT_LIMIT} most recent.</p>
         </div>
         {data?.source && (
           <span className="text-xs text-ink-muted bg-surface-3 rounded-full px-3 py-1 shrink-0" title={
@@ -62,14 +62,15 @@ export default function Audit() {
 
       {!isLoading && items.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard label="Events shown" value={stats.total.toLocaleString()} />
-          <KpiCard label="Case / graph views" value={stats.caseViews.toLocaleString()} accent="#1A6FC4" />
-          <KpiCard label="Offender lookups" value={stats.offenderViews.toLocaleString()} />
-          <KpiCard label="Assistant queries" value={stats.assistantQueries.toLocaleString()} accent="#C9820A" />
+          <KpiCard label="Events shown" value={stats.total.toLocaleString()}
+            hint={stats.total >= AUDIT_LIMIT ? `Most recent ${AUDIT_LIMIT} · older entries retained` : 'All recorded activity'} />
+          <KpiCard label="Case / graph views" value={stats.caseViews.toLocaleString()} accent="#1A6FC4" hint="Within these events" />
+          <KpiCard label="Offender lookups" value={stats.offenderViews.toLocaleString()} hint="Within these events" />
+          <KpiCard label="Assistant queries" value={stats.assistantQueries.toLocaleString()} accent="#C9820A" hint="Within these events" />
         </div>
       )}
 
-      <Section title="Recent activity" action={
+      <Section title={`Recent activity · latest ${Math.min(items.length, AUDIT_LIMIT)}`} action={
         <Select value={actionFilter} onChange={setActionFilter} className="w-56"
           options={[{ value: '', label: 'All actions' }, ...Object.entries(ACTION_LABELS).map(([k, label]) => ({ value: k, label }))]} />
       }>

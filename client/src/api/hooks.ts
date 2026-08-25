@@ -108,10 +108,14 @@ export const useNational = () =>
   useQuery({ queryKey: ['national'], queryFn: () => api.get<any>('/geo/national'), staleTime: Infinity });
 export const useVulnerability = (enabled: boolean) =>
   useQuery({ queryKey: ['vulnerability', role()], queryFn: () => api.get<any>('/analytics/vulnerability'), enabled });
+// The audit view answers "what has been looked at recently", so it shows the most recent 100
+// events and stops. The full trail is retained in the AuditLog table regardless of what this
+// page renders -- capping the view is a display choice, not a retention one.
+export const AUDIT_LIMIT = 100;
 export const useAudit = (enabled: boolean, action?: string) =>
   useQuery({
     queryKey: ['audit', role(), action || 'all'],
-    queryFn: () => api.get<{ items: any[]; source?: string }>(`/audit?limit=200${action ? `&action=${encodeURIComponent(action)}` : ''}`),
+    queryFn: () => api.get<{ items: any[]; source?: string }>(`/audit?limit=${AUDIT_LIMIT}${action ? `&action=${encodeURIComponent(action)}` : ''}`),
     enabled,
   });
 
