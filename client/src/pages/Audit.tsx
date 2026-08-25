@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMe, useAudit } from '../api/hooks';
 import { Section, Chip, Skeleton, Empty, Mono, KpiCard } from '../components/ui';
+import { Select } from '../components/Select';
 
 const ACTION_LABELS: Record<string, string> = {
   view_case: 'Case viewed',
@@ -17,9 +18,11 @@ export default function Audit() {
   const [actionFilter, setActionFilter] = useState('');
   const { data, isLoading } = useAudit(!!allowed, actionFilter || undefined);
 
-  if (!allowed) return <Empty title="Audit log is restricted" hint="Requires state-tier access (SCRB Analyst, DGP, Admin) or SP." />;
-
   const items = data?.items || [];
+  // Every hook must run before the permission check below. Placing this useMemo after the
+  // early return crashed the page outright: /me resolves a beat after first paint, so the
+  // first render bailed out early with one fewer hook than the second, and React threw
+  // "rendered more hooks than during the previous render" (#310) rather than degrading.
   const stats = useMemo(() => {
     const byAction: Record<string, number> = {};
     const users = new Set<string>();
@@ -36,6 +39,8 @@ export default function Audit() {
       distinctUsers: users.size,
     };
   }, [items]);
+
+  if (!allowed) return <Empty title="Audit log is restricted" hint="Requires state-tier access (SCRB Analyst, DGP, Admin) or SP." />;
 
   return (
     <div className="space-y-4">
@@ -65,11 +70,8 @@ export default function Audit() {
       )}
 
       <Section title="Recent activity" action={
-        <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
-          className="text-sm border border-line rounded-ctl px-2 py-1 bg-white text-ink">
-          <option value="">All actions</option>
-          {Object.entries(ACTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-        </select>
+        <Select value={actionFilter} onChange={setActionFilter} className="w-56"
+          options={[{ value: '', label: 'All actions' }, ...Object.entries(ACTION_LABELS).map(([k, label]) => ({ value: k, label }))]} />
       }>
         {isLoading ? <Skeleton rows={10} /> : !items.length ? <Empty title="No audit entries yet" hint="Browse cases / offenders to generate activity." /> : (
           <div className="overflow-x-auto">

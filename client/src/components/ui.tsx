@@ -1,6 +1,7 @@
 // Reusable presentational components — chips, KPI cards, states.
 import { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight, X } from 'lucide-react';
+import { Select } from './Select';
 
 export function Chip({ children, color = 'default', className = '' }: { children: ReactNode; color?: string; className?: string }) {
   const map: Record<string, string> = {
@@ -136,10 +137,9 @@ export function Pager({ page, pageSize, total, onPage, onPageSize }: {
         {onPageSize && (
           <>
             {' · '}
-            <select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}
-              className="bg-transparent border border-line rounded px-1 py-0.5 text-[12px] ml-0.5">
-              {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} per page</option>)}
-            </select>
+            <Select value={String(pageSize)} onChange={(v) => onPageSize(Number(v))}
+              className="inline-block w-32 align-middle ml-0.5"
+              options={PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} per page` }))} />
           </>
         )}
       </span>

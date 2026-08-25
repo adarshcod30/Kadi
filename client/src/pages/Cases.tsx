@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCases, useLookups, useMe, useCommand } from '../api/hooks';
 import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { Share2 } from 'lucide-react';
+import { Select } from '../components/Select';
 import { clampPage, clampPageSize } from '../lib/api';
 
 const SORTS: [string, string][] = [
@@ -125,42 +126,28 @@ export default function Cases() {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
           <input defaultValue={q.search || ''} onKeyDown={(e) => { if (e.key === 'Enter') set('search', (e.target as HTMLInputElement).value); }}
             placeholder="Search CrimeNo / MO / IO…" className="input w-full min-w-0" />
-          <select value={q.head || ''} onChange={(e) => set('head', e.target.value)} className="input w-full min-w-0">
-            <option value="">All crime heads</option>
-            {lookups?.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
-          <select value={q.subhead || ''} onChange={(e) => set('subhead', e.target.value)} className="input w-full min-w-0">
-            <option value="">{q.head ? 'All in this head' : 'All crime types'}</option>
-            {subheadOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <select value={q.district || ''} onChange={(e) => set('district', e.target.value)} className="input w-full min-w-0">
-            <option value="">{scope && scope !== 'state' ? 'My district' : 'All districts'}</option>
-            {districtOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select value={q.status || ''} onChange={(e) => set('status', e.target.value)} className="input w-full min-w-0">
-            <option value="">Any status</option>
-            {lookups?.statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <select value={q.gravity || ''} onChange={(e) => set('gravity', e.target.value)} className="input w-full min-w-0">
-            <option value="">Any gravity</option>
-            {lookups?.gravities.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          <Select value={q.head || ''} onChange={(v) => set('head', v)} className="min-w-0"
+            options={[{ value: '', label: 'All crime heads' }, ...(lookups?.heads || []).map((h) => ({ value: h.id, label: h.name }))]} />
+          <Select value={q.subhead || ''} onChange={(v) => set('subhead', v)} className="min-w-0"
+            options={[{ value: '', label: q.head ? 'All in this head' : 'All crime types' }, ...subheadOptions.map((s) => ({ value: s.id, label: s.name }))]} />
+          <Select value={q.district || ''} onChange={(v) => set('district', v)} className="min-w-0"
+            options={[{ value: '', label: scope && scope !== 'state' ? 'My district' : 'All districts' }, ...districtOptions.map((d) => ({ value: d.id, label: d.name }))]} />
+          <Select value={q.status || ''} onChange={(v) => set('status', v)} className="min-w-0"
+            options={[{ value: '', label: 'Any status' }, ...(lookups?.statuses || []).map((s) => ({ value: s.id, label: s.name }))]} />
+          <Select value={q.gravity || ''} onChange={(v) => set('gravity', v)} className="min-w-0"
+            options={[{ value: '', label: 'Any gravity' }, ...(lookups?.gravities || []).map((g) => ({ value: g.id, label: g.name }))]} />
         </div>
         <div className="flex flex-wrap gap-2 items-center border-t border-line pt-2">
           <label className="text-[12px] text-ink-muted">Registered</label>
           <input type="date" value={q.dateFrom || ''} onChange={(e) => set('dateFrom', e.target.value)} className="input" />
           <span className="text-ink-muted text-sm">→</span>
           <input type="date" value={q.dateTo || ''} onChange={(e) => set('dateTo', e.target.value)} className="input" />
-          <select value={q.severity || ''} onChange={(e) => set('severity', e.target.value)} className="input">
-            <option value="">Any health flag</option>
-            <option value="high">High risk only</option>
-            <option value="medium">Medium risk only</option>
-          </select>
+          <Select value={q.severity || ''} onChange={(v) => set('severity', v)} className="w-44"
+            options={[{ value: '', label: 'Any health flag' }, { value: 'high', label: 'High risk only' }, { value: 'medium', label: 'Medium risk only' }]} />
           <div className="ml-auto flex items-center gap-2">
             <label className="text-[12px] text-ink-muted">Sort</label>
-            <select value={q.sort || 'date_desc'} onChange={(e) => set('sort', e.target.value)} className="input">
-              {SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-            </select>
+            <Select value={q.sort || 'date_desc'} onChange={(v) => set('sort', v)} className="w-40"
+              options={SORTS.map(([v, label]) => ({ value: v, label }))} />
           </div>
         </div>
         {active.length > 0 && <FilterChips items={active} onRemove={(k) => set(k, '')} onClear={clearAll} />}

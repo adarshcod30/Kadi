@@ -11,6 +11,7 @@ import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPi
 import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies } from '../api/hooks';
 import { Section, Skeleton, Chip } from '../components/ui';
 import { Hint, stagger, rise } from '../components/viz';
+import { Select } from '../components/Select';
 
 type TabKey = 'where' | 'why' | 'when' | 'next';
 // District tier asks different questions of the same analytics. "Why is crime distributed
@@ -303,17 +304,14 @@ function StationRoster({ stations, sort, setSort, q, setQ }: any) {
         <div className="flex flex-wrap gap-2 items-center">
           <input value={q} onChange={(e: any) => setQ(e.target.value)}
             placeholder="Filter stations…" className="input text-[13px] flex-1 min-w-[160px]" />
-          <select value={sort} onChange={(e: any) => setSort(e.target.value)}
-            className="input text-[13px] w-auto">
-            <option value="zone">Sort: status</option>
-            <option value="cases_desc">Sort: caseload</option>
-            <option value="name">Sort: name</option>
-          </select>
-          <select value={category} onChange={(e: any) => setCategory(e.target.value)}
-            className="input text-[13px] w-auto">
-            <option value="">All station types</option>
-            {STATION_TYPE_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-          </select>
+          <Select value={sort} onChange={(v) => setSort(v as any)} className="w-40"
+            options={[
+              { value: 'zone', label: 'Sort: status' },
+              { value: 'cases_desc', label: 'Sort: caseload' },
+              { value: 'name', label: 'Sort: name' },
+            ]} />
+          <Select value={category} onChange={setCategory} className="w-52"
+            options={[{ value: '', label: 'All station types' }, ...STATION_TYPE_FILTERS.map(([id, label]) => ({ value: id, label }))]} />
         </div>
 
         <div className="flex flex-wrap gap-2">

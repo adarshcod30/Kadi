@@ -10,6 +10,7 @@ import { GraphCanvas, EDGE_COLOR, HEAD_COLOR, GraphFilters } from '../features/g
 import { WhyPanel } from '../features/graph/WhyPanel';
 import { Empty, Mono, Chip } from '../components/ui';
 import type { GraphNode, GraphEdge } from '../lib/types';
+import { Select } from '../components/Select';
 
 const EDGE_TYPES: [string, string][] = [
   ['shared_offender', 'Shared offender'], ['co_accused', 'Co-accused'], ['mo_similarity', 'Similar MO'],
@@ -285,21 +286,19 @@ function CaseSwitcher({ current }: { current?: string }) {
   const items = data?.items || [];
   if (!items.length) return null;
   return (
-    <select
+    <Select
       value={current || ''}
-      onChange={(e) => nav(`/graph?case=${e.target.value}`)}
-      className="input text-sm max-w-[240px]"
-      aria-label="Switch to another case network"
-    >
-      {!items.some((c: any) => String(c.caseMasterId) === String(current)) && current && (
-        <option value={current}>Current case</option>
-      )}
-      {items.map((c: any) => (
-        <option key={c.caseMasterId} value={c.caseMasterId}>
-          {c.crimeNo} · {c.crimeSubHead} · {c.links} links · {c.districtName}
-        </option>
-      ))}
-    </select>
+      onChange={(v) => nav(`/graph?case=${v}`)}
+      className="max-w-[240px]"
+      title="Switch to another case network"
+      options={[
+        ...(!items.some((c: any) => String(c.caseMasterId) === String(current)) && current
+          ? [{ value: String(current), label: 'Current case' }] : []),
+        ...items.map((c: any) => ({
+          value: String(c.caseMasterId),
+          label: `${c.crimeNo} · ${c.crimeSubHead} · ${c.links} links · ${c.districtName}`,
+        })),
+      ]} />
   );
 }
 

@@ -15,6 +15,7 @@ import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
 import indiaOutline from '../geo/india_outline.json';
+import { Select } from '../components/Select';
 
 // bright, satellite-legible palette
 const HEAD_COLOR: Record<string, string> = {
@@ -383,10 +384,8 @@ export default function MapPage() {
             <button onClick={() => setBasemap('sat')} className={`px-3 py-1.5 ${basemap === 'sat' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Satellite</button>
             <button onClick={() => setBasemap('streets')} className={`px-3 py-1.5 ${basemap === 'streets' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Streets</button>
           </div>
-          <select value={head} onChange={(e) => setHead(e.target.value)} className="input">
-            <option value="">All crime heads</option>
-            {lookups?.heads.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
+          <Select value={head} onChange={setHead} className="w-48"
+            options={[{ value: '', label: 'All crime heads' }, ...(lookups?.heads || []).map((h) => ({ value: h.id, label: h.name }))]} />
           {/* Stations are a separate concern from incidents: they are fixed places that
               exist whether or not anything happened there, so they get their own toggle
               rather than being folded into the layer switch. */}
@@ -407,11 +406,9 @@ export default function MapPage() {
             ) : null}
           </button>
           {showStations && (
-            <select value={stationCategory} onChange={(e) => setStationCategory(e.target.value)}
-              className="input text-sm" title="Filter stations by type">
-              <option value="">All station types</option>
-              {STATION_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-            </select>
+            <Select value={stationCategory} onChange={setStationCategory} className="w-56"
+              title="Filter stations by type"
+              options={[{ value: '', label: 'All station types' }, ...STATION_CATEGORIES.map(([id, label]) => ({ value: id, label }))]} />
           )}
         </div>
       </div>

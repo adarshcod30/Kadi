@@ -4,6 +4,7 @@ import { ShieldCheck, Share2 } from 'lucide-react';
 import { useOffenders } from '../api/hooks';
 import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { clampPage, clampPageSize } from '../lib/api';
+import { Select } from '../components/Select';
 
 const SORTS: [string, string][] = [
   ['risk_desc', 'Highest risk'],
@@ -115,17 +116,17 @@ export default function Offenders() {
           ))}
           {/* Recency is what separates a live lead from a historical record, and the risk
               score deliberately does not encode it on its own. */}
-          <select value={q.activeDays || ''} onChange={(e) => set('activeDays', e.target.value)} className="input ml-1">
-            <option value="">Active any time</option>
-            <option value="90">Active in last 90 days</option>
-            <option value="180">Active in last 6 months</option>
-            <option value="365">Active in last year</option>
-          </select>
+          <Select value={q.activeDays || ''} onChange={(v) => set('activeDays', v)} className="ml-1 w-52"
+            options={[
+              { value: '', label: 'Active any time' },
+              { value: '90', label: 'Active in last 90 days' },
+              { value: '180', label: 'Active in last 6 months' },
+              { value: '365', label: 'Active in last year' },
+            ]} />
           <div className="ml-auto flex items-center gap-2">
             <label className="text-[12px] text-ink-muted">Sort</label>
-            <select value={q.sort || 'risk_desc'} onChange={(e) => set('sort', e.target.value)} className="input">
-              {SORTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-            </select>
+            <Select value={q.sort || 'risk_desc'} onChange={(v) => set('sort', v)} className="w-48"
+              options={SORTS.map(([v, label]) => ({ value: v, label }))} />
           </div>
         </div>
 
