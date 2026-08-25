@@ -80,9 +80,24 @@ function getCase(user, id) {
     act: r.ActID, section: r.SectionID,
     description: db.lookups.sectionDesc.get(`${r.ActID}:${r.SectionID}`) || '',
   }));
+  // Was computed with only raw ids -- typeId, districtId -- and never rendered anywhere in
+  // the client. Joined out to names here, plus the two flags (IsAccused,
+  // IsComplainantAccused) that were generated with full referential integrity and dropped:
+  // a complainant who is ALSO listed as accused is a real investigative flag (a fabricated
+  // complaint, a mutual-combat case), not a detail to discard.
+  const accusedNameById = new Map(
+    (db.children.accused.get(kid) || []).map((a) => [String(a.AccusedMasterID), a.AccusedName]),
+  );
   const arrests = (db.children.arrests.get(kid) || []).map((r) => ({
-    date: r.ArrestSurrenderDate, typeId: r.ArrestSurrenderTypeID,
-    districtId: r.ArrestSurrenderDistrictId, accusedMasterId: r.AccusedMasterID,
+    date: r.ArrestSurrenderDate,
+    typeId: r.ArrestSurrenderTypeID,
+    typeLabel: (db.lookups.arrestSurrenderTypes.get(String(r.ArrestSurrenderTypeID)) || {}).LookupValue || '',
+    districtId: r.ArrestSurrenderDistrictId,
+    districtName: (db.lookups.districts.get(String(r.ArrestSurrenderDistrictId)) || {}).DistrictName || '',
+    accusedMasterId: r.AccusedMasterID,
+    accusedName: accusedNameById.get(String(r.AccusedMasterID)) || '',
+    isAccused: r.IsAccused === '1',
+    isComplainantAccused: r.IsComplainantAccused === '1',
   }));
   const chargesheets = (db.children.chargesheets.get(kid) || []).map((r) => ({
     date: r.csdate, type: r.cstype,

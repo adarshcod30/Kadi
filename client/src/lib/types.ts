@@ -26,7 +26,8 @@ export interface CaseRow {
   statusId: string; status: string; categoryId: string; category: string;
   gravityId: string; gravity: string;
   latitude: number | null; longitude: number | null; briefFacts: string;
-  ioId: string; ioName: string; linkedCount: number;
+  ioId: string; ioName: string; ioRank: string; ioDesignation: string;
+  courtId: string; courtName: string; linkedCount: number;
   healthSeverity: string | null; healthFlags: string[]; clusterId: string | null;
 }
 
@@ -37,7 +38,12 @@ export interface CaseDetail extends CaseRow {
     accused: { accusedMasterId: string; name: string; age: string; genderId: string; personId: string }[];
   };
   acts: { act: string; section: string; description: string }[];
-  arrests: { date: string; typeId: string; districtId: string; accusedMasterId: string }[];
+  arrests: {
+    date: string; typeId: string; typeLabel: string;
+    districtId: string; districtName: string;
+    accusedMasterId: string; accusedName: string;
+    isAccused: boolean; isComplainantAccused: boolean;
+  }[];
   chargesheets: { date: string; type: string; typeLabel: string }[];
   health: HealthRow | null;
   offenders: { offenderIdentityId: string; canonicalName: string; riskScore: number; band: string }[];

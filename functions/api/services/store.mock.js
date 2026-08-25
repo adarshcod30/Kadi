@@ -92,6 +92,10 @@ function load() {
   const religions = indexBy(readCsv('ReligionMaster'), 'ReligionID');
   const castes = indexBy(readCsv('CasteMaster'), 'caste_master_id');
   const occupations = indexBy(readCsv('OccupationMaster'), 'OccupationID');
+  const ranks = indexBy(readCsv('Rank'), 'RankID');
+  const designations = indexBy(readCsv('Designation'), 'DesignationID');
+  const courts = indexBy(readCsv('Court'), 'CourtID');
+  const arrestSurrenderTypes = indexBy(readCsv('ArrestSurrenderType'), 'ArrestSurrenderTypeID');
   const sections = readCsv('Section');
   const sectionDesc = new Map(sections.map((s) => [`${s.ActCode}:${s.SectionCode}`, s.SectionDescription]));
 
@@ -138,6 +142,13 @@ function load() {
       longitude: c.longitude ? Number(c.longitude) : null,
       briefFacts: c.BriefFacts,
       ioId: String(c.PolicePersonID || ''), ioName: io ? io.FirstName : '',
+      // Rank/Designation/Court were generated with full referential integrity and never
+      // surfaced -- shown here for the first time.
+      ioRank: io && ranks.get(String(io.RankID)) ? ranks.get(String(io.RankID)).RankName : '',
+      ioDesignation: io && designations.get(String(io.DesignationID))
+        ? designations.get(String(io.DesignationID)).DesignationName : '',
+      courtId: String(c.CourtID || ''),
+      courtName: courts.get(String(c.CourtID)) ? courts.get(String(c.CourtID)).CourtName : '',
       linkedCount: linkedCount[String(c.CaseMasterID)] || 0,
       healthSeverity: h ? h.severity : null,
       healthFlags: h ? h.flagKeys : [],
@@ -176,7 +187,7 @@ function load() {
     dataDir: DATA_DIR,
     loadedMs: Date.now() - t0,
     lookups: { districts, units, employees, heads, subheads, statuses, categories, gravities,
-      genders, religions, castes, occupations, sectionDesc, unitDistrict },
+      genders, religions, castes, occupations, sectionDesc, unitDistrict, ranks, designations, courts, arrestSurrenderTypes },
     children: { complainants, victims, accused, actSections, arrests, chargesheets },
     cases, caseList: [...cases.values()],
     offenders, offendersById, adjacency, offenderOfCase,

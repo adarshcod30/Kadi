@@ -1,0 +1,1337 @@
+EmployeeID,DistrictID,UnitID,RankID,DesignationID,FirstName,GenderID
+1,1,1,9,2,Mary Prasad,2
+2,1,1,8,4,Vinay Rao,1
+3,1,1,8,1,Nagaraj Rao,1
+4,1,2,6,2,Gopal Swamy,1
+5,1,2,9,2,Arun M,1
+6,1,2,9,2,Yamuna Setty,2
+7,1,2,7,1,Shankar Acharya,1
+8,1,3,6,2,Chaitra Ballal,2
+9,1,3,6,4,Prakash Ballal,1
+10,1,3,8,2,Suresh Pai,1
+11,1,3,6,4,Suresh Kori,1
+12,1,3,6,2,Arun Desai,1
+13,1,3,9,4,Nagaraj Bhat,1
+14,1,4,9,4,Mahesh Devaraj,1
+15,1,4,6,2,Sandeep Acharya,1
+16,1,4,6,2,Mahesh Iyer,1
+17,1,4,6,4,Nagaraj Reddy,1
+18,1,5,9,2,Sunil Kumar,1
+19,1,5,7,2,Manjunath Ballal,1
+20,1,5,9,2,David Gowda,1
+21,1,5,5,2,Sunil Reddy S,1
+22,1,5,6,2,Syed Setty S,1
+23,1,6,6,2,Girish Prasad,1
+24,1,6,9,2,Umesh Desai,1
+25,1,6,9,2,Raghavendra Bhat D,1
+26,1,6,8,2,Mahesh Nayak,1
+27,1,6,6,2,Nagaraj Reddy,1
+28,1,7,8,2,Suresh Prasad,1
+29,1,7,9,4,Rohit Patil,1
+30,1,7,8,2,Lokesh Swamy,1
+31,1,7,8,2,Vijay Gowda,1
+32,1,7,8,4,Ravi Rao M,1
+33,1,8,8,4,Santosh N,1
+34,1,8,6,4,Ashok Desai,1
+35,1,8,6,2,Shivakumar Acharya,1
+36,1,8,9,4,Shankar Prasad,1
+37,1,8,7,2,Sandeep V,1
+38,1,8,8,4,Shwetha Gowda,2
+39,1,9,8,2,Darshan Kori,1
+40,1,9,6,4,Rajesh Reddy,1
+41,1,9,9,2,Santosh Desai,1
+42,1,9,6,2,Arun Angadi,1
+43,1,9,5,2,Sowmya Hanumanthappa,2
+44,1,10,8,2,Lokesh V,1
+45,1,10,9,2,Sandeep Naik,1
+46,1,10,6,2,Darshan Setty,1
+47,1,10,8,2,Girish Naik N,1
+48,1,10,8,2,Ravi Iyer,1
+49,1,11,9,2,Ganesh Setty,1
+50,1,11,7,4,Rohit Biradar,1
+51,1,11,9,4,Ramesh Kamath,1
+52,1,11,6,1,Ayesha Shetty A,2
+53,1,12,9,2,Rajesh Reddy,1
+54,1,12,9,2,Arun Hegde,1
+55,1,12,7,4,Suresh Iyer,1
+56,1,13,6,2,Geetha Acharya,2
+57,1,13,5,2,Madhu Kamath,1
+58,1,13,6,2,Rohit Desai,1
+59,1,13,8,1,Srinivas Prasad,1
+60,1,14,5,1,Gopal B,1
+61,1,14,7,4,Imran Prasad A,1
+62,1,14,5,2,Ganesh L,1
+63,1,14,6,2,Prasad Angadi S,1
+64,1,14,9,2,Shankar Jadhav,1
+65,1,14,7,2,Netra Kumar,2
+66,1,15,6,2,Syed Kori,1
+67,1,15,7,1,Chandru Kori,1
+68,1,15,7,2,Arun B,1
+69,1,16,6,1,Ganesh Desai,1
+70,1,16,7,2,Anil Rao,1
+71,1,16,8,2,Anitha Kulkarni,2
+72,1,17,7,2,Rekha Acharya,2
+73,1,17,6,2,Venkatesh N,1
+74,1,17,8,2,Darshan Murthy,1
+75,1,17,7,2,Fathima Kumar N,2
+76,1,17,7,1,Ramesh Kulkarni P,1
+77,1,18,5,1,Girish Patil,1
+78,1,18,5,1,Lokesh Kori L,1
+79,1,18,9,2,Syed H,1
+80,1,18,7,2,Naveen Gowda,1
+81,1,18,5,1,Arun Naik,1
+82,1,19,6,4,Umesh Desai,1
+83,1,19,5,4,Rekha Bhat,2
+84,1,19,7,1,Darshan Setty,1
+85,1,19,7,2,Rohit Murthy,1
+86,1,20,8,1,Venkatesh Bhat,1
+87,1,20,9,2,Manasa Swamy,2
+88,1,20,7,2,Manjunath T,1
+89,1,20,6,2,Ravi Patil S,1
+90,1,20,8,4,Rohit Angadi,1
+91,1,21,9,1,Fathima A,2
+92,1,21,9,2,Prakash Pai,1
+93,1,21,7,4,Arun Biradar,1
+94,1,22,6,2,Rohit Setty H,1
+95,1,22,7,1,Ravi Acharya,1
+96,1,22,7,1,Sunil Shetty,1
+97,1,22,8,2,Nagaraj Swamy,1
+98,1,23,6,4,Prakash Prasad,1
+99,1,23,6,2,Ayesha Hanumanthappa,2
+100,1,23,5,2,Harish T,1
+101,1,23,8,4,Lakshmi Gowda,2
+102,1,24,7,4,Praveen Hegde,1
+103,1,24,8,2,Sandeep Patil,1
+104,1,24,5,1,Grace Nayak,2
+105,1,24,7,2,Girish N,1
+106,1,24,5,4,Ashok Acharya D,1
+107,1,24,9,2,Deepak Biradar,1
+108,1,25,8,4,Rajesh Iyer,1
+109,1,25,6,1,Madhu Naik D,1
+110,1,25,9,2,Ramya A,2
+111,1,25,8,2,Naveen Rao,1
+112,1,26,9,2,Nagaraj Setty,1
+113,1,26,7,4,Rajesh V,1
+114,1,26,5,2,Raghavendra Hiremath,1
+115,1,26,5,2,Roopa R,2
+116,1,26,8,2,Shivakumar P,1
+117,1,27,8,1,Arun Poojary,1
+118,1,27,6,2,Vishnu Kulkarni,1
+119,1,27,6,2,Naveen Hanumanthappa,1
+120,1,27,5,2,Mary T,2
+121,1,27,7,2,Imran Poojary,1
+122,1,27,9,2,Shankar N,1
+123,1,28,9,1,Ayesha Iyer,2
+124,1,28,6,2,Anitha Kamath,2
+125,1,28,8,2,Gopal Rao,1
+126,1,29,6,2,Abdul Gowda,1
+127,1,29,9,2,Sowmya Angadi T,2
+128,1,29,5,4,David Poojary,1
+129,1,29,7,2,Girish V,1
+130,1,29,6,4,Sandeep Hanumanthappa,1
+131,1,29,5,4,Santosh Rao,1
+132,1,30,7,1,Anil Reddy N,1
+133,1,30,6,2,Raghavendra Banakar,1
+134,1,30,8,1,Deepak Patil,1
+135,1,30,9,2,Praveen Kulkarni,1
+136,1,30,7,4,Suresh G,1
+137,1,31,7,2,Ramesh Acharya,1
+138,1,31,8,2,Divya Jadhav,2
+139,1,31,9,2,David Shetty,1
+140,1,32,8,4,Fathima Patil,2
+141,1,32,7,2,Harish Biradar,1
+142,1,32,6,1,David Poojary D,1
+143,1,32,7,2,Madhu Shetty M,1
+144,1,33,7,4,Arun Hegde,1
+145,1,33,9,4,Bhavya Kamath,2
+146,1,33,6,4,Umesh Jadhav,1
+147,1,33,9,2,Arun Kamath,1
+148,1,33,7,2,Ashwini V,2
+149,1,33,5,4,Srinivas Pai,1
+150,1,34,7,2,Arun K,1
+151,1,34,9,2,Thomas Reddy,1
+152,1,34,7,2,Gopal Banakar,1
+153,1,35,6,2,Girish Pai,1
+154,1,35,9,2,Harish Murthy,1
+155,1,35,6,4,Imran M,1
+156,1,35,7,4,Anil Hanumanthappa A,1
+157,1,35,6,2,Ramya Acharya,2
+158,1,35,6,2,Ganesh Bhat,1
+159,1,36,6,1,Rajesh Pai,1
+160,1,36,9,2,Manjunath Biradar,1
+161,1,36,5,2,Manasa Rao,2
+162,1,36,7,1,Nagaraj Hiremath,1
+163,1,37,9,4,Arun Shetty,1
+164,1,37,9,2,Nagaraj Murthy,1
+165,1,37,8,2,Kiran Hegde,1
+166,1,38,9,4,Kavya Murthy,2
+167,1,38,6,2,Prasad Swamy,1
+168,1,38,6,2,Yamuna Murthy,2
+169,1,38,8,2,Sandeep Kumar,1
+170,1,39,9,1,Rohit Jadhav,1
+171,1,39,7,2,Suresh Pai,1
+172,1,39,8,2,Chandru Shetty,1
+173,1,39,7,2,Shivakumar Kori,1
+174,1,39,6,2,Kiran Kumar,1
+175,1,40,6,2,Shivakumar Biradar,1
+176,1,40,7,2,Ganesh Nayak,1
+177,1,40,6,2,Ravi Naik,1
+178,1,40,9,2,David Nayak,1
+179,1,40,7,2,Abdul Swamy,1
+180,1,41,6,2,Ravi Ballal,1
+181,1,41,9,2,Karthik Hegde,1
+182,1,41,6,2,Yamuna Shetty,2
+183,1,41,6,1,Abdul Shetty,1
+184,1,41,6,1,Ashok Biradar,1
+185,1,42,9,2,Imran Hanumanthappa,1
+186,1,42,9,2,Manasa T,2
+187,1,42,8,2,Shivakumar Kamath,1
+188,1,43,5,2,Sandeep Reddy,1
+189,1,43,6,1,Harish Kulkarni,1
+190,1,43,9,2,Divya Murthy,2
+191,1,43,7,2,Mohan Setty,1
+192,1,44,9,2,Kiran Reddy,1
+193,1,44,5,2,Basavaraj Kamath,1
+194,1,44,6,1,Kavya Poojary,2
+195,1,44,9,4,Praveen A,1
+196,1,44,9,2,Nandini Poojary A,2
+197,1,44,6,4,Manjunath Kumar,1
+198,1,45,8,1,Mohan B,1
+199,1,45,6,2,Rekha Murthy,2
+200,1,45,9,2,Pooja Ballal,2
+201,1,45,8,1,David Patil,1
+202,1,45,7,1,Manasa Iyer,2
+203,1,46,9,2,Raghavendra M,1
+204,1,46,6,1,Ashok R,1
+205,1,46,7,2,Vijay Naik,1
+206,1,46,8,1,Karthik Naik,1
+207,1,47,5,2,Ashok Kamath,1
+208,1,47,9,1,Rohit Devaraj,1
+209,1,47,8,1,Srinivas S,1
+210,1,47,7,2,Ashok Kamath,1
+211,1,47,8,1,Madhu Ballal,1
+212,1,48,8,2,Mohan N,1
+213,1,48,6,2,Karthik Iyer,1
+214,1,48,9,2,Shankar Biradar A,1
+215,1,48,7,2,Vinay Rao,1
+216,1,48,6,1,Padma Patil N,2
+217,1,48,6,2,Prasad M,1
+218,1,49,7,2,Shankar Pai,1
+219,1,49,5,1,Santosh Hegde,1
+220,1,49,7,2,Raghavendra Hanumanthappa,1
+221,1,49,7,1,Abdul Kumar,1
+222,1,49,8,2,Harish Setty,1
+223,1,49,6,1,Darshan Murthy,1
+224,1,50,8,2,Manjunath Murthy D,1
+225,1,50,5,2,Manjunath Iyer,1
+226,1,50,9,2,Ashok Hegde,1
+227,1,50,6,4,Venkatesh Swamy,1
+228,1,50,8,2,Nandini Rao,2
+229,1,50,6,2,Abdul Kori,1
+230,1,51,8,1,David Desai,1
+231,1,51,6,1,Srinivas Reddy,1
+232,1,51,9,2,Kiran V,1
+233,1,51,7,2,Manjunath Hegde,1
+234,1,52,7,2,Bharathi T,2
+235,1,52,8,2,Prakash Pai,1
+236,1,52,7,4,Rajesh Iyer,1
+237,1,52,5,1,Anitha Desai,2
+238,1,52,9,1,Nandini N,2
+239,1,52,6,4,David Hiremath,1
+240,1,53,7,2,Arun N,1
+241,1,53,8,1,Gopal Poojary,1
+242,1,53,6,4,Sunil Kulkarni,1
+243,1,54,9,2,Abdul Murthy,1
+244,1,54,6,2,Ashok D,1
+245,1,54,8,2,Girish Setty,1
+246,1,54,6,1,Divya Pai,2
+247,1,54,9,2,Basavaraj Rao,1
+248,1,55,9,4,Rekha Murthy,2
+249,1,55,5,2,Gopal V,1
+250,1,55,8,1,Imran Gowda,1
+251,1,56,9,1,Harish Ballal,1
+252,1,56,5,4,Anitha Biradar,2
+253,1,56,7,2,Ravi Devaraj R,1
+254,1,56,7,2,Suresh Bhat N,1
+255,1,57,7,2,Manjunath Iyer,1
+256,1,57,6,4,Ramesh K,1
+257,1,57,9,4,Harish Swamy,1
+258,1,58,5,4,Suresh Gowda,1
+259,1,58,6,2,Syed Bhat,1
+260,1,58,6,2,David Acharya,1
+261,1,59,6,2,Chandru T,1
+262,1,59,7,2,Shankar Hegde,1
+263,1,59,6,2,Thomas Hanumanthappa,1
+264,1,60,5,1,Umesh Ballal S,1
+265,1,60,8,1,Ashok K,1
+266,1,60,7,4,Kavya Kulkarni,2
+267,1,60,7,2,Venkatesh Poojary,1
+268,1,60,9,2,Yamuna Kamath,2
+269,1,61,6,2,Abdul Kori,1
+270,1,61,9,4,Lokesh Biradar,1
+271,1,61,7,1,Shankar Patil,1
+272,1,61,8,4,Fathima Banakar,2
+273,1,61,9,2,Rekha V,2
+274,1,61,9,2,Rohit Bhat,1
+275,1,62,6,1,Thomas S,1
+276,1,62,9,1,Arun G,1
+277,1,62,9,4,Imran Swamy,1
+278,1,62,6,1,Sandeep Bhat,1
+279,1,62,8,4,Ganesh Rao,1
+280,1,62,8,1,Madhu Devaraj,1
+281,1,63,7,2,Raghavendra Ballal,1
+282,1,63,6,2,Abdul Pai,1
+283,1,63,6,2,Venkatesh P,1
+284,1,63,6,1,Sunitha Nayak,2
+285,1,64,5,4,Lakshmi P,2
+286,1,64,9,1,Imran Kamath,1
+287,1,64,8,1,Gopal Bhat R,1
+288,1,64,5,2,Ravi Acharya,1
+289,1,65,6,4,Karthik Setty,1
+290,1,65,7,4,Thomas Nayak,1
+291,1,65,6,2,Ashok Rao,1
+292,1,65,9,2,Grace Swamy,2
+293,1,66,8,1,Manjunath Gowda,1
+294,1,66,8,1,Sahana Iyer G,2
+295,1,66,6,2,Thomas Kamath,1
+296,1,67,9,4,Arun L,1
+297,1,67,7,4,Manjunath Patil P,1
+298,1,67,8,2,Karthik K,1
+299,1,68,9,4,Ayesha Biradar,2
+300,1,68,6,2,Manjunath Acharya,1
+301,1,68,6,1,Karthik Kulkarni,1
+302,1,68,9,2,Manjunath Hiremath,1
+303,1,69,8,2,Pooja Rao,2
+304,1,69,8,2,Suresh H,1
+305,1,69,6,2,Arun S,1
+306,1,69,5,1,Karthik Iyer,1
+307,1,69,6,2,Sandeep Ballal,1
+308,1,69,6,1,Lokesh Jadhav,1
+309,1,70,9,2,Basavaraj Jadhav,1
+310,1,70,6,1,Manasa Desai G,2
+311,1,70,9,2,Prasad G,1
+312,1,71,6,2,Rajesh Kumar,1
+313,1,71,9,4,Sandeep Hegde,1
+314,1,71,8,1,Madhu Jadhav,1
+315,1,71,6,4,Ravi Hiremath,1
+316,1,71,7,2,Vinay Prasad,1
+317,1,72,9,2,Kiran Poojary K,1
+318,1,72,5,4,Rohit Swamy,1
+319,1,72,6,1,Arun Acharya,1
+320,1,72,7,1,Srinivas Hanumanthappa,1
+321,1,72,6,2,Vinay G,1
+322,1,72,8,2,Ramesh G,1
+323,1,73,8,4,Harish Desai,1
+324,1,73,9,2,Ravi Rao T,1
+325,1,73,9,1,Ashok Kumar K,1
+326,1,73,8,2,David Kamath,1
+327,1,73,5,2,Bhavya Gowda,2
+328,1,74,6,2,Gopal Iyer,1
+329,1,74,9,2,Vishnu K,1
+330,1,74,7,2,Praveen Jadhav,1
+331,1,74,8,2,Geetha B,2
+332,1,74,7,2,Bhavya Gowda,2
+333,1,75,9,2,Fathima Hiremath,2
+334,1,75,6,2,Prasad Hiremath,1
+335,1,75,5,4,Raghavendra Naik,1
+336,1,76,6,2,Ashwini Kamath,2
+337,1,76,7,2,Sunil Prasad,1
+338,1,76,6,2,Abdul Desai,1
+339,1,77,8,2,Lokesh Kumar G,1
+340,1,77,6,2,Ganesh Angadi,1
+341,1,77,9,4,Mohan Shetty,1
+342,1,78,7,4,Rajesh Kori,1
+343,1,78,6,2,Prasad Banakar,1
+344,1,78,6,2,Prakash Reddy,1
+345,1,78,6,2,Roopa Kumar,2
+346,1,78,6,4,Bharathi Kulkarni,2
+347,1,78,6,4,Anil L,1
+348,1,79,7,2,Anil Shetty,1
+349,1,79,6,2,Yamuna Shetty,2
+350,1,79,9,2,Shankar Banakar,1
+351,1,79,5,2,Kiran Kumar,1
+352,1,79,8,2,Karthik Murthy,1
+353,1,80,5,1,Chandru N,1
+354,1,80,5,1,Darshan Kori,1
+355,1,80,7,2,Uma Prasad,2
+356,1,81,6,2,Vishnu Patil,1
+357,1,81,6,1,Sahana Hiremath,2
+358,1,81,6,2,Ashok Banakar,1
+359,1,81,9,2,David Murthy,1
+360,1,81,9,1,Vijay L,1
+361,1,82,7,4,Manjunath G,1
+362,1,82,9,4,Rekha Rao,2
+363,1,82,9,2,Umesh Prasad,1
+364,1,83,8,4,Sahana Devaraj,2
+365,1,83,6,2,Nagaraj Bhat,1
+366,1,83,6,2,Shankar Devaraj,1
+367,1,83,7,2,Ashok Naik,1
+368,1,83,8,2,Girish Kori,1
+369,1,83,6,2,Vishnu Nayak T,1
+370,1,84,8,2,Lokesh Kori,1
+371,1,84,9,4,Srinivas Kamath,1
+372,1,84,8,2,Deepak Poojary,1
+373,1,84,9,1,Sowmya Banakar,2
+374,1,85,7,2,Mohan Biradar,1
+375,1,85,8,2,Syed Ballal,1
+376,1,85,8,2,Shwetha Shetty,2
+377,1,85,6,4,Arun Acharya,1
+378,1,85,8,2,Harish Bhat,1
+379,1,85,9,2,Santosh Bhat,1
+380,1,86,7,2,Basavaraj V,1
+381,1,86,6,2,Kiran Setty,1
+382,1,86,7,4,Vishnu Hanumanthappa,1
+383,1,86,7,2,Girish R,1
+384,1,86,7,4,Girish Devaraj,1
+385,1,86,9,2,Shivakumar Ballal,1
+386,1,87,7,2,Darshan P,1
+387,1,87,8,4,Venkatesh Iyer L,1
+388,1,87,7,2,Vinay Gowda,1
+389,1,88,7,2,Ramesh L,1
+390,1,88,7,4,Santosh Gowda,1
+391,1,88,9,1,Deepak Ballal,1
+392,1,88,6,1,Ramesh N,1
+393,1,89,8,2,Imran Devaraj,1
+394,1,89,5,2,Arun Nayak,1
+395,1,89,6,1,Naveen Hiremath,1
+396,1,89,9,2,Anitha Reddy,2
+397,1,90,8,4,Yogesh A,1
+398,1,90,6,1,Raghavendra M,1
+399,1,90,8,2,Yogesh Ballal,1
+400,1,90,9,2,Naveen R,1
+401,1,91,9,2,Manjunath Iyer,1
+402,1,91,6,2,Suresh Hanumanthappa T,1
+403,1,91,9,4,Basavaraj Poojary,1
+404,1,91,6,2,Suresh G,1
+405,1,92,8,2,Deepak Bhat,1
+406,1,92,6,2,Vinay Devaraj,1
+407,1,92,8,2,Basavaraj Gowda,1
+408,1,93,7,2,Syed Murthy,1
+409,1,93,8,2,Santosh Bhat,1
+410,1,93,6,4,Praveen Hanumanthappa,1
+411,1,93,7,4,Sandeep Setty D,1
+412,1,93,8,1,Geetha Ballal,2
+413,1,93,6,2,Rohit Acharya,1
+414,1,94,9,1,Mahesh Pai,1
+415,1,94,9,2,Mohan Swamy,1
+416,1,94,9,2,Venkatesh Biradar,1
+417,1,95,7,2,Madhu Setty,1
+418,1,95,6,2,Manjunath Biradar,1
+419,1,95,6,1,Lokesh Angadi,1
+420,1,95,7,2,Deepak Nayak,1
+421,1,95,6,1,Naveen Rao V,1
+422,1,95,6,2,Chandru Kori,1
+423,1,96,5,2,Basavaraj Kulkarni,1
+424,1,96,9,1,Prasad Swamy,1
+425,1,96,6,4,Mary Shetty,2
+426,1,96,8,2,Harish Hegde,1
+427,1,96,8,4,Kiran Angadi V,1
+428,1,96,9,2,Darshan Kumar,1
+429,1,97,9,1,Basavaraj B,1
+430,1,97,8,2,Sahana Acharya,2
+431,1,97,9,2,Manasa Desai,2
+432,1,97,7,2,Girish Desai,1
+433,1,97,9,4,Imran Kumar,1
+434,1,98,8,4,Abdul Kumar,1
+435,1,98,9,1,Shivakumar Hanumanthappa,1
+436,1,98,9,2,David Acharya,1
+437,1,98,6,4,Santosh Bhat,1
+438,1,98,7,2,Vinay Kulkarni,1
+439,1,98,6,2,Vijay Iyer,1
+440,1,99,5,2,Naveen A,1
+441,1,99,7,1,Rajesh Banakar,1
+442,1,99,8,1,Rajesh Reddy,1
+443,1,99,6,1,Prakash Reddy,1
+444,1,99,6,2,Gopal Hegde,1
+445,1,99,7,4,Sowmya Iyer,2
+446,1,100,5,4,Srinivas Poojary,1
+447,1,100,9,2,Suresh Gowda G,1
+448,1,100,7,1,Girish Devaraj,1
+449,1,100,5,2,Praveen D,1
+450,1,101,5,1,Ashok Shetty,1
+451,1,101,8,2,Harish Acharya,1
+452,1,101,9,1,Sunil Angadi,1
+453,1,101,8,1,Chandru Kori,1
+454,1,101,9,2,Sandeep Prasad,1
+455,1,102,8,2,Pooja Pai T,2
+456,1,102,8,1,Karthik H,1
+457,1,102,5,2,Lakshmi Desai,2
+458,1,102,9,2,Basavaraj Poojary,1
+459,1,103,9,2,Kiran Gowda,1
+460,1,103,8,2,Kiran Biradar,1
+461,1,103,9,2,Shivakumar Patil,1
+462,1,103,7,2,Bharathi Hiremath K,2
+463,1,103,8,2,Praveen Biradar,1
+464,1,104,5,4,Rohit Devaraj,1
+465,1,104,8,2,Naveen Prasad,1
+466,1,104,7,1,Girish Prasad,1
+467,1,104,9,1,Thomas Shetty,1
+468,1,104,8,4,Deepak Reddy,1
+469,1,104,9,4,Praveen Hegde,1
+470,1,105,6,2,Ashok Shetty,1
+471,1,105,8,4,Praveen B,1
+472,1,105,6,1,Naveen Biradar,1
+473,1,105,8,4,Ashok Nayak L,1
+474,1,105,7,2,Venkatesh Gowda,1
+475,1,106,8,2,Roopa Kumar,2
+476,1,106,8,2,Roopa Rao B,2
+477,1,106,7,2,Suresh Reddy L,1
+478,1,107,9,2,Manjunath Prasad,1
+479,1,107,8,4,Prasad Swamy,1
+480,1,107,8,1,Shankar Biradar R,1
+481,1,107,7,2,Chaitra Setty,2
+482,1,107,9,1,Karthik G,1
+483,1,108,9,2,Girish Hegde,1
+484,1,108,5,2,Chandru Kumar,1
+485,1,108,7,1,Suresh Patil,1
+486,1,108,7,2,Manjunath Swamy,1
+487,1,109,8,2,Mohan Patil,1
+488,1,109,6,4,Nagaraj Swamy,1
+489,1,109,9,2,Syed Poojary,1
+490,1,109,5,2,Vijay Nayak,1
+491,1,109,9,2,Srinivas Murthy A,1
+492,1,109,5,4,Thomas Shetty H,1
+493,1,110,9,4,Syed Pai,1
+494,1,110,6,2,Basavaraj Hegde,1
+495,1,110,5,2,Arun Reddy,1
+496,1,111,9,2,Shivakumar Hanumanthappa,1
+497,1,111,7,4,Ganesh Pai,1
+498,1,111,9,1,Bharathi Hegde,2
+499,1,111,7,4,Venkatesh Iyer,1
+500,1,111,8,2,Sujatha Banakar,2
+501,1,112,7,4,Lakshmi Patil,2
+502,1,112,6,2,Vinay Rao,1
+503,1,112,8,4,Madhu Acharya,1
+504,1,112,6,2,Santosh Gowda,1
+505,1,112,9,2,Vijay Nayak,1
+506,1,112,7,2,Vinay Banakar L,1
+507,1,113,9,1,Yamuna Swamy A,2
+508,1,113,9,2,Mahesh Kori,1
+509,1,113,6,4,Rohit Naik,1
+510,1,113,7,2,Arun D,1
+511,1,113,9,2,Rajesh Acharya,1
+512,1,114,6,1,Prasad Hanumanthappa,1
+513,1,114,6,1,Kiran Swamy,1
+514,1,114,9,4,Yogesh Kulkarni,1
+515,1,114,8,1,Deepak H,1
+516,1,115,7,2,Umesh Setty V,1
+517,1,115,9,1,Prakash Kori,1
+518,1,115,9,2,Vishnu Pai,1
+519,1,115,9,1,Ravi Jadhav,1
+520,1,115,9,2,Rajesh Acharya,1
+521,1,116,5,2,Sushma V,2
+522,1,116,7,4,Harish Setty,1
+523,1,116,8,2,Divya Angadi,2
+524,1,116,7,1,Pooja Banakar H,2
+525,1,117,6,2,Naveen Ballal,1
+526,1,117,8,4,Prakash Reddy,1
+527,1,117,8,2,Nandini Pai P,2
+528,1,117,9,2,Santosh Banakar,1
+529,1,117,9,2,Prakash Ballal,1
+530,1,117,7,1,Umesh Gowda,1
+531,1,118,6,4,Deepa Jadhav,2
+532,1,118,7,1,Imran Setty,1
+533,1,118,5,2,Shankar Kulkarni,1
+534,1,119,5,2,Sahana G,2
+535,1,119,8,2,Rohit Kumar,1
+536,1,119,7,2,Vijay Ballal,1
+537,1,119,8,4,Vijay Rao,1
+538,1,119,9,2,Santosh L,1
+539,1,119,6,1,Rajesh B,1
+540,1,120,9,2,Syed Rao,1
+541,1,120,7,2,Suresh Patil,1
+542,1,120,6,2,Padma Kamath,2
+543,2,121,8,2,Deepa B,2
+544,2,121,5,2,Yogesh Desai,1
+545,2,121,6,2,Chaitra Banakar,2
+546,2,122,7,2,Girish Murthy,1
+547,2,122,6,2,Mahesh Acharya N,1
+548,2,122,8,2,Yogesh Banakar,1
+549,2,122,7,1,Ramesh Rao,1
+550,2,122,8,4,Ashok L,1
+551,2,123,6,2,Imran Kori,1
+552,2,123,8,2,Srinivas Hiremath,1
+553,2,123,5,4,Sunil Biradar,1
+554,2,123,5,2,Karthik Pai D,1
+555,2,123,5,2,Sushma Kamath,2
+556,2,123,6,2,Yamuna Kumar,2
+557,2,124,5,4,Manjunath Biradar,1
+558,2,124,7,2,Manjunath Hanumanthappa,1
+559,2,124,6,2,Harish Bhat,1
+560,2,124,8,2,Srinivas Devaraj S,1
+561,2,124,5,2,Shankar Kulkarni,1
+562,2,124,9,4,Arun M,1
+563,2,125,8,2,Lakshmi Prasad,2
+564,2,125,5,2,Bhavya Hanumanthappa,2
+565,2,125,8,1,Lokesh Swamy,1
+566,2,125,7,2,Umesh Desai,1
+567,2,125,7,2,Basavaraj Desai,1
+568,2,126,5,4,Umesh Biradar,1
+569,2,126,8,2,Sandeep N,1
+570,2,126,7,2,Harish Poojary,1
+571,2,126,8,2,David Gowda,1
+572,2,126,8,2,Suresh Hegde,1
+573,2,126,5,2,Anil L,1
+574,2,127,6,2,Abdul Banakar,1
+575,2,127,6,1,Kiran Biradar,1
+576,2,127,8,2,Mahesh G,1
+577,2,127,7,2,Madhu Angadi D,1
+578,2,127,6,2,Suresh Devaraj,1
+579,2,127,5,2,Shankar Rao,1
+580,2,128,8,2,Yogesh Reddy,1
+581,2,128,9,4,Fathima Setty,2
+582,2,128,9,1,Arun Prasad,1
+583,2,128,5,2,Ravi Acharya,1
+584,2,128,6,4,Manjunath Hanumanthappa,1
+585,2,129,7,2,Shankar Swamy,1
+586,2,129,7,2,Rajesh Jadhav,1
+587,2,129,6,2,Sandeep Kamath,1
+588,2,130,7,1,Sunil Desai,1
+589,2,130,8,2,Prakash Bhat,1
+590,2,130,9,2,Ashok Nayak K,1
+591,2,130,7,2,Umesh Shetty T,1
+592,2,131,8,2,Syed Gowda,1
+593,2,131,5,2,Ashok Naik,1
+594,2,131,7,2,Sushma Prasad,2
+595,2,131,8,2,Manjunath Pai,1
+596,2,131,6,4,Yogesh Jadhav,1
+597,2,132,9,1,Sowmya Setty L,2
+598,2,132,8,2,Sunil K,1
+599,2,132,9,2,Fathima Murthy,2
+600,2,132,6,2,Deepak Biradar,1
+601,2,132,8,2,Arun Banakar,1
+602,2,132,9,2,Kavya Ballal,2
+603,2,133,7,2,Ravi Rao,1
+604,2,133,9,2,Abdul Iyer,1
+605,2,133,6,4,Padma Reddy,2
+606,2,134,6,2,Ramesh Kori,1
+607,2,134,6,4,Suresh Hiremath,1
+608,2,134,7,1,Girish B,1
+609,2,135,5,2,Nagaraj Kumar R,1
+610,2,135,8,2,Vijay Poojary,1
+611,2,135,9,2,Gopal Nayak,1
+612,2,135,6,2,Shankar G,1
+613,2,135,8,2,Geetha Pai,2
+614,3,136,5,2,Ravi Iyer,1
+615,3,136,5,2,Harish Jadhav V,1
+616,3,136,8,2,Madhu Naik,1
+617,3,136,9,2,Basavaraj Bhat,1
+618,3,136,7,1,Raghavendra Acharya,1
+619,3,137,6,2,Yogesh Biradar,1
+620,3,137,9,2,Thomas Naik,1
+621,3,137,6,2,Deepa S,2
+622,3,137,5,4,Basavaraj Naik,1
+623,3,137,7,2,Sunil Hegde,1
+624,3,138,7,2,Vishnu Hiremath,1
+625,3,138,8,4,Ashok Prasad,1
+626,3,138,7,2,Venkatesh Banakar,1
+627,3,138,5,4,Kiran Naik,1
+628,3,138,8,1,Mohan Hanumanthappa,1
+629,3,138,9,4,Vishnu Hegde,1
+630,3,139,7,2,Geetha Jadhav,2
+631,3,139,8,1,Darshan R,1
+632,3,139,9,2,Vishnu Kulkarni,1
+633,3,140,9,2,Karthik H,1
+634,3,140,7,2,Chandru Rao,1
+635,3,140,6,2,Uma Hegde,2
+636,3,140,7,1,Shankar Patil,1
+637,3,140,9,1,Imran Kulkarni A,1
+638,3,141,5,2,Sandeep Angadi,1
+639,3,141,5,4,Sunitha Swamy,2
+640,3,141,7,2,Chandru Kulkarni,1
+641,3,141,8,2,Yogesh Pai,1
+642,3,141,5,4,Padma P,2
+643,3,142,9,2,Ramesh Kamath,1
+644,3,142,6,1,Abdul Kumar,1
+645,3,142,7,2,Raghavendra Jadhav H,1
+646,3,142,9,2,Ganesh G,1
+647,3,142,9,2,Prasad Kulkarni,1
+648,3,142,9,2,Thomas Kumar,1
+649,3,143,6,2,David Swamy,1
+650,3,143,9,2,Ramesh Biradar,1
+651,3,143,7,2,Girish Kamath,1
+652,3,144,7,2,Ashwini Hiremath,2
+653,3,144,6,2,Sunitha Devaraj,2
+654,3,144,9,1,Ramesh Shetty,1
+655,3,145,7,2,Manjunath B,1
+656,3,145,9,2,Arun Reddy,1
+657,3,145,6,2,Lokesh Shetty,1
+658,3,146,9,1,Prakash Banakar,1
+659,3,146,7,2,Ganesh Poojary,1
+660,3,146,9,2,Suresh V,1
+661,3,146,6,2,Mahesh Murthy,1
+662,3,146,5,2,David M,1
+663,3,146,8,1,Sunil Poojary D,1
+664,3,147,7,2,Rajesh Kamath,1
+665,3,147,6,2,Kiran P,1
+666,3,147,6,2,Sujatha P,2
+667,3,147,8,2,Vinay Desai,1
+668,3,147,8,4,Girish Pai,1
+669,3,147,9,2,Ashok Poojary,1
+670,3,148,9,2,Ayesha Poojary,2
+671,3,148,5,4,Chandru Prasad P,1
+672,3,148,7,2,Sunil H,1
+673,3,149,9,2,Ayesha Acharya,2
+674,3,149,8,2,Mahesh Nayak,1
+675,3,149,7,2,Ashok Nayak,1
+676,3,149,8,2,Ravi H,1
+677,3,150,6,4,Shankar Banakar,1
+678,3,150,6,2,Naveen Murthy,1
+679,3,150,9,4,Nandini Rao,2
+680,3,150,7,2,Praveen Banakar,1
+681,3,150,6,2,Gopal T,1
+682,3,151,9,2,Vijay N,1
+683,3,151,9,2,Thomas Kulkarni,1
+684,3,151,8,2,David Kori,1
+685,3,151,8,4,Yogesh Biradar M,1
+686,3,151,8,1,Ashok G,1
+687,3,152,6,1,Deepak Biradar,1
+688,3,152,6,2,Arun Kamath,1
+689,3,152,6,2,Harish Hanumanthappa,1
+690,3,152,7,1,Raghavendra Prasad,1
+691,3,152,8,4,Sujatha Banakar,2
+692,3,152,9,2,Manjunath Nayak,1
+693,3,153,9,2,Venkatesh Patil,1
+694,3,153,8,2,Uma Kulkarni,2
+695,3,153,7,2,Mohan Banakar,1
+696,3,153,9,4,Karthik Kulkarni,1
+697,4,154,7,2,Chandru Acharya P,1
+698,4,154,6,2,Raghavendra Shetty,1
+699,4,154,9,2,Girish Setty,1
+700,4,154,8,2,Prasad Angadi,1
+701,4,155,7,2,Harish Hanumanthappa,1
+702,4,155,7,2,Srinivas Rao,1
+703,4,155,5,1,Ganesh Nayak,1
+704,4,155,6,2,Ravi Prasad,1
+705,4,155,8,1,Thomas Banakar,1
+706,4,156,5,2,Meena Banakar,2
+707,4,156,5,1,Girish Acharya,1
+708,4,156,9,2,Naveen Kamath,1
+709,4,156,9,2,Prasad Acharya,1
+710,4,156,5,1,Anil Bhat,1
+711,4,156,6,2,Chandru Pai,1
+712,4,157,8,2,Kiran Hegde,1
+713,4,157,8,4,Suresh Jadhav,1
+714,4,157,7,2,Basavaraj Iyer K,1
+715,4,158,8,2,Santosh Setty,1
+716,4,158,9,2,David Prasad,1
+717,4,158,6,2,Anil Naik,1
+718,4,158,7,4,Lokesh Biradar,1
+719,4,159,9,4,Vidya Nayak R,2
+720,4,159,5,2,David Banakar,1
+721,4,159,6,1,Mohan Murthy,1
+722,4,160,5,2,Vinay Naik,1
+723,4,160,7,2,Girish Kulkarni,1
+724,4,160,8,4,Prasad Reddy,1
+725,4,160,7,2,Mahesh Kumar,1
+726,4,160,9,2,Mahesh Gowda,1
+727,4,161,6,2,Basavaraj Pai,1
+728,4,161,8,2,Vishnu Nayak,1
+729,4,161,6,2,Srinivas Murthy,1
+730,4,161,9,2,Anil H,1
+731,4,162,6,1,Vinay Desai,1
+732,4,162,7,2,Prasad Poojary,1
+733,4,162,8,2,Shivakumar Iyer,1
+734,4,162,7,1,Kiran D,1
+735,4,163,6,2,Girish Hanumanthappa,1
+736,4,163,6,2,Gopal Biradar,1
+737,4,163,8,1,Vishnu Kori,1
+738,4,163,7,2,Lokesh Kulkarni,1
+739,4,164,9,2,David Naik,1
+740,4,164,7,4,Girish Bhat,1
+741,4,164,7,2,Umesh Kori,1
+742,4,165,7,2,Deepak N,1
+743,4,165,6,2,Ashwini Hiremath,2
+744,4,165,8,1,Karthik Hegde N,1
+745,4,165,6,1,Ravi Kamath,1
+746,4,165,5,4,Shivakumar Setty,1
+747,4,165,6,4,Yogesh Setty T,1
+748,4,166,9,2,Sunil Naik,1
+749,4,166,7,2,Naveen Hegde,1
+750,4,166,5,2,Praveen N,1
+751,4,166,9,4,Mahesh M,1
+752,4,166,5,4,Chandru R,1
+753,4,166,7,2,Gopal Shetty P,1
+754,4,167,8,4,Suresh Reddy,1
+755,4,167,9,2,Rajesh Hanumanthappa,1
+756,4,167,6,4,Prakash Desai,1
+757,4,167,6,1,Nagaraj Gowda,1
+758,4,167,8,2,Arun Kori,1
+759,4,167,5,2,Umesh Pai,1
+760,5,168,8,2,Abdul Desai,1
+761,5,168,9,4,Uma Kumar S,2
+762,5,168,9,1,Ayesha Pai,2
+763,5,168,6,2,Darshan Kumar,1
+764,5,168,8,2,Ashok Hegde,1
+765,5,169,9,2,Nagaraj S,1
+766,5,169,9,4,David Desai,1
+767,5,169,8,2,Prasad Shetty S,1
+768,5,169,8,2,Vijay Shetty,1
+769,5,169,7,2,Santosh Pai,1
+770,5,170,9,2,Yogesh Hanumanthappa,1
+771,5,170,7,2,Shankar Nayak,1
+772,5,170,9,2,Srinivas Jadhav,1
+773,5,170,5,2,Syed Biradar,1
+774,5,170,6,2,Darshan Bhat,1
+775,5,170,6,1,Madhu Jadhav H,1
+776,5,171,8,1,Basavaraj N,1
+777,5,171,8,4,Anil Acharya,1
+778,5,171,5,2,Shivakumar M,1
+779,5,171,5,2,Rajesh Patil,1
+780,5,171,9,4,Manjunath Naik,1
+781,5,172,8,4,Venkatesh P,1
+782,5,172,6,2,Basavaraj Ballal,1
+783,5,172,9,2,Pooja T,2
+784,5,172,5,1,Nagaraj Naik,1
+785,5,172,8,2,David Ballal,1
+786,5,173,6,1,Praveen Devaraj,1
+787,5,173,9,2,Sandeep A,1
+788,5,173,7,2,Arun Shetty T,1
+789,5,173,5,1,Yogesh Acharya,1
+790,5,174,9,2,Ramesh Hiremath,1
+791,5,174,8,4,Ganesh Shetty,1
+792,5,174,8,1,Ravi H,1
+793,5,174,9,2,Kiran T,1
+794,5,174,6,1,Prasad Banakar,1
+795,5,175,8,2,Manjunath Shetty,1
+796,5,175,5,1,Vijay Setty,1
+797,5,175,7,4,Deepak Setty S,1
+798,5,176,5,2,Roopa Swamy,2
+799,5,176,5,1,Bhavya Jadhav,2
+800,5,176,9,2,Imran Poojary,1
+801,5,176,6,4,Madhu Devaraj,1
+802,5,177,7,4,Vishnu Shetty,1
+803,5,177,6,1,Raghavendra Shetty M,1
+804,5,177,9,2,Ramesh Devaraj,1
+805,5,178,9,2,Gopal Prasad,1
+806,5,178,9,2,Umesh Poojary,1
+807,5,178,7,4,Yamuna Rao,2
+808,5,179,5,2,Sandeep Biradar,1
+809,5,179,5,1,Manjunath Desai,1
+810,5,179,8,2,Naveen Nayak,1
+811,5,179,6,2,Ashok Hegde,1
+812,5,179,5,2,Vishnu Kamath D,1
+813,5,179,6,4,Suresh Kulkarni A,1
+814,5,180,8,4,Vishnu Kori,1
+815,5,180,6,4,Harish Kumar,1
+816,5,180,7,2,Vijay Naik,1
+817,5,180,5,2,Prakash Kumar,1
+818,5,180,6,4,Srinivas H,1
+819,5,180,7,4,Santosh Kumar,1
+820,5,181,6,4,Umesh B,1
+821,5,181,7,1,Mahesh Hiremath,1
+822,5,181,6,1,Prasad V,1
+823,5,181,8,4,Vijay Poojary,1
+824,5,181,5,2,Ravi S,1
+825,6,182,7,2,Praveen Angadi,1
+826,6,182,8,2,Venkatesh V,1
+827,6,182,9,2,Sunil Patil,1
+828,6,183,5,2,Nagaraj Angadi,1
+829,6,183,7,1,Suresh Patil,1
+830,6,183,9,2,Syed Biradar,1
+831,6,183,8,2,Ravi Devaraj,1
+832,6,183,9,4,Meena Rao,2
+833,6,184,6,2,Gopal Murthy,1
+834,6,184,9,1,Mahesh Kumar S,1
+835,6,184,7,4,Grace P,2
+836,6,184,8,4,Girish Rao,1
+837,6,184,8,1,Ashok Desai,1
+838,6,185,5,2,Vinay P,1
+839,6,185,9,4,Rohit Reddy,1
+840,6,185,9,1,Shankar Ballal,1
+841,6,185,6,2,Suresh Desai,1
+842,6,185,8,1,Praveen Kulkarni,1
+843,6,186,7,2,Yogesh Swamy,1
+844,6,186,7,2,Kavya Prasad,2
+845,6,186,6,2,Anitha Angadi,2
+846,6,186,8,2,Prasad Nayak,1
+847,6,186,6,4,Chandru Desai,1
+848,6,186,6,1,Imran K,1
+849,6,187,9,2,Manjunath Acharya,1
+850,6,187,8,1,Rajesh Reddy,1
+851,6,187,8,4,Nagaraj Jadhav K,1
+852,6,187,5,1,Bharathi Bhat,2
+853,6,187,9,4,Kiran Prasad,1
+854,6,188,9,2,Deepak Hiremath,1
+855,6,188,8,1,Rajesh Kori,1
+856,6,188,6,4,Shwetha Ballal,2
+857,6,189,8,2,Girish Nayak,1
+858,6,189,8,4,Raghavendra Jadhav,1
+859,6,189,6,1,Umesh Kulkarni,1
+860,6,189,9,2,Manjunath Pai,1
+861,6,189,7,2,Suresh Biradar,1
+862,6,190,8,2,Prakash Poojary,1
+863,6,190,8,2,Suresh Murthy M,1
+864,6,190,9,2,Suresh Kumar,1
+865,6,190,6,1,Prakash Kumar,1
+866,6,190,6,2,Lakshmi Jadhav,2
+867,7,191,6,2,Vijay Banakar P,1
+868,7,191,8,2,Suresh Naik,1
+869,7,191,8,2,Shankar Nayak,1
+870,7,191,9,1,Arun Setty,1
+871,7,192,6,2,Ravi Nayak S,1
+872,7,192,7,4,Rajesh Hiremath,1
+873,7,192,6,2,Ramesh Iyer M,1
+874,7,192,7,2,Ramesh Shetty,1
+875,7,193,6,2,Nandini Biradar M,2
+876,7,193,9,2,Karthik Kulkarni A,1
+877,7,193,6,2,Anil Devaraj,1
+878,7,194,7,2,Umesh Pai,1
+879,7,194,9,2,Santosh Shetty,1
+880,7,194,7,2,Pooja Ballal,2
+881,7,194,6,2,Manjunath Biradar,1
+882,7,194,8,4,Vishnu Kori,1
+883,7,195,5,2,Prakash Nayak,1
+884,7,195,9,2,Rohit Pai,1
+885,7,195,8,2,Mahesh Setty,1
+886,7,195,9,2,Karthik Kumar L,1
+887,7,195,9,2,Yogesh Setty,1
+888,7,196,7,2,Srinivas Bhat,1
+889,7,196,9,2,Divya L,2
+890,7,196,6,4,Santosh Pai,1
+891,7,196,7,2,Ramya K,2
+892,7,196,7,2,Ramesh Kulkarni,1
+893,7,197,8,2,Naveen Shetty,1
+894,7,197,8,4,Ganesh A,1
+895,7,197,6,2,Vinay Kori,1
+896,7,198,9,2,Lokesh Biradar,1
+897,7,198,8,2,Rohit P,1
+898,7,198,6,2,Shankar Ballal,1
+899,7,199,8,1,Prasad Patil,1
+900,7,199,5,1,Darshan Gowda,1
+901,7,199,9,2,Shivakumar Pai,1
+902,7,200,8,4,Nandini Angadi,2
+903,7,200,9,1,Gopal Desai,1
+904,7,200,9,2,Vinay Hanumanthappa,1
+905,7,200,8,2,Karthik Hegde,1
+906,7,200,9,2,Gopal Devaraj N,1
+907,7,201,7,4,Ramesh Jadhav,1
+908,7,201,6,2,Uma A,2
+909,7,201,6,2,Thomas Pai,1
+910,7,201,6,2,Karthik Pai,1
+911,8,202,8,2,Rajesh Acharya,1
+912,8,202,8,2,Ramesh Jadhav L,1
+913,8,202,9,2,Sandeep Kori,1
+914,8,202,7,2,Rekha Jadhav,2
+915,8,202,6,2,Girish Biradar,1
+916,8,202,7,4,Srinivas Ballal S,1
+917,8,203,6,2,Chandru G,1
+918,8,203,6,2,Abdul Hanumanthappa,1
+919,8,203,7,2,Chandru Reddy,1
+920,8,203,9,2,Venkatesh Nayak,1
+921,8,203,9,2,Vinay Banakar,1
+922,8,204,7,2,Syed Iyer,1
+923,8,204,9,2,Rajesh Acharya,1
+924,8,204,9,2,Roopa L,2
+925,8,205,8,2,Darshan Desai,1
+926,8,205,7,1,Vidya M,2
+927,8,205,9,4,Naveen Jadhav,1
+928,8,205,5,4,Prakash Biradar,1
+929,8,205,7,4,Praveen Shetty,1
+930,8,205,7,1,Vinay Ballal,1
+931,8,206,9,4,Abdul Iyer,1
+932,8,206,6,2,Ashok Biradar,1
+933,8,206,7,2,Rohit Nayak,1
+934,8,207,6,2,Ravi Kamath,1
+935,8,207,9,4,Umesh Nayak,1
+936,8,207,9,2,Sushma Bhat,2
+937,8,207,9,4,Ramya L,2
+938,8,208,7,1,Karthik Shetty,1
+939,8,208,6,2,Vijay Desai,1
+940,8,208,6,1,Chaitra Kori,2
+941,8,208,9,2,Basavaraj Poojary,1
+942,8,209,5,2,Ganesh G,1
+943,8,209,9,2,Prakash Banakar,1
+944,8,209,9,2,Shankar Kumar,1
+945,8,209,5,2,Mohan Rao,1
+946,9,210,9,4,Vishnu Jadhav,1
+947,9,210,8,2,Bharathi Hegde,2
+948,9,210,7,2,Venkatesh Hanumanthappa,1
+949,9,210,6,2,Kiran Reddy,1
+950,9,211,6,1,Vishnu Kamath,1
+951,9,211,7,2,Shankar Naik,1
+952,9,211,8,4,Sunil Setty,1
+953,9,211,8,1,Madhu Kori,1
+954,9,212,9,2,Shivakumar Patil,1
+955,9,212,9,2,Deepak Kamath,1
+956,9,212,6,2,Abdul Swamy,1
+957,9,212,7,2,Raghavendra Bhat,1
+958,9,212,6,2,Grace Hegde,2
+959,9,213,9,2,Sandeep Ballal,1
+960,9,213,6,2,Deepak Setty,1
+961,9,213,8,2,Darshan H,1
+962,9,213,9,2,Deepak G,1
+963,9,213,8,2,Mahesh S,1
+964,9,214,9,2,Imran Desai,1
+965,9,214,5,2,Rajesh Setty,1
+966,9,214,7,4,Vijay Kulkarni,1
+967,9,214,6,1,Umesh Hegde,1
+968,9,215,9,2,Umesh Kori,1
+969,9,215,7,2,Vishnu S,1
+970,9,215,9,2,Prakash Kulkarni,1
+971,10,216,6,2,Yogesh Kori,1
+972,10,216,6,2,Karthik Poojary,1
+973,10,216,7,2,Naveen G,1
+974,10,216,9,1,Gopal Jadhav,1
+975,10,216,7,2,Imran Devaraj,1
+976,10,216,7,1,Arun Iyer,1
+977,10,217,6,1,Imran Kumar,1
+978,10,217,6,2,Santosh Desai N,1
+979,10,217,6,2,Prakash Poojary,1
+980,10,217,7,1,Vijay Bhat,1
+981,10,217,6,2,Venkatesh Hanumanthappa M,1
+982,10,217,7,2,Naveen Acharya L,1
+983,10,218,6,2,Kiran Murthy,1
+984,10,218,7,2,Imran Hanumanthappa,1
+985,10,218,8,2,Thomas Shetty,1
+986,10,218,9,2,Ashok Shetty L,1
+987,10,218,9,2,Abdul Ballal,1
+988,10,219,7,2,Girish R,1
+989,10,219,5,1,Mohan Kumar,1
+990,10,219,6,2,Nandini Nayak,2
+991,10,219,8,2,Kiran Banakar,1
+992,10,219,6,2,Mohan Poojary,1
+993,10,220,9,1,Srinivas Poojary,1
+994,10,220,6,1,Ramesh Murthy,1
+995,10,220,6,4,Ramesh Kumar,1
+996,10,220,6,2,Ashok Hegde,1
+997,10,220,9,2,Harish Banakar,1
+998,10,221,6,4,Sushma H,2
+999,10,221,8,2,Vishnu Kamath,1
+1000,10,221,8,1,Ashok Pai,1
+1001,10,221,7,1,Anil Iyer,1
+1002,11,222,7,2,Sunil S,1
+1003,11,222,9,2,Mohan G,1
+1004,11,222,6,4,Harish Iyer,1
+1005,11,222,9,2,Mohan P,1
+1006,11,222,7,2,Vishnu L,1
+1007,11,223,6,2,Darshan Rao,1
+1008,11,223,7,4,Vijay Kori,1
+1009,11,223,9,4,Girish S,1
+1010,11,223,7,2,Sunil Acharya,1
+1011,11,223,5,2,Santosh Hiremath,1
+1012,11,224,9,2,David Desai,1
+1013,11,224,6,2,Venkatesh Patil,1
+1014,11,224,6,2,Sujatha Murthy,2
+1015,11,224,9,4,Manasa Angadi,2
+1016,11,224,6,2,Lakshmi Jadhav,2
+1017,11,224,8,4,Sunitha Angadi,2
+1018,11,225,6,2,Syed Jadhav,1
+1019,11,225,9,1,Srinivas V,1
+1020,11,225,6,2,Vijay Desai,1
+1021,11,226,6,2,Imran Prasad,1
+1022,11,226,9,4,Mohan Kamath,1
+1023,11,226,6,4,Umesh Naik S,1
+1024,11,226,7,1,Sowmya M,2
+1025,11,227,7,4,Naveen Murthy,1
+1026,11,227,6,2,Imran Setty,1
+1027,11,227,6,2,Deepak Kumar,1
+1028,12,228,9,1,Darshan Devaraj,1
+1029,12,228,8,4,Syed Bhat,1
+1030,12,228,8,2,Anil D,1
+1031,12,228,7,4,Shankar B,1
+1032,12,228,5,4,Syed Patil M,1
+1033,12,228,7,1,Deepa Acharya,2
+1034,12,229,5,2,Arun Desai,1
+1035,12,229,6,1,Deepak Biradar,1
+1036,12,229,6,4,Lakshmi Kulkarni,2
+1037,12,229,7,2,Shivakumar T,1
+1038,12,229,6,2,Imran Nayak,1
+1039,12,229,9,2,Praveen Prasad,1
+1040,12,230,8,4,Rohit Setty,1
+1041,12,230,5,2,Gopal Bhat,1
+1042,12,230,8,4,Darshan Patil,1
+1043,12,230,9,1,Lokesh Kori,1
+1044,12,231,9,2,Basavaraj Kamath B,1
+1045,12,231,9,2,Uma Bhat,2
+1046,12,231,7,2,Vishnu Hanumanthappa,1
+1047,12,231,9,4,Rekha Angadi,2
+1048,12,231,7,4,Rajesh Murthy,1
+1049,12,232,7,1,Shivakumar Prasad,1
+1050,12,232,7,2,Mohan Swamy,1
+1051,12,232,8,2,Kavya Patil B,2
+1052,13,233,9,2,Anil Naik M,1
+1053,13,233,7,2,Darshan H,1
+1054,13,233,7,1,Darshan Banakar,1
+1055,13,233,6,2,Suresh Angadi,1
+1056,13,234,5,2,Praveen Gowda,1
+1057,13,234,7,2,Kiran Banakar N,1
+1058,13,234,6,2,Karthik Angadi,1
+1059,13,234,7,1,Lokesh Hanumanthappa,1
+1060,13,235,6,4,Chandru Naik,1
+1061,13,235,5,4,Rohit Angadi,1
+1062,13,235,8,4,Mohan Banakar L,1
+1063,13,235,9,2,Rohit Iyer,1
+1064,13,236,6,2,Rajesh Nayak,1
+1065,13,236,5,2,Ganesh Poojary,1
+1066,13,236,8,4,Chandru Angadi,1
+1067,13,236,9,4,Venkatesh Shetty,1
+1068,13,236,9,4,Ramesh Patil N,1
+1069,13,236,6,2,Vishnu Angadi,1
+1070,13,237,7,4,Praveen Shetty,1
+1071,13,237,6,2,Mohan Kori,1
+1072,13,237,7,4,Venkatesh Shetty,1
+1073,13,237,7,2,Arun A,1
+1074,13,237,6,2,Lokesh Kulkarni B,1
+1075,14,238,5,2,Suresh Rao,1
+1076,14,238,6,4,Mohan Bhat,1
+1077,14,238,7,2,Basavaraj Setty,1
+1078,14,239,5,2,Arun Devaraj,1
+1079,14,239,7,4,Santosh Banakar,1
+1080,14,239,9,1,Chaitra Murthy,2
+1081,14,239,6,2,Rajesh Banakar,1
+1082,14,240,6,2,David Ballal,1
+1083,14,240,7,2,Umesh Hegde,1
+1084,14,240,8,2,Thomas Swamy,1
+1085,14,240,7,2,Ravi Hiremath,1
+1086,14,240,7,2,Madhu Patil,1
+1087,14,240,9,2,Sowmya Desai,2
+1088,14,241,7,2,Arun Acharya,1
+1089,14,241,6,4,Divya Acharya,2
+1090,14,241,5,2,Rohit Nayak,1
+1091,14,242,6,1,Prasad T,1
+1092,14,242,8,4,Praveen Kulkarni,1
+1093,14,242,9,2,Nagaraj Prasad,1
+1094,14,242,8,1,Imran K,1
+1095,14,242,7,2,Deepak M,1
+1096,15,243,8,2,Abdul Kori,1
+1097,15,243,5,2,Ramesh Hegde,1
+1098,15,243,5,4,Abdul K,1
+1099,15,243,8,1,Raghavendra Kulkarni,1
+1100,15,243,9,2,Manjunath Nayak A,1
+1101,15,243,8,2,Imran Pai,1
+1102,15,244,9,2,Arun Biradar,1
+1103,15,244,9,1,Srinivas Gowda,1
+1104,15,244,8,2,Basavaraj Murthy,1
+1105,15,244,8,4,Divya Kumar,2
+1106,15,245,8,2,Shankar G,1
+1107,15,245,5,4,Sowmya Hiremath,2
+1108,15,245,6,1,Grace Kamath,2
+1109,15,245,7,2,Thomas Iyer,1
+1110,15,245,9,2,Harish P,1
+1111,15,246,5,1,Divya S,2
+1112,15,246,5,1,Madhu T,1
+1113,15,246,7,1,Suresh Kulkarni,1
+1114,15,247,8,2,Gopal Hanumanthappa,1
+1115,15,247,6,2,Anil Devaraj,1
+1116,15,247,6,4,Karthik Bhat,1
+1117,15,247,7,1,Gopal Prasad,1
+1118,15,247,9,4,Ashok Kumar,1
+1119,15,247,6,4,Ravi Banakar,1
+1120,16,248,7,2,Rekha L,2
+1121,16,248,9,2,Chandru Devaraj,1
+1122,16,248,9,4,Santosh Desai,1
+1123,16,249,6,2,Ashok Gowda K,1
+1124,16,249,6,4,Sujatha R,2
+1125,16,249,9,2,Sunil Poojary,1
+1126,16,249,6,2,Prakash Murthy,1
+1127,16,249,9,2,Ramesh Swamy A,1
+1128,16,249,6,1,Ganesh Pai,1
+1129,16,250,7,4,Gopal Kori,1
+1130,16,250,9,2,Harish Biradar,1
+1131,16,250,9,2,Mohan L,1
+1132,16,251,5,2,Naveen Desai,1
+1133,16,251,6,2,Naveen V,1
+1134,16,251,8,1,Vijay D,1
+1135,16,251,9,2,Chandru Kamath,1
+1136,17,252,8,2,Shivakumar Jadhav,1
+1137,17,252,6,2,Deepak Iyer N,1
+1138,17,252,8,2,Vijay Shetty,1
+1139,17,252,5,2,Manjunath Kori,1
+1140,17,252,8,2,Raghavendra Jadhav,1
+1141,17,252,7,2,Shivakumar Rao,1
+1142,17,253,5,2,Girish Setty,1
+1143,17,253,5,1,Rajesh Banakar,1
+1144,17,253,7,2,Vinay Gowda,1
+1145,17,254,7,2,Prakash Angadi T,1
+1146,17,254,7,2,Mary H,2
+1147,17,254,7,2,Sandeep B,1
+1148,17,254,6,2,Ramesh Shetty,1
+1149,17,254,8,2,Vishnu Kumar,1
+1150,17,254,6,2,Prakash Jadhav,1
+1151,17,255,9,2,Sandeep Jadhav,1
+1152,17,255,8,4,Girish G,1
+1153,17,255,9,2,Arun Prasad,1
+1154,18,256,8,4,Shwetha Angadi,2
+1155,18,256,9,4,Rajesh Reddy,1
+1156,18,256,7,2,Lokesh Hanumanthappa,1
+1157,18,256,6,2,Basavaraj Kumar M,1
+1158,18,256,9,2,Bharathi Shetty,2
+1159,18,256,7,1,Vijay Kumar,1
+1160,18,257,6,1,Girish Rao,1
+1161,18,257,6,2,Rajesh Jadhav,1
+1162,18,257,6,2,Thomas Ballal,1
+1163,18,257,9,1,Gopal Iyer,1
+1164,18,258,9,1,Imran Angadi,1
+1165,18,258,7,2,Vinay Swamy,1
+1166,18,258,8,2,Deepak Angadi,1
+1167,18,258,8,2,Srinivas Hiremath,1
+1168,18,259,9,2,Ramesh Murthy,1
+1169,18,259,6,2,Shivakumar Iyer L,1
+1170,18,259,6,2,Karthik Bhat,1
+1171,18,259,9,4,Rohit Desai,1
+1172,18,259,6,2,Manjunath Patil,1
+1173,19,260,8,2,Ramesh Pai L,1
+1174,19,260,5,4,Ganesh Hiremath,1
+1175,19,260,7,4,Rajesh Ballal,1
+1176,19,261,9,2,Kiran Hiremath,1
+1177,19,261,9,2,Anil Angadi,1
+1178,19,261,7,2,Mahesh Ballal S,1
+1179,19,262,5,1,Santosh Devaraj A,1
+1180,19,262,7,2,Abdul Reddy L,1
+1181,19,262,8,2,Sunil Patil,1
+1182,20,263,5,1,Nagaraj Hanumanthappa,1
+1183,20,263,6,2,Ganesh Ballal D,1
+1184,20,263,8,2,Ganesh Pai,1
+1185,20,263,5,2,Nagaraj Patil,1
+1186,20,263,6,2,Nagaraj Iyer,1
+1187,20,264,8,2,Mohan M,1
+1188,20,264,7,2,Ganesh Kulkarni,1
+1189,20,264,7,2,Nandini Acharya,2
+1190,20,265,8,2,Bhavya Reddy,2
+1191,20,265,7,2,Arun Kumar,1
+1192,20,265,7,2,Manjunath Reddy,1
+1193,20,265,7,2,Rajesh G,1
+1194,20,265,8,2,Girish Kulkarni,1
+1195,20,265,6,2,Venkatesh Angadi,1
+1196,21,266,6,2,Syed L,1
+1197,21,266,6,2,Ashok Hanumanthappa,1
+1198,21,266,8,1,Shankar Angadi,1
+1199,21,267,7,4,Harish Swamy,1
+1200,21,267,6,2,Praveen Gowda,1
+1201,21,267,6,2,Deepa Acharya,2
+1202,21,267,9,4,Pooja Patil,2
+1203,21,267,9,1,Naveen Setty,1
+1204,21,268,9,4,Shivakumar Setty,1
+1205,21,268,8,4,Harish Devaraj,1
+1206,21,268,7,2,Imran Bhat,1
+1207,22,269,6,1,Vishnu Angadi,1
+1208,22,269,7,1,Ashok Kumar,1
+1209,22,269,9,4,Praveen Banakar,1
+1210,22,269,8,2,Venkatesh Swamy,1
+1211,22,270,6,1,Raghavendra Nayak,1
+1212,22,270,6,2,Ramesh Swamy,1
+1213,22,270,6,2,Shankar Pai,1
+1214,22,270,5,2,Abdul S,1
+1215,22,271,6,4,Basavaraj V,1
+1216,22,271,9,1,Chandru Shetty,1
+1217,22,271,9,2,Santosh Angadi R,1
+1218,22,271,5,2,Ashok Setty,1
+1219,22,271,5,2,Girish Reddy,1
+1220,22,271,6,2,Santosh Nayak,1
+1221,23,272,6,1,Sujatha Kumar,2
+1222,23,272,8,4,Venkatesh Kulkarni,1
+1223,23,272,7,2,Girish Hegde,1
+1224,23,273,7,4,Shankar Banakar A,1
+1225,23,273,9,2,Nagaraj Pai,1
+1226,23,273,7,2,Yogesh Gowda,1
+1227,23,273,5,1,David Pai,1
+1228,23,274,5,4,Thomas P,1
+1229,23,274,5,2,Lokesh Ballal,1
+1230,23,274,9,2,Basavaraj Kulkarni,1
+1231,23,274,8,2,Lokesh K,1
+1232,24,275,8,2,Naveen Nayak,1
+1233,24,275,8,1,Venkatesh Banakar,1
+1234,24,275,7,4,Thomas Setty,1
+1235,24,276,7,2,Lakshmi Gowda,2
+1236,24,276,9,2,Vishnu N,1
+1237,24,276,7,2,Venkatesh Hegde,1
+1238,24,276,9,4,Yogesh Hegde,1
+1239,24,276,8,2,Yogesh Murthy,1
+1240,24,276,7,4,Mahesh Banakar,1
+1241,24,277,6,2,Sujatha Kumar,2
+1242,24,277,8,2,Mohan Biradar N,1
+1243,24,277,7,1,Nagaraj Biradar B,1
+1244,24,277,9,2,Geetha Bhat,2
+1245,24,277,7,2,Anil Setty,1
+1246,24,277,9,4,Manjunath Rao,1
+1247,25,278,7,4,David Naik,1
+1248,25,278,9,2,Mohan Rao,1
+1249,25,278,5,2,Uma Kulkarni,2
+1250,25,279,6,2,Syed Bhat,1
+1251,25,279,6,2,Deepak R,1
+1252,25,279,7,1,Vijay Iyer,1
+1253,25,279,9,2,Srinivas Poojary,1
+1254,25,280,6,2,Ganesh Shetty,1
+1255,25,280,9,4,Suresh Prasad,1
+1256,25,280,7,2,Praveen Kori,1
+1257,25,280,9,2,Ganesh Kulkarni,1
+1258,25,280,8,1,Vinay Setty,1
+1259,25,280,6,4,Nagaraj Biradar,1
+1260,26,281,8,2,Naveen H,1
+1261,26,281,7,2,Ganesh Murthy,1
+1262,26,281,9,4,Manjunath L,1
+1263,26,281,9,2,Imran Hanumanthappa,1
+1264,26,282,6,1,Vishnu Prasad,1
+1265,26,282,8,2,Divya Iyer,2
+1266,26,282,9,4,Roopa Jadhav,2
+1267,26,282,8,2,Ganesh T,1
+1268,26,282,7,1,Ramesh D,1
+1269,26,282,7,2,Karthik Kulkarni,1
+1270,26,283,7,2,Darshan K,1
+1271,26,283,5,2,Lokesh H,1
+1272,26,283,6,4,Thomas Prasad P,1
+1273,26,283,7,1,Ganesh Rao,1
+1274,26,283,7,2,Ravi Shetty,1
+1275,27,284,5,1,Raghavendra P,1
+1276,27,284,9,2,Fathima Setty,2
+1277,27,284,5,2,Harish Patil R,1
+1278,27,285,9,2,Lakshmi Prasad,2
+1279,27,285,8,4,Ravi Pai,1
+1280,27,285,6,2,Yogesh Rao,1
+1281,27,286,6,2,Ramesh R,1
+1282,27,286,5,2,Raghavendra Iyer,1
+1283,27,286,9,2,Karthik Kumar,1
+1284,28,287,5,2,Kavya Kulkarni,2
+1285,28,287,6,4,Sunil Naik,1
+1286,28,287,8,2,Divya Prasad,2
+1287,28,287,6,2,Darshan Angadi,1
+1288,28,287,9,2,Shwetha Setty,2
+1289,28,288,6,2,Rohit L,1
+1290,28,288,8,4,Anil Murthy G,1
+1291,28,288,7,4,Vishnu Kumar,1
+1292,28,288,8,1,Umesh Swamy,1
+1293,28,288,5,2,Sunil Desai,1
+1294,28,289,9,2,Abdul Nayak,1
+1295,28,289,6,2,Arun Hegde,1
+1296,28,289,9,4,Gopal Hiremath,1
+1297,28,289,5,4,Sandeep Poojary,1
+1298,28,289,8,2,Divya Iyer,2
+1299,29,290,8,4,Rajesh Biradar,1
+1300,29,290,6,2,Ravi A,1
+1301,29,290,6,2,Sunitha Pai,2
+1302,29,291,6,1,Ramesh Naik,1
+1303,29,291,8,4,Madhu Shetty,1
+1304,29,291,6,2,Shankar Kumar,1
+1305,29,292,8,2,David Gowda K,1
+1306,29,292,5,2,Manjunath Kamath,1
+1307,29,292,9,2,Umesh Prasad,1
+1308,29,292,8,4,Vijay Hegde,1
+1309,30,293,7,4,Arun Hiremath R,1
+1310,30,293,6,2,Naveen Naik,1
+1311,30,293,5,2,Suresh Desai,1
+1312,30,293,8,4,Chandru Setty,1
+1313,30,293,6,2,David Nayak,1
+1314,30,294,8,1,Vishnu M,1
+1315,30,294,7,2,Deepak Kamath,1
+1316,30,294,8,2,Ganesh Kumar,1
+1317,30,294,8,2,Sunil Kumar,1
+1318,30,295,6,4,Anil Desai,1
+1319,30,295,7,4,Madhu Kulkarni,1
+1320,30,295,6,4,Thomas Kori,1
+1321,30,295,7,4,Ramesh Gowda,1
+1322,30,295,9,1,Anil Poojary B,1
+1323,30,295,7,2,Lokesh Hegde,1
+1324,31,296,8,2,Madhu G,1
+1325,31,296,8,2,Imran Naik,1
+1326,31,296,6,1,Darshan Angadi,1
+1327,31,296,7,4,Naveen Kulkarni M,1
+1328,31,297,9,4,Manasa Shetty A,2
+1329,31,297,6,2,Yogesh Desai,1
+1330,31,297,6,2,Umesh Ballal P,1
+1331,31,298,9,1,Manjunath K,1
+1332,31,298,6,2,Srinivas Kumar,1
+1333,31,298,7,2,Harish Poojary,1
+1334,31,298,7,2,Naveen Hiremath,1
+1335,31,298,9,2,Anil P,1
+1336,31,298,5,2,Ramya Acharya,2

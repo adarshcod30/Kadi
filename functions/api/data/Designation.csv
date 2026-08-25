@@ -1,0 +1,6 @@
+DesignationID,DesignationName,Active,SortOrder
+1,SHO,True,1
+2,Investigating Officer,True,2
+3,Station Writer,True,3
+4,Beat Officer,True,4
+5,Circle Inspector,True,5

@@ -38,7 +38,8 @@ SMALL = ["socio", "forecast", "stats", "zones", "occasions", "district_stats", "
          "hotspots", "eval_report", "offenders", "anomalies", "clusters",
          "case_linked_count", "offender_of_case", "stations"]
 LOOKUPS = ["District", "Unit", "CrimeHead", "CrimeSubHead", "CaseStatusMaster",
-           "CaseCategory", "GravityOffence", "GenderMaster", "Court", "Section", "Act"]
+           "CaseCategory", "GravityOffence", "GenderMaster", "Court", "Section", "Act",
+           "Rank", "Designation", "ArrestSurrenderType"]
 
 # Sized to hold a whole ego network rather than truncate it. The cap used to be 14 while
 # case_linked_count was written from the UNCAPPED graph, so the switcher advertised "125
@@ -201,6 +202,31 @@ def main():
         total_before += b
         total_after += a
         print(f"  CaseMaster.csv   {b:6.1f} MB -> {a:5.1f} MB   ({len(rows):,} FIRs)")
+
+    # ---- Employee, trimmed (never shipped at all before this) ----
+    # Employee.csv was absent from every bundle build. store.mock.js reads it
+    # unconditionally to resolve the investigating officer's name for every case, so on the
+    # deployed function that lookup always missed and every case detail showed "IO: --".
+    # Trimmed rather than copied whole: KGID, EmployeeDOB, BloodGroupID,
+    # PhysicallyChallenged and AppointmentDate are personnel/HR fields no feature reads --
+    # unlike CaseMaster.BriefFacts above, dropping them costs nothing today, and not
+    # shipping unused personal data about individually named officers is the right default
+    # even in a synthetic dataset.
+    src = os.path.join(SRC, "Employee.csv")
+    if os.path.exists(src):
+        with open(src) as f:
+            rows = list(csv.DictReader(f))
+        fields = ["EmployeeID", "DistrictID", "UnitID", "RankID", "DesignationID", "FirstName", "GenderID"]
+        dst = os.path.join(OUT, "Employee.csv")
+        with open(dst, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for r in rows:
+                w.writerow({k: r[k] for k in fields})
+        b, a = size_mb(src), size_mb(dst)
+        total_before += b
+        total_after += a
+        print(f"  Employee.csv     {b:6.1f} MB -> {a:5.1f} MB   ({len(rows):,} employees, HR fields dropped)")
 
     # ---- lookups + party tables the detail view needs ----
     for name in LOOKUPS + ["Accused", "Victim", "ComplainantDetails", "ActSectionAssociation", "ArrestSurrender", "ChargesheetDetails"]:

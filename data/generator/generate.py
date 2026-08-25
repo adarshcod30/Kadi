@@ -235,9 +235,6 @@ class Builder:
         head_id = self.head_of_subhead[subhead_id]
         sh = self.subhead_index[subhead_id]
         heinous = sh[3]
-        year = incident_dt.year
-        crime_no, case_no = self.crime_no(category_code, district_id, unit_id, year)
-        cid = self._next("CaseMaster")
 
         # reporting delay (hours) — mostly small; occasionally large
         rd_roll = self.rng.random()
@@ -251,6 +248,15 @@ class Builder:
         reg_date = (info_dt + timedelta(hours=self.rng.randint(0, 24))).date()
         if reg_date > TODAY:
             reg_date = TODAY
+
+        # CrimeNo's serial counter is a station register: it only ticks once a case is
+        # actually entered, so its year must be the year of REGISTRATION, not the year the
+        # underlying incident happened. Using incident_dt.year here previously gave 576 of
+        # 40,829 cases (1.4%) a CrimeNo whose embedded year didn't match CrimeRegisteredDate
+        # -- every one a late-December incident whose reporting delay carried registration
+        # into January or February of the following year.
+        crime_no, case_no = self.crime_no(category_code, district_id, unit_id, reg_date.year)
+        cid = self._next("CaseMaster")
 
         if lat is None:
             lat, lng = self.sample_latlng(district_id)
@@ -383,7 +389,8 @@ class Builder:
         return aid
 
     def add_arrest(self, case_id, accused_id, district_id, unit_id, io_emp_id,
-                   arrest_date, atype=1, state_id=K.KARNATAKA_STATE_ID, is_accused=1):
+                   arrest_date, atype=1, state_id=K.KARNATAKA_STATE_ID, is_accused=1,
+                   is_complainant_accused=0):
         asid = self._next("ArrestSurrender")
         self.add("ArrestSurrender", {
             "ArrestSurrenderID": asid, "CaseMasterID": case_id,
@@ -392,7 +399,7 @@ class Builder:
             "PoliceStationID": unit_id, "IOID": io_emp_id if io_emp_id else "",
             "CourtID": self.courts_by_district.get(district_id, ""),
             "AccusedMasterID": accused_id, "IsAccused": is_accused,
-            "IsComplainantAccused": 0,
+            "IsComplainantAccused": is_complainant_accused,
         })
         self.add("inv_arrestsurrenderaccused", {
             "ArrestSurrenderID": asid, "AccusedMasterID": accused_id,
@@ -601,7 +608,14 @@ def _attach_disposition(b: Builder, rng: Rng, case, officers_pool):
         for aid in case.get("accused", []):
             if rng.random() < 0.8:
                 adate = min(reg + timedelta(days=rng.randint(1, cs_gap)), TODAY)
-                b.add_arrest(case["CaseMasterID"], aid, case["district_id"], case["unit_id"], io, adate)
+                # IsComplainantAccused was hardcoded 0 for all 11,717 arrests -- a flag
+                # generated with full referential integrity that could never be true. Real
+                # investigations occasionally find the complainant is also an accused
+                # (mutual-combat cases, a complaint filed to pre-empt one's own arrest).
+                # Same 1% treatment already used for VictimPolice above.
+                complainant_accused = 1 if rng.random() < 0.01 else 0
+                b.add_arrest(case["CaseMasterID"], aid, case["district_id"], case["unit_id"], io, adate,
+                             is_complainant_accused=complainant_accused)
     elif status == 4:  # undetected
         if rng.random() < 0.6:
             cs_date = datetime.combine(min(reg + timedelta(days=rng.randint(90, 300)), TODAY), datetime.min.time())

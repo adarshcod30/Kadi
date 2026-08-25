@@ -1,0 +1,10 @@
+RankID,RankName,Hierarchy,Active
+1,Director General of Police,1,True
+2,Inspector General of Police,2,True
+3,Superintendent of Police,3,True
+4,Deputy Superintendent of Police,4,True
+5,Police Inspector,5,True
+6,Police Sub-Inspector,6,True
+7,Assistant Sub-Inspector,7,True
+8,Head Constable,8,True
+9,Police Constable,9,True

@@ -71,7 +71,11 @@ export default function CaseDetail() {
             <span className="text-ink-muted">· {c.crimeHead}</span>
             <StatusChip status={c.status} /><GravityChip gravity={c.gravity} /><Chip>{c.category}</Chip>
           </div>
-          <div className="text-xs text-ink-muted mt-1">{c.unitName}, {c.districtName} · IO: {c.ioName || '—'}</div>
+          <div className="text-xs text-ink-muted mt-1">
+            {c.unitName}, {c.districtName} · IO: {c.ioName || '—'}
+            {c.ioRank && <span> ({c.ioRank})</span>}
+            {c.courtName && <span> · Court: {c.courtName}</span>}
+          </div>
         </div>
         <div className="flex gap-2">
           {c.linkedCount > 0 && (
@@ -91,7 +95,8 @@ export default function CaseDetail() {
           <Section title="Parties">
             <div className="grid sm:grid-cols-3 gap-4 p-4">
               <PartyList title="Accused" items={c.parties.accused.map((a) => `${a.personId ? a.personId + ' · ' : ''}${a.name}`)} />
-              <PartyList title="Victims" items={c.parties.victims.map((v) => `${v.name} (${v.age})`)} />
+              <PartyList title="Victims" items={c.parties.victims.map((v) =>
+                `${v.name} (${v.age})${v.isPolice ? ' \u00b7 Police' : ''}`)} />
               <PartyList title="Complainant" items={c.parties.complainants.map((v) => `${v.name} (${v.age})`)} />
             </div>
           </Section>
@@ -102,6 +107,27 @@ export default function CaseDetail() {
               {!c.acts.length && <span className="text-sm text-ink-muted">—</span>}
             </div>
           </Section>
+
+          {c.arrests.length > 0 && (
+            <Section title="Arrests & surrenders">
+              <div className="divide-y divide-line">
+                {c.arrests.map((a, i) => (
+                  <div key={i} className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+                    <div>
+                      <span className="font-medium">{a.typeLabel || 'Event'}</span>
+                      {a.accusedName && <span className="text-ink-muted"> · {a.accusedName}</span>}
+                      {a.isComplainantAccused && (
+                        <Chip color="amber" className="ml-2 !text-[11px]">Complainant also accused</Chip>
+                      )}
+                    </div>
+                    <div className="text-xs text-ink-muted font-num text-right shrink-0">
+                      {a.date}{a.districtName ? ` · ${a.districtName}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {c.offenders.length > 0 && (
             <Section title="Resolved offenders in this FIR">

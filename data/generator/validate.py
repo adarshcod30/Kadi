@@ -84,6 +84,16 @@ def main():
     dup = pd.DataFrame({"k": key, "s": serial}).duplicated().sum()
     all_ok &= check("CrimeNo serial unique per (station,category,year)", dup == 0, f"{dup} dupes")
 
+    # Regression guard: a station register's serial only ticks on registration, so the year
+    # embedded in CrimeNo must be the year of CrimeRegisteredDate. 576/40,829 cases failed
+    # this before the fix -- late-December incidents whose reporting delay carried
+    # registration into the next year while CrimeNo still carried the incident's year.
+    crimeno_year = cases["CrimeNo"].str[9:13]
+    reg_year = cases["CrimeRegisteredDate"].astype(str).str[:4]
+    year_mismatch = (crimeno_year != reg_year).sum()
+    all_ok &= check("CrimeNo year matches CrimeRegisteredDate year", year_mismatch == 0,
+                     f"{year_mismatch} mismatched")
+
     # ---- Planted patterns present ----
     gang = gt["gangs"][0]
     all_ok &= check("gang cases exist", set(map(str, gang["caseMasterIds"])).issubset(case_ids),
