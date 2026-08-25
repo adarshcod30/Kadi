@@ -29,8 +29,16 @@ import random
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
+import sys
+
 import karnataka as K
-from patterns import PLANTED_SURNAMES
+from patterns import PLANTED_SURNAMES, RESERVED_SURNAMES
+
+# Real Census-sourced urbanisation figures, shared with the analytics pipeline (socio.py
+# reads the same module) so a station's Town/City-vs-Rural split and the district's own
+# "how urban is this place" figure never disagree with each other.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "appsail", "pipeline"))
+from demographics import DISTRICT_DEMOGRAPHICS  # noqa: E402
 
 SEED = 2026
 DATE_START = date(2023, 1, 1)
@@ -204,8 +212,11 @@ class Builder:
             first = self.rng.choice(K.FIRST_NAMES_F if g == 2 else K.FIRST_NAMES_M)
             # Distinctive (place-derived) surnames, NOT the 30-name common pool. A surname
             # seen 1,200 times carries no identity signal, so ER correctly refuses to merge
-            # on it; these stay rare enough to be evidence.
-            last = self.rng.choice(PLANTED_SURNAMES)
+            # on it; these stay rare enough to be evidence. RESERVED_SURNAMES stays out --
+            # those belong exclusively to the named ground-truth patterns in patterns.py,
+            # and drawing them here too was exactly what pushed "Belavadi" past the
+            # distinctiveness threshold its own planted pattern depends on.
+            last = self.rng.choice([s for s in PLANTED_SURNAMES if s not in RESERVED_SURNAMES])
             key = (first, last)
             if key in seen:
                 continue
@@ -446,6 +457,8 @@ def build_reference(b: Builder, rng: Rng):
                            "StateID": K.KARNATAKA_STATE_ID, "Active": True})
     for ut in K.UNIT_TYPES:
         b.add("UnitType", ut)
+    for sc in K.STATION_CATEGORIES:
+        b.add("StationCategory", sc)
     for r in K.RANKS:
         b.add("Rank", r)
     for de in K.DESIGNATIONS:
@@ -489,24 +502,96 @@ def build_reference(b: Builder, rng: Rng):
     _build_employees(b, rng)
 
 
+def _station_location(b: Builder, rng: Rng, district_id: int, placed: list, min_sep_deg: float):
+    """A distinct point for one station: real district geometry, clustered near an urban
+    centre like an incident would be, but rejected and redrawn if it lands within
+    min_sep_deg of a station already placed in this district.
+
+    Without this, station location was never modelled at all -- the map derived a
+    station's position after the fact from the mean of its own cases' coordinates, and
+    since those cases were themselves drawn from the same handful of per-district urban
+    centres, dozens of stations in one district converged toward nearly the same point.
+    That is why Bengaluru's ~120 stations rendered as a single blob regardless of zoom:
+    it was not a rendering bug, the stations never had distinct locations to render.
+    Giving each station its own point once, here, at generation time, is the actual fix.
+    """
+    best, best_d = None, -1.0
+    for _ in range(60):
+        lat, lng = b.sample_latlng(district_id)
+        d = min((abs(lat - p[0]) + abs(lng - p[1]) for p in placed), default=99.0)
+        if d >= min_sep_deg:
+            return lat, lng
+        if d > best_d:
+            best, best_d = (lat, lng), d
+    return best  # 60 tries exhausted (very dense district) -- take the most-separated draw
+
+
 def _build_units(b: Builder, rng: Rng, total=300):
     # distribute stations across districts roughly by weight, min 3 each
     weights = K.DISTRICT_WEIGHTS
     alloc = {}
     for did, w in weights.items():
         alloc[did] = max(3, round(w * total))
-    # trim/pad to ~total
     unit_id = 0
     for d in K.DISTRICTS:
         did = d["DistrictID"]
         n = alloc[did]
         base = d["DistrictName"].split()[0]
+        urban_pct = DISTRICT_DEMOGRAPHICS.get(did, (None, None, None, 50.0))[3]
+
+        # Denser districts need a tighter minimum separation just to fit n stations inside
+        # their own polygon at all; sparser ones can afford (and look more realistic with)
+        # more spread. ~500m floor, up to ~2.2km for a sparsely stationed district.
+        min_sep = max(0.0045, min(0.02, 0.02 * (10.0 / max(n, 1))))
+
+        # ---- specialised-station allocation for this district ----
+        idx = rng.sample(range(n), n) if n else []
+        cursor = 0
+        category_of = {}
+
+        def take(k, cat_id):
+            nonlocal cursor
+            for _ in range(min(k, len(idx) - cursor)):
+                category_of[idx[cursor]] = cat_id
+                cursor += 1
+
+        take(1, 4)  # Women Police Station -- one per district, always
+        if did == 1:  # Bengaluru City: the state's dedicated cyber-crime carve-out
+            take(6, 6)
+        else:  # everywhere else: CEN covers cyber + economic + narcotics together
+            take(1, 5)
+        # Traffic stations concentrate heavily in the handful of large cities, the way they
+        # actually do in Karnataka -- Bengaluru City alone runs dozens of dedicated traffic
+        # PS. A continuous urban_pct*k formula spread ~2-3 into most of the 31 districts
+        # (52 total), which does not match reality: most district towns run traffic
+        # enforcement out of the local L&O station, not a separate one. Tiered instead of
+        # linear, so only the genuinely dense commissionerates (Bengaluru City 98% urban,
+        # Hubballi-Dharwad 96%) get real traffic-station coverage.
+        if urban_pct >= 90:
+            n_traffic = 6
+        elif urban_pct >= 40:
+            n_traffic = 1
+        else:
+            n_traffic = 0
+        take(n_traffic, 3)
+        if did in K.RAILWAY_JUNCTION_DISTRICTS:
+            take(min(2, max(1, n // 40)), 7)
+        # Remainder: ordinary Law & Order, Town/City vs Rural. Per-unit, not per-district --
+        # a district that is 45% urban plausibly has both kinds of station, not a single
+        # district-wide coin flip deciding all of it at once.
+        for i in idx[cursor:]:
+            category_of[i] = 1 if rng.random() < urban_pct / 100 else 2
+
+        placed_points: list = []
         for i in range(n):
             unit_id += 1
             loc = rng.choice(K.STATION_LOCALITIES)
             name = f"{base} {loc} PS" if i else f"{base} City PS"
+            lat, lng = _station_location(b, rng, did, placed_points, min_sep)
+            placed_points.append((lat, lng))
             row = {"UnitID": unit_id, "UnitName": name, "TypeID": 1, "ParentUnit": "",
-                   "NationalityID": 1, "StateID": K.KARNATAKA_STATE_ID, "DistrictID": did, "Active": True}
+                   "NationalityID": 1, "StateID": K.KARNATAKA_STATE_ID, "DistrictID": did, "Active": True,
+                   "StationCategoryID": category_of.get(i, 1), "Latitude": lat, "Longitude": lng}
             b.add("Unit", row)
             b.units.append(row)
             b.units_by_district[did].append(row)
@@ -654,7 +739,7 @@ def _attach_disposition(b: Builder, rng: Rng, case, officers_pool):
 # ---------------------------------------------------------------------------
 TABLE_ORDER = [
     # lookups / masters (import first)
-    "State", "District", "UnitType", "Unit", "Rank", "Designation", "Employee",
+    "State", "District", "UnitType", "StationCategory", "Unit", "Rank", "Designation", "Employee",
     "CaseCategory", "GravityOffence", "CaseStatusMaster", "GenderMaster",
     "ArrestSurrenderType", "CrimeHead", "CrimeSubHead", "Act", "Section",
     "CrimeHeadActSection", "ReligionMaster", "CasteMaster", "OccupationMaster", "Court",

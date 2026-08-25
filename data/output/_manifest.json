@@ -1,10 +1,11 @@
 {
-  "generated": "2026-08-25T19:38:36",
+  "generated": "2026-08-25T21:23:14",
   "seed": 2026,
   "import_order": [
     "State",
     "District",
     "UnitType",
+    "StationCategory",
     "Unit",
     "Rank",
     "Designation",
@@ -36,10 +37,11 @@
     "State": 7,
     "District": 31,
     "UnitType": 5,
+    "StationCategory": 7,
     "Unit": 298,
     "Rank": 9,
     "Designation": 5,
-    "Employee": 1336,
+    "Employee": 1344,
     "CaseCategory": 4,
     "GravityOffence": 2,
     "CaseStatusMaster": 4,
@@ -54,13 +56,13 @@
     "CasteMaster": 5,
     "OccupationMaster": 10,
     "Court": 31,
-    "CaseMaster": 60018,
-    "ComplainantDetails": 60018,
-    "Victim": 74853,
-    "Accused": 54176,
-    "ActSectionAssociation": 87843,
-    "ArrestSurrender": 17196,
-    "inv_arrestsurrenderaccused": 17196,
-    "ChargesheetDetails": 32742
+    "CaseMaster": 59985,
+    "ComplainantDetails": 59985,
+    "Victim": 74799,
+    "Accused": 54337,
+    "ActSectionAssociation": 87868,
+    "ArrestSurrender": 17346,
+    "inv_arrestsurrenderaccused": 17346,
+    "ChargesheetDetails": 32942
   }
 }

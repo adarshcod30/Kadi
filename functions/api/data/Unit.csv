@@ -1,299 +1,299 @@
-UnitID,UnitName,TypeID,ParentUnit,NationalityID,StateID,DistrictID,Active
-1,Bengaluru City PS,1,,1,1,1,True
-2,Bengaluru Layout PS,1,,1,1,1,True
-3,Bengaluru Halli PS,1,,1,1,1,True
-4,Bengaluru Halli PS,1,,1,1,1,True
-5,Bengaluru Old Town PS,1,,1,1,1,True
-6,Bengaluru Rural PS,1,,1,1,1,True
-7,Bengaluru West PS,1,,1,1,1,True
-8,Bengaluru New Town PS,1,,1,1,1,True
-9,Bengaluru New Town PS,1,,1,1,1,True
-10,Bengaluru Cross Road PS,1,,1,1,1,True
-11,Bengaluru Circle PS,1,,1,1,1,True
-12,Bengaluru Camp PS,1,,1,1,1,True
-13,Bengaluru Cross Road PS,1,,1,1,1,True
-14,Bengaluru Peth PS,1,,1,1,1,True
-15,Bengaluru Camp PS,1,,1,1,1,True
-16,Bengaluru Colony PS,1,,1,1,1,True
-17,Bengaluru West PS,1,,1,1,1,True
-18,Bengaluru City PS,1,,1,1,1,True
-19,Bengaluru New Town PS,1,,1,1,1,True
-20,Bengaluru Market PS,1,,1,1,1,True
-21,Bengaluru Rural PS,1,,1,1,1,True
-22,Bengaluru Extension PS,1,,1,1,1,True
-23,Bengaluru Rural PS,1,,1,1,1,True
-24,Bengaluru Colony PS,1,,1,1,1,True
-25,Bengaluru City PS,1,,1,1,1,True
-26,Bengaluru Industrial Area PS,1,,1,1,1,True
-27,Bengaluru Peth PS,1,,1,1,1,True
-28,Bengaluru Industrial Area PS,1,,1,1,1,True
-29,Bengaluru Layout PS,1,,1,1,1,True
-30,Bengaluru East PS,1,,1,1,1,True
-31,Bengaluru Cross PS,1,,1,1,1,True
-32,Bengaluru Nagar PS,1,,1,1,1,True
-33,Bengaluru Gate PS,1,,1,1,1,True
-34,Bengaluru Gate PS,1,,1,1,1,True
-35,Bengaluru Cross PS,1,,1,1,1,True
-36,Bengaluru Halli PS,1,,1,1,1,True
-37,Bengaluru Old Town PS,1,,1,1,1,True
-38,Bengaluru Market PS,1,,1,1,1,True
-39,Bengaluru Layout PS,1,,1,1,1,True
-40,Bengaluru Market PS,1,,1,1,1,True
-41,Bengaluru Cross Road PS,1,,1,1,1,True
-42,Bengaluru Cross Road PS,1,,1,1,1,True
-43,Bengaluru Extension PS,1,,1,1,1,True
-44,Bengaluru Extension PS,1,,1,1,1,True
-45,Bengaluru Colony PS,1,,1,1,1,True
-46,Bengaluru North PS,1,,1,1,1,True
-47,Bengaluru Old Town PS,1,,1,1,1,True
-48,Bengaluru Bazaar PS,1,,1,1,1,True
-49,Bengaluru Bazaar PS,1,,1,1,1,True
-50,Bengaluru Camp PS,1,,1,1,1,True
-51,Bengaluru Extension PS,1,,1,1,1,True
-52,Bengaluru City PS,1,,1,1,1,True
-53,Bengaluru Bazaar PS,1,,1,1,1,True
-54,Bengaluru Gate PS,1,,1,1,1,True
-55,Bengaluru Gate PS,1,,1,1,1,True
-56,Bengaluru Colony PS,1,,1,1,1,True
-57,Bengaluru Circle PS,1,,1,1,1,True
-58,Bengaluru Market PS,1,,1,1,1,True
-59,Bengaluru Cross PS,1,,1,1,1,True
-60,Bengaluru Camp PS,1,,1,1,1,True
-61,Bengaluru Cross Road PS,1,,1,1,1,True
-62,Bengaluru Peth PS,1,,1,1,1,True
-63,Bengaluru Rural PS,1,,1,1,1,True
-64,Bengaluru Circle PS,1,,1,1,1,True
-65,Bengaluru Halli PS,1,,1,1,1,True
-66,Bengaluru New Town PS,1,,1,1,1,True
-67,Bengaluru Peth PS,1,,1,1,1,True
-68,Bengaluru Cross PS,1,,1,1,1,True
-69,Bengaluru Halli PS,1,,1,1,1,True
-70,Bengaluru Nagar PS,1,,1,1,1,True
-71,Bengaluru Circle PS,1,,1,1,1,True
-72,Bengaluru Camp PS,1,,1,1,1,True
-73,Bengaluru Peth PS,1,,1,1,1,True
-74,Bengaluru Halli PS,1,,1,1,1,True
-75,Bengaluru Halli PS,1,,1,1,1,True
-76,Bengaluru City PS,1,,1,1,1,True
-77,Bengaluru Camp PS,1,,1,1,1,True
-78,Bengaluru West PS,1,,1,1,1,True
-79,Bengaluru North PS,1,,1,1,1,True
-80,Bengaluru Town PS,1,,1,1,1,True
-81,Bengaluru Bazaar PS,1,,1,1,1,True
-82,Bengaluru Halli PS,1,,1,1,1,True
-83,Bengaluru Industrial Area PS,1,,1,1,1,True
-84,Bengaluru Rural PS,1,,1,1,1,True
-85,Bengaluru Bazaar PS,1,,1,1,1,True
-86,Bengaluru New Town PS,1,,1,1,1,True
-87,Bengaluru Circle PS,1,,1,1,1,True
-88,Bengaluru Peth PS,1,,1,1,1,True
-89,Bengaluru North PS,1,,1,1,1,True
-90,Bengaluru Peth PS,1,,1,1,1,True
-91,Bengaluru West PS,1,,1,1,1,True
-92,Bengaluru Rural PS,1,,1,1,1,True
-93,Bengaluru Old Town PS,1,,1,1,1,True
-94,Bengaluru Bazaar PS,1,,1,1,1,True
-95,Bengaluru Colony PS,1,,1,1,1,True
-96,Bengaluru Industrial Area PS,1,,1,1,1,True
-97,Bengaluru Peth PS,1,,1,1,1,True
-98,Bengaluru Bazaar PS,1,,1,1,1,True
-99,Bengaluru Cross Road PS,1,,1,1,1,True
-100,Bengaluru Nagar PS,1,,1,1,1,True
-101,Bengaluru Cross Road PS,1,,1,1,1,True
-102,Bengaluru Cross PS,1,,1,1,1,True
-103,Bengaluru Industrial Area PS,1,,1,1,1,True
-104,Bengaluru Extension PS,1,,1,1,1,True
-105,Bengaluru Cross Road PS,1,,1,1,1,True
-106,Bengaluru Old Town PS,1,,1,1,1,True
-107,Bengaluru Halli PS,1,,1,1,1,True
-108,Bengaluru Bazaar PS,1,,1,1,1,True
-109,Bengaluru Peth PS,1,,1,1,1,True
-110,Bengaluru Cross PS,1,,1,1,1,True
-111,Bengaluru Circle PS,1,,1,1,1,True
-112,Bengaluru East PS,1,,1,1,1,True
-113,Bengaluru Extension PS,1,,1,1,1,True
-114,Bengaluru Nagar PS,1,,1,1,1,True
-115,Bengaluru City PS,1,,1,1,1,True
-116,Bengaluru Town PS,1,,1,1,1,True
-117,Bengaluru North PS,1,,1,1,1,True
-118,Bengaluru Old Town PS,1,,1,1,1,True
-119,Bengaluru New Town PS,1,,1,1,1,True
-120,Bengaluru Colony PS,1,,1,1,1,True
-121,Bengaluru City PS,1,,1,1,2,True
-122,Bengaluru Peth PS,1,,1,1,2,True
-123,Bengaluru Gate PS,1,,1,1,2,True
-124,Bengaluru East PS,1,,1,1,2,True
-125,Bengaluru Nagar PS,1,,1,1,2,True
-126,Bengaluru Bazaar PS,1,,1,1,2,True
-127,Bengaluru Peth PS,1,,1,1,2,True
-128,Bengaluru Colony PS,1,,1,1,2,True
-129,Bengaluru Halli PS,1,,1,1,2,True
-130,Bengaluru Peth PS,1,,1,1,2,True
-131,Bengaluru Circle PS,1,,1,1,2,True
-132,Bengaluru Cross Road PS,1,,1,1,2,True
-133,Bengaluru Industrial Area PS,1,,1,1,2,True
-134,Bengaluru Town PS,1,,1,1,2,True
-135,Bengaluru Extension PS,1,,1,1,2,True
-136,Mysuru City PS,1,,1,1,3,True
-137,Mysuru Colony PS,1,,1,1,3,True
-138,Mysuru Rural PS,1,,1,1,3,True
-139,Mysuru Colony PS,1,,1,1,3,True
-140,Mysuru Bazaar PS,1,,1,1,3,True
-141,Mysuru Bazaar PS,1,,1,1,3,True
-142,Mysuru Halli PS,1,,1,1,3,True
-143,Mysuru Nagar PS,1,,1,1,3,True
-144,Mysuru Colony PS,1,,1,1,3,True
-145,Mysuru South PS,1,,1,1,3,True
-146,Mysuru Circle PS,1,,1,1,3,True
-147,Mysuru Peth PS,1,,1,1,3,True
-148,Mysuru Market PS,1,,1,1,3,True
-149,Mysuru Old Town PS,1,,1,1,3,True
-150,Mysuru Nagar PS,1,,1,1,3,True
-151,Mysuru Peth PS,1,,1,1,3,True
-152,Mysuru Gate PS,1,,1,1,3,True
-153,Mysuru Rural PS,1,,1,1,3,True
-154,Dakshina City PS,1,,1,1,4,True
-155,Dakshina Circle PS,1,,1,1,4,True
-156,Dakshina North PS,1,,1,1,4,True
-157,Dakshina Colony PS,1,,1,1,4,True
-158,Dakshina City PS,1,,1,1,4,True
-159,Dakshina Market PS,1,,1,1,4,True
-160,Dakshina City PS,1,,1,1,4,True
-161,Dakshina Colony PS,1,,1,1,4,True
-162,Dakshina Camp PS,1,,1,1,4,True
-163,Dakshina Cross Road PS,1,,1,1,4,True
-164,Dakshina Market PS,1,,1,1,4,True
-165,Dakshina New Town PS,1,,1,1,4,True
-166,Dakshina East PS,1,,1,1,4,True
-167,Dakshina West PS,1,,1,1,4,True
-168,Belagavi City PS,1,,1,1,5,True
-169,Belagavi New Town PS,1,,1,1,5,True
-170,Belagavi Town PS,1,,1,1,5,True
-171,Belagavi Cross Road PS,1,,1,1,5,True
-172,Belagavi Nagar PS,1,,1,1,5,True
-173,Belagavi Industrial Area PS,1,,1,1,5,True
-174,Belagavi Old Town PS,1,,1,1,5,True
-175,Belagavi Gate PS,1,,1,1,5,True
-176,Belagavi North PS,1,,1,1,5,True
-177,Belagavi City PS,1,,1,1,5,True
-178,Belagavi Layout PS,1,,1,1,5,True
-179,Belagavi Industrial Area PS,1,,1,1,5,True
-180,Belagavi Camp PS,1,,1,1,5,True
-181,Belagavi Camp PS,1,,1,1,5,True
-182,Kalaburagi City PS,1,,1,1,6,True
-183,Kalaburagi Bazaar PS,1,,1,1,6,True
-184,Kalaburagi North PS,1,,1,1,6,True
-185,Kalaburagi Cross Road PS,1,,1,1,6,True
-186,Kalaburagi West PS,1,,1,1,6,True
-187,Kalaburagi Peth PS,1,,1,1,6,True
-188,Kalaburagi Camp PS,1,,1,1,6,True
-189,Kalaburagi North PS,1,,1,1,6,True
-190,Kalaburagi New Town PS,1,,1,1,6,True
-191,Hubballi-Dharwad City PS,1,,1,1,7,True
-192,Hubballi-Dharwad Halli PS,1,,1,1,7,True
-193,Hubballi-Dharwad Extension PS,1,,1,1,7,True
-194,Hubballi-Dharwad Market PS,1,,1,1,7,True
-195,Hubballi-Dharwad Circle PS,1,,1,1,7,True
-196,Hubballi-Dharwad Industrial Area PS,1,,1,1,7,True
-197,Hubballi-Dharwad South PS,1,,1,1,7,True
-198,Hubballi-Dharwad North PS,1,,1,1,7,True
-199,Hubballi-Dharwad Camp PS,1,,1,1,7,True
-200,Hubballi-Dharwad Extension PS,1,,1,1,7,True
-201,Hubballi-Dharwad Halli PS,1,,1,1,7,True
-202,Ballari City PS,1,,1,1,8,True
-203,Ballari Cross PS,1,,1,1,8,True
-204,Ballari North PS,1,,1,1,8,True
-205,Ballari Halli PS,1,,1,1,8,True
-206,Ballari East PS,1,,1,1,8,True
-207,Ballari Cross PS,1,,1,1,8,True
-208,Ballari City PS,1,,1,1,8,True
-209,Ballari Rural PS,1,,1,1,8,True
-210,Vijayapura City PS,1,,1,1,9,True
-211,Vijayapura Market PS,1,,1,1,9,True
-212,Vijayapura Town PS,1,,1,1,9,True
-213,Vijayapura Gate PS,1,,1,1,9,True
-214,Vijayapura Old Town PS,1,,1,1,9,True
-215,Vijayapura Gate PS,1,,1,1,9,True
-216,Shivamogga City PS,1,,1,1,10,True
-217,Shivamogga City PS,1,,1,1,10,True
-218,Shivamogga Halli PS,1,,1,1,10,True
-219,Shivamogga Peth PS,1,,1,1,10,True
-220,Shivamogga Layout PS,1,,1,1,10,True
-221,Shivamogga Industrial Area PS,1,,1,1,10,True
-222,Tumakuru City PS,1,,1,1,11,True
-223,Tumakuru Colony PS,1,,1,1,11,True
-224,Tumakuru Layout PS,1,,1,1,11,True
-225,Tumakuru Rural PS,1,,1,1,11,True
-226,Tumakuru Peth PS,1,,1,1,11,True
-227,Tumakuru Colony PS,1,,1,1,11,True
-228,Davanagere City PS,1,,1,1,12,True
-229,Davanagere New Town PS,1,,1,1,12,True
-230,Davanagere South PS,1,,1,1,12,True
-231,Davanagere North PS,1,,1,1,12,True
-232,Davanagere Camp PS,1,,1,1,12,True
-233,Udupi City PS,1,,1,1,13,True
-234,Udupi East PS,1,,1,1,13,True
-235,Udupi Circle PS,1,,1,1,13,True
-236,Udupi New Town PS,1,,1,1,13,True
-237,Udupi Layout PS,1,,1,1,13,True
-238,Hassan City PS,1,,1,1,14,True
-239,Hassan New Town PS,1,,1,1,14,True
-240,Hassan West PS,1,,1,1,14,True
-241,Hassan Industrial Area PS,1,,1,1,14,True
-242,Hassan Bazaar PS,1,,1,1,14,True
-243,Mandya City PS,1,,1,1,15,True
-244,Mandya Cross Road PS,1,,1,1,15,True
-245,Mandya Cross PS,1,,1,1,15,True
-246,Mandya Town PS,1,,1,1,15,True
-247,Mandya East PS,1,,1,1,15,True
-248,Chitradurga City PS,1,,1,1,16,True
-249,Chitradurga South PS,1,,1,1,16,True
-250,Chitradurga Town PS,1,,1,1,16,True
-251,Chitradurga Old Town PS,1,,1,1,16,True
-252,Kolar City PS,1,,1,1,17,True
-253,Kolar Town PS,1,,1,1,17,True
-254,Kolar Colony PS,1,,1,1,17,True
-255,Kolar Old Town PS,1,,1,1,17,True
-256,Raichur City PS,1,,1,1,18,True
-257,Raichur Peth PS,1,,1,1,18,True
-258,Raichur Bazaar PS,1,,1,1,18,True
-259,Raichur Industrial Area PS,1,,1,1,18,True
-260,Bidar City PS,1,,1,1,19,True
-261,Bidar North PS,1,,1,1,19,True
-262,Bidar Old Town PS,1,,1,1,19,True
-263,Koppal City PS,1,,1,1,20,True
-264,Koppal East PS,1,,1,1,20,True
-265,Koppal Halli PS,1,,1,1,20,True
-266,Haveri City PS,1,,1,1,21,True
-267,Haveri South PS,1,,1,1,21,True
-268,Haveri Industrial Area PS,1,,1,1,21,True
-269,Gadag City PS,1,,1,1,22,True
-270,Gadag Cross PS,1,,1,1,22,True
-271,Gadag Nagar PS,1,,1,1,22,True
-272,Chikkamagaluru City PS,1,,1,1,23,True
-273,Chikkamagaluru Cross Road PS,1,,1,1,23,True
-274,Chikkamagaluru Circle PS,1,,1,1,23,True
-275,Chamarajanagar City PS,1,,1,1,24,True
-276,Chamarajanagar Cross PS,1,,1,1,24,True
-277,Chamarajanagar Extension PS,1,,1,1,24,True
-278,Kodagu City PS,1,,1,1,25,True
-279,Kodagu Gate PS,1,,1,1,25,True
-280,Kodagu South PS,1,,1,1,25,True
-281,Bagalkote City PS,1,,1,1,26,True
-282,Bagalkote Colony PS,1,,1,1,26,True
-283,Bagalkote Peth PS,1,,1,1,26,True
-284,Yadgir City PS,1,,1,1,27,True
-285,Yadgir Extension PS,1,,1,1,27,True
-286,Yadgir Colony PS,1,,1,1,27,True
-287,Chikkaballapura City PS,1,,1,1,28,True
-288,Chikkaballapura Layout PS,1,,1,1,28,True
-289,Chikkaballapura Halli PS,1,,1,1,28,True
-290,Ramanagara City PS,1,,1,1,29,True
-291,Ramanagara Colony PS,1,,1,1,29,True
-292,Ramanagara Rural PS,1,,1,1,29,True
-293,Uttara City PS,1,,1,1,30,True
-294,Uttara Halli PS,1,,1,1,30,True
-295,Uttara Nagar PS,1,,1,1,30,True
-296,Dharwad City PS,1,,1,1,31,True
-297,Dharwad East PS,1,,1,1,31,True
-298,Dharwad West PS,1,,1,1,31,True
+UnitID,UnitName,TypeID,ParentUnit,NationalityID,StateID,DistrictID,Active,StationCategoryID,Latitude,Longitude
+1,Bengaluru City PS,1,,1,1,1,True,1,12.927259,77.659466
+2,Bengaluru Market PS,1,,1,1,1,True,1,12.912334,77.717054
+3,Bengaluru Cross PS,1,,1,1,1,True,1,13.046699,77.404013
+4,Bengaluru Extension PS,1,,1,1,1,True,1,12.960616,77.588305
+5,Bengaluru South PS,1,,1,1,1,True,1,12.950453,77.602062
+6,Bengaluru Gate PS,1,,1,1,1,True,1,12.953746,77.567376
+7,Bengaluru South PS,1,,1,1,1,True,1,12.965159,77.32547
+8,Bengaluru Nagar PS,1,,1,1,1,True,1,13.04516,77.618286
+9,Bengaluru Colony PS,1,,1,1,1,True,1,12.900634,77.547316
+10,Bengaluru Peth PS,1,,1,1,1,True,1,13.085866,77.62872
+11,Bengaluru Circle PS,1,,1,1,1,True,1,12.668445,77.607044
+12,Bengaluru Extension PS,1,,1,1,1,True,1,12.913485,77.662236
+13,Bengaluru Colony PS,1,,1,1,1,True,1,13.212315,77.48279
+14,Bengaluru South PS,1,,1,1,1,True,6,13.088447,77.646312
+15,Bengaluru Layout PS,1,,1,1,1,True,1,12.877313,77.551541
+16,Bengaluru Halli PS,1,,1,1,1,True,4,12.87199,77.470623
+17,Bengaluru Peth PS,1,,1,1,1,True,1,13.005892,77.509806
+18,Bengaluru Colony PS,1,,1,1,1,True,1,12.98039,77.565628
+19,Bengaluru Rural PS,1,,1,1,1,True,1,12.918934,77.643778
+20,Bengaluru Halli PS,1,,1,1,1,True,1,13.040714,77.56945
+21,Bengaluru Halli PS,1,,1,1,1,True,1,12.767464,77.750128
+22,Bengaluru Nagar PS,1,,1,1,1,True,1,12.944202,77.631356
+23,Bengaluru Rural PS,1,,1,1,1,True,1,12.883186,77.582791
+24,Bengaluru East PS,1,,1,1,1,True,1,12.916341,77.718823
+25,Bengaluru West PS,1,,1,1,1,True,1,12.964952,77.611683
+26,Bengaluru City PS,1,,1,1,1,True,1,12.940809,77.660821
+27,Bengaluru Market PS,1,,1,1,1,True,1,12.944117,77.606056
+28,Bengaluru Colony PS,1,,1,1,1,True,1,12.989126,77.698187
+29,Bengaluru Old Town PS,1,,1,1,1,True,3,12.902148,77.637194
+30,Bengaluru Layout PS,1,,1,1,1,True,1,12.986936,77.695272
+31,Bengaluru Circle PS,1,,1,1,1,True,1,13.088971,77.581803
+32,Bengaluru Cross Road PS,1,,1,1,1,True,1,13.064357,77.630263
+33,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.982095,77.605754
+34,Bengaluru South PS,1,,1,1,1,True,1,13.017648,77.473233
+35,Bengaluru City PS,1,,1,1,1,True,1,13.021812,77.625147
+36,Bengaluru Gate PS,1,,1,1,1,True,1,13.0518,77.397443
+37,Bengaluru South PS,1,,1,1,1,True,1,12.968518,77.541728
+38,Bengaluru Gate PS,1,,1,1,1,True,1,13.025512,77.605641
+39,Bengaluru Cross Road PS,1,,1,1,1,True,1,12.882745,77.561708
+40,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.971212,77.635744
+41,Bengaluru Camp PS,1,,1,1,1,True,6,13.008304,77.570179
+42,Bengaluru Cross Road PS,1,,1,1,1,True,1,13.016191,77.571826
+43,Bengaluru East PS,1,,1,1,1,True,1,12.96673,77.566413
+44,Bengaluru Rural PS,1,,1,1,1,True,1,13.193806,77.493835
+45,Bengaluru New Town PS,1,,1,1,1,True,1,13.051629,77.600927
+46,Bengaluru Bazaar PS,1,,1,1,1,True,1,12.950696,77.57947
+47,Bengaluru Nagar PS,1,,1,1,1,True,1,12.937394,77.686059
+48,Bengaluru Cross Road PS,1,,1,1,1,True,1,12.92682,77.606004
+49,Bengaluru Camp PS,1,,1,1,1,True,1,12.904456,77.64652
+50,Bengaluru East PS,1,,1,1,1,True,1,12.95331,77.703537
+51,Bengaluru Camp PS,1,,1,1,1,True,1,12.929103,77.575511
+52,Bengaluru Extension PS,1,,1,1,1,True,1,12.793917,77.624729
+53,Bengaluru Camp PS,1,,1,1,1,True,1,13.126233,77.579055
+54,Bengaluru Nagar PS,1,,1,1,1,True,3,12.929867,77.372826
+55,Bengaluru Industrial Area PS,1,,1,1,1,True,1,13.09207,77.502214
+56,Bengaluru Cross Road PS,1,,1,1,1,True,1,13.020753,77.633691
+57,Bengaluru North PS,1,,1,1,1,True,1,12.767292,77.659772
+58,Bengaluru Rural PS,1,,1,1,1,True,1,13.028589,77.547497
+59,Bengaluru Nagar PS,1,,1,1,1,True,1,13.017995,77.582146
+60,Bengaluru Rural PS,1,,1,1,1,True,1,12.961553,77.622796
+61,Bengaluru Circle PS,1,,1,1,1,True,1,12.906161,77.608747
+62,Bengaluru South PS,1,,1,1,1,True,1,12.966625,77.537373
+63,Bengaluru Rural PS,1,,1,1,1,True,1,12.92227,77.584301
+64,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.969163,77.549104
+65,Bengaluru Town PS,1,,1,1,1,True,6,13.038957,77.612978
+66,Bengaluru Gate PS,1,,1,1,1,True,6,12.88173,77.609138
+67,Bengaluru South PS,1,,1,1,1,True,1,12.654046,77.68017
+68,Bengaluru Old Town PS,1,,1,1,1,True,1,13.023075,77.503643
+69,Bengaluru Old Town PS,1,,1,1,1,True,1,12.999738,77.528597
+70,Bengaluru Rural PS,1,,1,1,1,True,1,13.206737,77.47735
+71,Bengaluru Halli PS,1,,1,1,1,True,7,13.067413,77.641602
+72,Bengaluru Layout PS,1,,1,1,1,True,3,12.692918,77.639089
+73,Bengaluru Nagar PS,1,,1,1,1,True,1,12.942027,77.636942
+74,Bengaluru Camp PS,1,,1,1,1,True,7,12.974146,77.681749
+75,Bengaluru Market PS,1,,1,1,1,True,1,13.050375,77.699787
+76,Bengaluru Extension PS,1,,1,1,1,True,1,13.143655,77.503744
+77,Bengaluru Layout PS,1,,1,1,1,True,3,13.065826,77.585544
+78,Bengaluru South PS,1,,1,1,1,True,1,12.924136,77.5935
+79,Bengaluru Nagar PS,1,,1,1,1,True,1,12.780137,77.48179
+80,Bengaluru Nagar PS,1,,1,1,1,True,3,12.972905,77.545167
+81,Bengaluru Market PS,1,,1,1,1,True,1,12.942045,77.345727
+82,Bengaluru City PS,1,,1,1,1,True,1,12.8606,77.381047
+83,Bengaluru Circle PS,1,,1,1,1,True,6,12.970105,77.56448
+84,Bengaluru Nagar PS,1,,1,1,1,True,1,12.968586,77.632657
+85,Bengaluru Circle PS,1,,1,1,1,True,1,12.874175,77.578868
+86,Bengaluru City PS,1,,1,1,1,True,1,12.859256,77.573167
+87,Bengaluru Town PS,1,,1,1,1,True,1,13.013828,77.452989
+88,Bengaluru Rural PS,1,,1,1,1,True,1,13.113208,77.470365
+89,Bengaluru West PS,1,,1,1,1,True,1,12.977414,77.532215
+90,Bengaluru City PS,1,,1,1,1,True,1,13.0483,77.466047
+91,Bengaluru Extension PS,1,,1,1,1,True,1,12.947973,77.733046
+92,Bengaluru Rural PS,1,,1,1,1,True,1,12.910477,77.3746
+93,Bengaluru Rural PS,1,,1,1,1,True,1,12.976317,77.60859
+94,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.947237,77.652479
+95,Bengaluru Cross Road PS,1,,1,1,1,True,1,12.724092,77.727207
+96,Bengaluru Camp PS,1,,1,1,1,True,1,12.92046,77.341537
+97,Bengaluru Gate PS,1,,1,1,1,True,1,12.899162,77.64825
+98,Bengaluru Layout PS,1,,1,1,1,True,1,12.868951,77.526725
+99,Bengaluru Colony PS,1,,1,1,1,True,1,12.896054,77.651708
+100,Bengaluru New Town PS,1,,1,1,1,True,1,12.925147,77.646833
+101,Bengaluru Old Town PS,1,,1,1,1,True,3,13.075733,77.648889
+102,Bengaluru Old Town PS,1,,1,1,1,True,1,12.968798,77.619354
+103,Bengaluru Bazaar PS,1,,1,1,1,True,1,12.913565,77.341075
+104,Bengaluru New Town PS,1,,1,1,1,True,1,12.945865,77.643447
+105,Bengaluru Town PS,1,,1,1,1,True,1,13.025155,77.482717
+106,Bengaluru Cross PS,1,,1,1,1,True,1,12.815034,77.582775
+107,Bengaluru Layout PS,1,,1,1,1,True,1,12.938435,77.594331
+108,Bengaluru New Town PS,1,,1,1,1,True,1,12.949255,77.623254
+109,Bengaluru East PS,1,,1,1,1,True,1,13.097334,77.435089
+110,Bengaluru New Town PS,1,,1,1,1,True,1,12.701381,77.637538
+111,Bengaluru Colony PS,1,,1,1,1,True,6,12.934089,77.631953
+112,Bengaluru Circle PS,1,,1,1,1,True,1,12.996718,77.450654
+113,Bengaluru Industrial Area PS,1,,1,1,1,True,1,13.000645,77.728369
+114,Bengaluru Rural PS,1,,1,1,1,True,1,13.027062,77.517552
+115,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.99786,77.640009
+116,Bengaluru Gate PS,1,,1,1,1,True,1,12.915099,77.623273
+117,Bengaluru Halli PS,1,,1,1,1,True,1,12.846398,77.792316
+118,Bengaluru Industrial Area PS,1,,1,1,1,True,1,12.907596,77.582928
+119,Bengaluru Nagar PS,1,,1,1,1,True,1,13.022161,77.438159
+120,Bengaluru Cross PS,1,,1,1,1,True,1,12.913519,77.57284
+121,Bengaluru City PS,1,,1,1,2,True,2,12.631352,77.248687
+122,Bengaluru Circle PS,1,,1,1,2,True,2,13.054107,77.89648
+123,Bengaluru Cross PS,1,,1,1,2,True,1,12.549135,77.276721
+124,Bengaluru Cross PS,1,,1,1,2,True,1,13.031513,77.862323
+125,Bengaluru West PS,1,,1,1,2,True,4,12.647757,77.256786
+126,Bengaluru Circle PS,1,,1,1,2,True,2,12.633426,77.398384
+127,Bengaluru Industrial Area PS,1,,1,1,2,True,2,13.122346,77.132081
+128,Bengaluru West PS,1,,1,1,2,True,1,12.432226,77.56063
+129,Bengaluru North PS,1,,1,1,2,True,2,13.060731,77.194073
+130,Bengaluru South PS,1,,1,1,2,True,2,12.370174,77.563726
+131,Bengaluru Cross Road PS,1,,1,1,2,True,2,12.591411,77.191049
+132,Bengaluru City PS,1,,1,1,2,True,2,13.047905,77.21669
+133,Bengaluru Industrial Area PS,1,,1,1,2,True,2,12.677877,77.240232
+134,Bengaluru Bazaar PS,1,,1,1,2,True,5,13.008202,77.812175
+135,Bengaluru Cross Road PS,1,,1,1,2,True,1,12.642876,77.18705
+136,Mysuru City PS,1,,1,1,3,True,2,12.364602,76.472504
+137,Mysuru Cross PS,1,,1,1,3,True,2,12.187542,76.465144
+138,Mysuru Bazaar PS,1,,1,1,3,True,2,11.944646,76.124667
+139,Mysuru Gate PS,1,,1,1,3,True,2,12.531675,76.219749
+140,Mysuru West PS,1,,1,1,3,True,1,12.081327,76.480132
+141,Mysuru Cross Road PS,1,,1,1,3,True,1,12.503789,76.438488
+142,Mysuru Nagar PS,1,,1,1,3,True,2,12.194952,76.098382
+143,Mysuru Layout PS,1,,1,1,3,True,2,12.034695,76.357002
+144,Mysuru East PS,1,,1,1,3,True,3,11.974746,76.382054
+145,Mysuru Gate PS,1,,1,1,3,True,2,12.186639,76.168404
+146,Mysuru Gate PS,1,,1,1,3,True,2,12.25809,76.84984
+147,Mysuru Colony PS,1,,1,1,3,True,2,12.185527,76.20104
+148,Mysuru Old Town PS,1,,1,1,3,True,5,11.890244,76.150213
+149,Mysuru Colony PS,1,,1,1,3,True,2,12.146399,76.88011
+150,Mysuru Cross Road PS,1,,1,1,3,True,1,12.219442,76.918638
+151,Mysuru Peth PS,1,,1,1,3,True,2,12.029605,76.395312
+152,Mysuru Industrial Area PS,1,,1,1,3,True,7,12.147992,76.160277
+153,Mysuru Camp PS,1,,1,1,3,True,4,12.100283,76.294072
+154,Dakshina City PS,1,,1,1,4,True,1,12.694692,75.196483
+155,Dakshina Cross PS,1,,1,1,4,True,1,12.847367,75.372946
+156,Dakshina Cross Road PS,1,,1,1,4,True,3,12.676029,75.493111
+157,Dakshina Halli PS,1,,1,1,4,True,5,12.706639,75.228307
+158,Dakshina Old Town PS,1,,1,1,4,True,4,12.728955,75.117064
+159,Dakshina Industrial Area PS,1,,1,1,4,True,1,12.50106,75.342302
+160,Dakshina South PS,1,,1,1,4,True,2,12.725128,75.42331
+161,Dakshina Halli PS,1,,1,1,4,True,2,12.818583,74.932769
+162,Dakshina Rural PS,1,,1,1,4,True,2,12.760626,75.141906
+163,Dakshina Market PS,1,,1,1,4,True,2,12.66685,75.21509
+164,Dakshina North PS,1,,1,1,4,True,1,12.676413,75.273617
+165,Dakshina Cross PS,1,,1,1,4,True,1,12.54994,75.42482
+166,Dakshina Layout PS,1,,1,1,4,True,2,12.862501,74.963469
+167,Dakshina Cross Road PS,1,,1,1,4,True,2,12.505484,75.403082
+168,Belagavi City PS,1,,1,1,5,True,7,15.427849,74.536184
+169,Belagavi South PS,1,,1,1,5,True,2,16.538475,74.94736
+170,Belagavi Layout PS,1,,1,1,5,True,2,16.372058,74.520896
+171,Belagavi Cross Road PS,1,,1,1,5,True,2,15.856497,74.57599
+172,Belagavi North PS,1,,1,1,5,True,4,16.073408,75.342891
+173,Belagavi South PS,1,,1,1,5,True,2,15.987279,74.753373
+174,Belagavi City PS,1,,1,1,5,True,2,16.478817,74.323407
+175,Belagavi Rural PS,1,,1,1,5,True,2,16.307729,74.624128
+176,Belagavi Halli PS,1,,1,1,5,True,2,15.986262,75.189554
+177,Belagavi Industrial Area PS,1,,1,1,5,True,2,16.545073,74.91496
+178,Belagavi Bazaar PS,1,,1,1,5,True,2,16.115876,74.971514
+179,Belagavi Old Town PS,1,,1,1,5,True,2,16.144236,74.925115
+180,Belagavi City PS,1,,1,1,5,True,2,16.190808,74.994422
+181,Belagavi Gate PS,1,,1,1,5,True,5,16.148646,74.856674
+182,Kalaburagi City PS,1,,1,1,6,True,1,16.975834,76.856906
+183,Kalaburagi Old Town PS,1,,1,1,6,True,4,16.637699,76.658336
+184,Kalaburagi Rural PS,1,,1,1,6,True,7,17.138851,77.265319
+185,Kalaburagi Gate PS,1,,1,1,6,True,1,17.163963,77.28846
+186,Kalaburagi Peth PS,1,,1,1,6,True,2,16.825724,76.427462
+187,Kalaburagi Peth PS,1,,1,1,6,True,5,17.188559,77.242054
+188,Kalaburagi Rural PS,1,,1,1,6,True,2,16.796749,76.498885
+189,Kalaburagi Cross Road PS,1,,1,1,6,True,1,17.525873,77.555614
+190,Kalaburagi Halli PS,1,,1,1,6,True,1,16.573738,76.620553
+191,Hubballi-Dharwad City PS,1,,1,1,7,True,3,15.460531,75.182658
+192,Hubballi-Dharwad Layout PS,1,,1,1,7,True,7,15.419533,75.264982
+193,Hubballi-Dharwad Layout PS,1,,1,1,7,True,1,15.584133,75.03344
+194,Hubballi-Dharwad Industrial Area PS,1,,1,1,7,True,4,15.530412,74.988673
+195,Hubballi-Dharwad Peth PS,1,,1,1,7,True,1,15.182471,74.949208
+196,Hubballi-Dharwad Cross PS,1,,1,1,7,True,5,15.410618,75.30414
+197,Hubballi-Dharwad Layout PS,1,,1,1,7,True,3,15.553232,75.053864
+198,Hubballi-Dharwad South PS,1,,1,1,7,True,3,15.281107,75.047807
+199,Hubballi-Dharwad East PS,1,,1,1,7,True,3,15.496312,75.074495
+200,Hubballi-Dharwad Colony PS,1,,1,1,7,True,3,15.357599,75.063082
+201,Hubballi-Dharwad West PS,1,,1,1,7,True,3,15.387212,75.204755
+202,Ballari City PS,1,,1,1,8,True,1,15.067499,76.867491
+203,Ballari Nagar PS,1,,1,1,8,True,2,15.598413,76.857769
+204,Ballari Colony PS,1,,1,1,8,True,7,15.016031,76.316333
+205,Ballari Nagar PS,1,,1,1,8,True,2,15.003888,76.348517
+206,Ballari North PS,1,,1,1,8,True,2,15.229836,76.434666
+207,Ballari Cross Road PS,1,,1,1,8,True,4,14.886853,76.353411
+208,Ballari Old Town PS,1,,1,1,8,True,5,15.188544,76.527589
+209,Ballari Nagar PS,1,,1,1,8,True,1,15.218072,76.455177
+210,Vijayapura City PS,1,,1,1,9,True,2,17.252312,75.925426
+211,Vijayapura Layout PS,1,,1,1,9,True,4,16.65039,75.782983
+212,Vijayapura Industrial Area PS,1,,1,1,9,True,5,16.290344,76.253772
+213,Vijayapura Circle PS,1,,1,1,9,True,1,16.948023,75.786802
+214,Vijayapura Layout PS,1,,1,1,9,True,2,16.935956,75.754484
+215,Vijayapura Rural PS,1,,1,1,9,True,2,16.851683,76.019662
+216,Shivamogga City PS,1,,1,1,10,True,1,14.223691,75.308536
+217,Shivamogga Nagar PS,1,,1,1,10,True,1,13.741116,75.235846
+218,Shivamogga North PS,1,,1,1,10,True,1,14.162167,75.33428
+219,Shivamogga Layout PS,1,,1,1,10,True,5,14.058065,74.661004
+220,Shivamogga Camp PS,1,,1,1,10,True,2,14.135513,75.365029
+221,Shivamogga Old Town PS,1,,1,1,10,True,4,14.237336,75.184059
+222,Tumakuru City PS,1,,1,1,11,True,2,13.674801,77.414735
+223,Tumakuru Layout PS,1,,1,1,11,True,1,13.174497,77.107127
+224,Tumakuru City PS,1,,1,1,11,True,1,13.714949,76.75238
+225,Tumakuru East PS,1,,1,1,11,True,5,13.141135,77.00649
+226,Tumakuru Colony PS,1,,1,1,11,True,4,13.157143,76.985221
+227,Tumakuru Halli PS,1,,1,1,11,True,1,14.114806,77.245075
+228,Davanagere City PS,1,,1,1,12,True,7,14.679058,76.323458
+229,Davanagere Colony PS,1,,1,1,12,True,1,14.662661,75.870304
+230,Davanagere East PS,1,,1,1,12,True,4,14.483202,75.90342
+231,Davanagere New Town PS,1,,1,1,12,True,2,14.189635,75.719564
+232,Davanagere Industrial Area PS,1,,1,1,12,True,5,14.574808,76.271817
+233,Udupi City PS,1,,1,1,13,True,1,13.880448,74.820143
+234,Udupi Cross Road PS,1,,1,1,13,True,4,13.856293,74.80097
+235,Udupi Halli PS,1,,1,1,13,True,5,13.69047,74.880845
+236,Udupi West PS,1,,1,1,13,True,2,13.742473,74.846286
+237,Udupi Peth PS,1,,1,1,13,True,1,13.578901,75.038779
+238,Hassan City PS,1,,1,1,14,True,2,12.98516,75.6315
+239,Hassan Old Town PS,1,,1,1,14,True,2,13.044876,76.37004
+240,Hassan Peth PS,1,,1,1,14,True,4,12.931506,76.580691
+241,Hassan North PS,1,,1,1,14,True,2,13.318918,76.036558
+242,Hassan City PS,1,,1,1,14,True,5,12.620282,76.070943
+243,Mandya City PS,1,,1,1,15,True,2,12.494984,76.930944
+244,Mandya East PS,1,,1,1,15,True,2,12.651219,76.446644
+245,Mandya Camp PS,1,,1,1,15,True,5,12.406478,77.146926
+246,Mandya Town PS,1,,1,1,15,True,4,12.717557,76.447009
+247,Mandya Circle PS,1,,1,1,15,True,2,12.498073,76.836702
+248,Chitradurga City PS,1,,1,1,16,True,4,13.775692,76.172547
+249,Chitradurga New Town PS,1,,1,1,16,True,2,13.947786,76.096836
+250,Chitradurga Layout PS,1,,1,1,16,True,5,13.709203,76.302633
+251,Chitradurga Peth PS,1,,1,1,16,True,2,13.700742,76.531541
+252,Kolar City PS,1,,1,1,17,True,2,13.533608,77.751298
+253,Kolar Nagar PS,1,,1,1,17,True,1,12.87539,77.902722
+254,Kolar Halli PS,1,,1,1,17,True,4,13.194925,78.018961
+255,Kolar Halli PS,1,,1,1,17,True,5,13.427872,78.204428
+256,Raichur City PS,1,,1,1,18,True,1,15.721542,76.740823
+257,Raichur Halli PS,1,,1,1,18,True,2,16.162985,77.198541
+258,Raichur Halli PS,1,,1,1,18,True,5,16.018177,76.408047
+259,Raichur North PS,1,,1,1,18,True,4,16.493249,77.059187
+260,Bidar City PS,1,,1,1,19,True,5,17.761686,77.315255
+261,Bidar Peth PS,1,,1,1,19,True,2,17.813175,77.054793
+262,Bidar North PS,1,,1,1,19,True,4,17.789418,77.0149
+263,Koppal City PS,1,,1,1,20,True,2,15.747646,76.355525
+264,Koppal Cross Road PS,1,,1,1,20,True,5,15.73617,76.2935
+265,Koppal New Town PS,1,,1,1,20,True,4,15.889127,76.279915
+266,Haveri City PS,1,,1,1,21,True,5,14.727813,75.659603
+267,Haveri North PS,1,,1,1,21,True,2,14.78655,75.598425
+268,Haveri North PS,1,,1,1,21,True,4,14.710452,75.510822
+269,Gadag City PS,1,,1,1,22,True,4,15.754412,75.363658
+270,Gadag South PS,1,,1,1,22,True,1,15.127533,75.497622
+271,Gadag North PS,1,,1,1,22,True,5,15.47863,75.715514
+272,Chikkamagaluru City PS,1,,1,1,23,True,2,13.321341,75.729951
+273,Chikkamagaluru Bazaar PS,1,,1,1,23,True,4,13.542606,75.3482
+274,Chikkamagaluru Town PS,1,,1,1,23,True,5,13.492474,76.044968
+275,Chamarajanagar City PS,1,,1,1,24,True,4,12.020186,77.162132
+276,Chamarajanagar Cross Road PS,1,,1,1,24,True,2,12.098883,77.236598
+277,Chamarajanagar City PS,1,,1,1,24,True,5,12.198342,77.342561
+278,Kodagu City PS,1,,1,1,25,True,5,12.257727,75.788682
+279,Kodagu Colony PS,1,,1,1,25,True,4,12.332017,75.781685
+280,Kodagu Industrial Area PS,1,,1,1,25,True,2,12.65549,75.810924
+281,Bagalkote City PS,1,,1,1,26,True,2,16.158595,75.580628
+282,Bagalkote Bazaar PS,1,,1,1,26,True,5,16.161047,75.525334
+283,Bagalkote Halli PS,1,,1,1,26,True,4,16.580822,75.246907
+284,Yadgir City PS,1,,1,1,27,True,4,16.58923,77.396843
+285,Yadgir Camp PS,1,,1,1,27,True,5,17.002412,76.644176
+286,Yadgir Bazaar PS,1,,1,1,27,True,1,16.645209,77.36832
+287,Chikkaballapura City PS,1,,1,1,28,True,2,13.385126,78.231757
+288,Chikkaballapura Halli PS,1,,1,1,28,True,5,13.224215,78.061281
+289,Chikkaballapura East PS,1,,1,1,28,True,4,13.209678,78.033081
+290,Ramanagara City PS,1,,1,1,29,True,4,13.153133,77.776787
+291,Ramanagara West PS,1,,1,1,29,True,5,13.203027,77.614352
+292,Ramanagara West PS,1,,1,1,29,True,1,13.351321,77.348622
+293,Uttara City PS,1,,1,1,30,True,2,15.174088,74.658187
+294,Uttara Circle PS,1,,1,1,30,True,5,14.165441,74.729725
+295,Uttara Circle PS,1,,1,1,30,True,4,14.810111,74.839643
+296,Dharwad City PS,1,,1,1,31,True,2,15.23115,75.377885
+297,Dharwad Colony PS,1,,1,1,31,True,4,15.629962,75.482447
+298,Dharwad Cross Road PS,1,,1,1,31,True,5,15.216322,75.4063

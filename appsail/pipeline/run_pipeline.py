@@ -102,35 +102,35 @@ def run(data_dir: str):
     )
 
     # --- police-station roster -------------------------------------------------------
-    # Units carry no coordinates, so a station's map position is the centroid of its own
-    # geocoded FIRs -- its operational centre rather than a building address we do not have.
-    # Stations with no geocoded case still appear in the list; they simply cannot be plotted,
-    # and the payload says so rather than dropping them silently.
+    # A station's map position is now its OWN generated Latitude/Longitude (generate.py),
+    # not the centroid of its cases. The centroid approach meant a station's location was
+    # never really modelled -- it was an average of wherever its cases happened to be
+    # geocoded, and since cases are geocoded from the same handful of per-district urban
+    # centres, dozens of stations in one district converged toward nearly the same point.
+    # A district's ~120 stations rendered as one blob on the map regardless of zoom, because
+    # they never had distinct positions to render. generate.py now draws each station its
+    # own point with a minimum separation from its district's other stations.
     step("police-station roster")
-    _st_agg = {}
+    _st_case_count = defaultdict(int)
     for row in cases.itertuples(index=False):
-        u = str(row.PoliceStationID)
-        e = _st_agg.setdefault(u, {"n": 0, "lat": 0.0, "lng": 0.0, "geo": 0, "open": 0})
-        e["n"] += 1
-        try:
-            la, lo = float(row.latitude), float(row.longitude)
-            e["lat"] += la
-            e["lng"] += lo
-            e["geo"] += 1
-        except (TypeError, ValueError):
-            pass
+        _st_case_count[str(row.PoliceStationID)] += 1
     # stationBaselines covers every station; zone_report["stations"] only the flagged ones.
     _zone_by_unit = dict(zone_report.get("stationBaselines", {}))
     for z in zone_report.get("stations", []):
         _zone_by_unit[str(z["unitId"])] = z
+    _cat_names = {}
+    if "StationCategory" in tables:
+        _cat_names = dict(zip(tables["StationCategory"]["StationCategoryID"],
+                              tables["StationCategory"]["StationCategoryName"]))
     # NOT `stations` -- a later block in this same function rebinds that name to a set(),
     # which silently replaced this list before it reached write_json 90 lines below.
     station_roster = []
     for _, urow in tables["Unit"].iterrows():
         u = str(urow["UnitID"])
-        agg = _st_agg.get(u, {"n": 0, "geo": 0, "lat": 0.0, "lng": 0.0})
         did = str(urow.get("DistrictID", ""))
         z = _zone_by_unit.get(u)
+        cat_id = str(urow.get("StationCategoryID", "") or "")
+        lat_raw, lng_raw = urow.get("Latitude"), urow.get("Longitude")
         station_roster.append({
             "unitId": u,
             "unitName": urow.get("UnitName", u),
@@ -138,10 +138,11 @@ def run(data_dir: str):
             # _dnames may be keyed by str or int depending on how the CSV parsed; try both
             # rather than silently emitting an empty name.
             "districtName": _dnames.get(did) or _dnames.get(int(did) if str(did).isdigit() else did, ""),
-            "cases": agg["n"],
-            "geocoded": agg["geo"],
-            "lat": round(agg["lat"] / agg["geo"], 5) if agg["geo"] else None,
-            "lng": round(agg["lng"] / agg["geo"], 5) if agg["geo"] else None,
+            "cases": _st_case_count.get(u, 0),
+            "lat": round(float(lat_raw), 5) if lat_raw not in (None, "") else None,
+            "lng": round(float(lng_raw), 5) if lng_raw not in (None, "") else None,
+            "categoryId": cat_id,
+            "category": _cat_names.get(cat_id, _cat_names.get(int(cat_id) if cat_id.isdigit() else cat_id, "")),
             "zone": (z or {}).get("zone", "normal"),
             "zoneZ": (z or {}).get("z", 0.0),
             "current": (z or {}).get("current"),

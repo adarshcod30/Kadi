@@ -22,6 +22,18 @@ const HEAD_COLOR: Record<string, string> = {
   '5': '#A98BFF', '6': '#7C8CFF', '7': '#C8D2E0', '8': '#4BD68A',
 };
 
+// Station specialisation, not the same axis as crime type. Fill colour on the map still
+// carries zone status (is this station running hot); the RING is the station's kind, so
+// both read at a glance without needing two separate layers.
+const STATION_CATEGORIES: [string, string][] = [
+  ['1', 'Law and Order (Town/City)'], ['2', 'Law and Order (Rural)'],
+  ['3', 'Traffic'], ['4', 'Women'],
+  ['5', 'CEN (Cyber/Economic/Narcotics)'], ['6', 'Cyber Crime'], ['7', 'Railway'],
+];
+const STATION_RING_COLOR: Record<string, string> = {
+  '3': '#0B3D75', '4': '#D6336C', '5': '#7C4DFF', '6': '#00B8A9', '7': '#5B6B7F',
+};
+
 const STYLE: any = {
   version: 8,
   glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -64,6 +76,7 @@ export default function MapPage() {
   // area as one polygon among 31. State tier still opens on the whole state.
   const [selDistrict, setSelDistrict] = useState<string | null>(null);
   const [showStations, setShowStations] = useState(false);
+  const [stationCategory, setStationCategory] = useState('');
   useEffect(() => {
     const cap = me?.capabilities;
     if (cap && cap.effectiveScope === 'district' && cap.districtId && selDistrict === null) {
@@ -252,6 +265,7 @@ export default function MapPage() {
     if (!m || !ready) return;
     const feats = (stations?.items || [])
       .filter((r: any) => r.lat != null && r.lng != null)
+      .filter((r: any) => !stationCategory || String(r.categoryId) === stationCategory)
       .map((r: any) => ({
         type: 'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: [r.lng, r.lat] },
@@ -259,6 +273,7 @@ export default function MapPage() {
           unitName: r.unitName, districtName: r.districtName, zone: r.zone,
           cases: r.cases, current: r.current ?? 0, baseline: r.baseline ?? 0,
           redAt: r.thresholds?.redAt ?? 0,
+          category: r.category || '', categoryId: String(r.categoryId || ''),
         },
       }));
     const data = { type: 'FeatureCollection' as const, features: feats };
@@ -273,8 +288,15 @@ export default function MapPage() {
             11, ['interpolate', ['linear'], ['get', 'cases'], 0, 5, 250, 14]],
           'circle-color': ['match', ['get', 'zone'],
             'red_pulsing', '#C0392B', 'red', '#C0392B', 'yellow', '#E0A106', '#2FA8A0'],
-          'circle-stroke-width': 1.4,
-          'circle-stroke-color': '#FFFFFF',
+          // Ring colour carries the station's TYPE, independent of the fill's zone status --
+          // a Women's or Traffic station is identifiable at a glance even when it is
+          // otherwise reading normal. Ordinary Law & Order stations keep the plain white ring.
+          'circle-stroke-width': ['match', ['get', 'categoryId'],
+            '3', 2.4, '4', 2.4, '5', 2.4, '6', 2.4, '7', 2.4, 1.4],
+          'circle-stroke-color': ['match', ['get', 'categoryId'],
+            '3', STATION_RING_COLOR['3'], '4', STATION_RING_COLOR['4'],
+            '5', STATION_RING_COLOR['5'], '6', STATION_RING_COLOR['6'],
+            '7', STATION_RING_COLOR['7'], '#FFFFFF'],
           'circle-opacity': 0.92,
         },
       });
@@ -286,7 +308,7 @@ export default function MapPage() {
           .setLngLat(e.lngLat)
           .setHTML(
             `<div style="font:13px/1.45 system-ui"><b>${p.unitName}</b><br/>`
-            + `<span style="color:#5B6B7F">${p.districtName}</span><br/>`
+            + `<span style="color:#5B6B7F">${p.districtName}${p.category ? ' · ' + p.category : ''}</span><br/>`
             + `${Number(p.cases).toLocaleString()} FIRs total<br/>`
             + `<b>${p.current}</b> this month vs an average of ${p.baseline}<br/>`
             + `<span style="color:#5B6B7F">Its own red line: +${p.redAt}</span></div>`,
@@ -301,7 +323,7 @@ export default function MapPage() {
     if (m.getLayer('stations-dot')) {
       m.setLayoutProperty('stations-dot', 'visibility', showStations ? 'visible' : 'none');
     }
-  }, [ready, stations, showStations]);
+  }, [ready, stations, showStations, stationCategory]);
 
   // ---- drill-down highlight + fly ----
   useEffect(() => {
@@ -384,6 +406,13 @@ export default function MapPage() {
               </span>
             ) : null}
           </button>
+          {showStations && (
+            <select value={stationCategory} onChange={(e) => setStationCategory(e.target.value)}
+              className="input text-sm" title="Filter stations by type">
+              <option value="">All station types</option>
+              {STATION_CATEGORIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          )}
         </div>
       </div>
 

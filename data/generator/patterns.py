@@ -23,6 +23,20 @@ from datetime import datetime, timedelta
 import karnataka as K
 
 
+# The 7 surnames each NAMED ground-truth pattern below is built around (the gang, the
+# serial-burglary chain, the cyber ring, the repeat offender on bail, ...). These must be
+# excluded from every GENERAL random-surname draw everywhere in the generator, not just
+# the ordinary-repeat-offenders pool -- Builder.build_recurring_pool() in generate.py used
+# to draw from the raw PLANTED_SURNAMES list directly, so "Belavadi" (the risky-offender
+# pattern's own surname) could also be handed to hundreds of unrelated background
+# identities. At 60K cases that pushed its real frequency to 39 occurrences, well past the
+# distinctiveness threshold entity resolution needs to link its OWN 6 planted cases with
+# confidence, and the planted pattern's ground-truth check started failing -- not because
+# entity resolution regressed, but because the "distinctive" surname it depended on no
+# longer was. A surname used by a specific ground-truth story must be exclusive to it,
+# not merely rare.
+RESERVED_SURNAMES = {"Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi"}
+
 # Distinctive surnames reserved for planted offenders (NOT in the random name pool),
 # so entity resolution resolves them confidently by name. Karnataka taluk/place-derived
 # surnames — a large pool so we can populate a realistic repeat-offender watchlist.
@@ -118,8 +132,7 @@ def _ordinary_repeat_offenders(b, rng, today, target=240):
     offender watchlist and network views are realistically populated. Distributed across
     districts weighted like the base data (cities have more), and occasionally sharing a
     co-accused so small networks form."""
-    reserved = {"Doddamani", "Chikkanna", "Yaraguntla", "Talwar", "Marihal", "Hosakote", "Belavadi"}
-    pool = [s for s in PLANTED_SURNAMES if s not in reserved]
+    pool = [s for s in PLANTED_SURNAMES if s not in RESERVED_SURNAMES]
     district_ids = list(K.DISTRICT_WEIGHTS.keys())
     district_w = list(K.DISTRICT_WEIGHTS.values())
     records = []

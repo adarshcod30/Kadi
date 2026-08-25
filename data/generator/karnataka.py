@@ -147,6 +147,32 @@ ARREST_TYPES = [
 ]
 
 # ---------------------------------------------------------------------------
+# Police station specialisation. Not in the source ER diagram (that models FIR data, not
+# the station roster) -- added because a real KSP station is not a generic dot on a map. It
+# is one of a handful of distinct kinds of station, each with a different mandate. Karnataka
+# runs Law & Order (Town/City and Rural), Traffic, Women's, CEN (Cyber, Economic & Narcotics
+# -- rolled out in every district), and a Cyber Crime carve-out unique to Bengaluru (8
+# dedicated stations, per the state government's 2024 announcement), plus Railway Police at
+# major junction towns. Sourced from bangaloreurbanpolice.karnataka.gov.in, the Karnataka
+# Police Wikipedia entry, and Deccan Herald's reporting on the Bengaluru cyber rollout --
+# not from the ER diagram, which does not cover this.
+STATION_CATEGORIES = [
+    {"StationCategoryID": 1, "StationCategoryName": "Law and Order (Town/City)"},
+    {"StationCategoryID": 2, "StationCategoryName": "Law and Order (Rural)"},
+    {"StationCategoryID": 3, "StationCategoryName": "Traffic Police Station"},
+    {"StationCategoryID": 4, "StationCategoryName": "Women Police Station"},
+    {"StationCategoryID": 5, "StationCategoryName": "CEN (Cyber, Economic & Narcotics) Police Station"},
+    {"StationCategoryID": 6, "StationCategoryName": "Cyber Crime Police Station"},
+    {"StationCategoryID": 7, "StationCategoryName": "Railway Police Station"},
+]
+
+# Districts with a major railway junction, per KSP's Railway DPO coverage -- Railway Police
+# is not a per-district service like CEN, only present where there is real rail traffic to
+# police.
+RAILWAY_JUNCTION_DISTRICTS = {1, 3, 7, 5, 6, 12, 8}  # Bengaluru City, Mysuru, Hubballi-Dharwad,
+# Belagavi, Kalaburagi, Davanagere, Ballari -- Karnataka's principal rail junctions
+
+# ---------------------------------------------------------------------------
 # Crime taxonomy: CrimeHead (major) -> CrimeSubHead (minor)
 # gravity: whether sub-head is typically heinous. weight: relative volume.
 # ---------------------------------------------------------------------------

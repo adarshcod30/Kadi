@@ -280,9 +280,19 @@ function Outliers({ anomalies }: { anomalies: any }) {
   );
 }
 
+// Every station's own specialisation -- not part of the original FIR schema, added because
+// a real KSP station is not a generic dot: Traffic, Women's, CEN and Cyber Crime stations
+// each answer a different kind of complaint, and "classify stations by type" only means
+// something if that classification is actually filterable and visible here.
+const STATION_TYPE_FILTERS: [string, string][] = [
+  ['1', 'Law and Order (Town/City)'], ['2', 'Law and Order (Rural)'],
+  ['3', 'Traffic'], ['4', 'Women'], ['5', 'CEN'], ['6', 'Cyber Crime'], ['7', 'Railway'],
+];
+
 function StationRoster({ stations, sort, setSort, q, setQ }: any) {
+  const [category, setCategory] = useState('');
   if (!stations) return <div className="card"><Skeleton rows={5} /></div>;
-  const items = stations.items || [];
+  const items = (stations.items || []).filter((r: any) => !category || String(r.categoryId) === category);
   const s = stations.summary || {};
   return (
     <Section
@@ -298,6 +308,11 @@ function StationRoster({ stations, sort, setSort, q, setQ }: any) {
             <option value="zone">Sort: status</option>
             <option value="cases_desc">Sort: caseload</option>
             <option value="name">Sort: name</option>
+          </select>
+          <select value={category} onChange={(e: any) => setCategory(e.target.value)}
+            className="input text-[13px] w-auto">
+            <option value="">All station types</option>
+            {STATION_TYPE_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
           </select>
         </div>
 
@@ -317,6 +332,7 @@ function StationRoster({ stations, sort, setSort, q, setQ }: any) {
             <thead className="sticky top-0 bg-surface">
               <tr className="text-ink-subtle text-[11px] uppercase tracking-wide">
                 <th className="text-left font-medium py-1.5 px-1">Station</th>
+                <th className="text-left font-medium px-1 hidden md:table-cell">Type</th>
                 <th className="text-right font-medium px-1">FIRs</th>
                 <th className="text-right font-medium px-1">This month</th>
                 <th className="text-right font-medium px-1 hidden sm:table-cell">Its average</th>
@@ -337,6 +353,9 @@ function StationRoster({ stations, sort, setSort, q, setQ }: any) {
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-1 text-ink-subtle text-[11.5px] hidden md:table-cell truncate max-w-[140px]">
+                    {(r.category || '').replace('Law and Order ', '')}
                   </td>
                   <td className="text-right font-num px-1 text-ink-muted">{r.cases?.toLocaleString()}</td>
                   <td className="text-right font-num px-1 text-ink">{r.current ?? '—'}</td>

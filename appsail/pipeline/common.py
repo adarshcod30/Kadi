@@ -35,7 +35,7 @@ SOURCE_TABLES = [
     "CaseMaster", "Accused", "Victim", "ComplainantDetails", "ArrestSurrender",
     "ActSectionAssociation", "ChargesheetDetails", "Unit", "District", "Employee",
     "CrimeHead", "CrimeSubHead", "CaseStatusMaster", "CaseCategory", "GravityOffence",
-    "Court", "Section", "Act",
+    "Court", "Section", "Act", "StationCategory",
 ]
 
 

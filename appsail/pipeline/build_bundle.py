@@ -39,7 +39,7 @@ SMALL = ["socio", "forecast", "stats", "zones", "occasions", "district_stats", "
          "case_linked_count", "offender_of_case", "stations", "link_summary"]
 LOOKUPS = ["District", "Unit", "CrimeHead", "CrimeSubHead", "CaseStatusMaster",
            "CaseCategory", "GravityOffence", "GenderMaster", "Court", "Section", "Act",
-           "Rank", "Designation", "ArrestSurrenderType"]
+           "Rank", "Designation", "ArrestSurrenderType", "StationCategory"]
 
 # Sized to hold a whole ego network rather than truncate it. The cap used to be 14 while
 # case_linked_count was written from the UNCAPPED graph, so the switcher advertised "125
