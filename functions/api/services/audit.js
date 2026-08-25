@@ -50,4 +50,28 @@ function list({ limit = 100, action, role } = {}) {
   return rows.slice(0, limit);
 }
 
-module.exports = { record, list, persistence: () => ({ ok: persistOk, failed: persistFail, lastError: persistLast }) };
+// The read side of the write-through this file's header promises: a live ZCQL read against
+// AuditLog, for when the in-memory buffer (this container's session only) is too thin to
+// answer honestly. Returns null on any Data Store failure so the caller can fall back to
+// the buffer rather than turning an audit read into a 500.
+async function listPersisted(req, { limit = 100, action } = {}) {
+  const where = action ? ` WHERE action='${String(action).replace(/'/g, "''")}'` : '';
+  const rows = await datastore.query(
+    req,
+    `SELECT appUserId, userName, role, action, targetType, targetId, queryText, ip, ts `
+      + `FROM AuditLog${where} ORDER BY ROWID DESC LIMIT ${Math.min(Number(limit) || 100, 500)}`,
+    'AuditLog',
+  );
+  if (rows === null) return null;
+  return rows.map((r, i) => ({
+    auditId: `D${String(i).padStart(7, '0')}`,
+    appUserId: r.appUserId, userName: r.userName, role: r.role,
+    action: r.action, targetType: r.targetType || null, targetId: r.targetId || null,
+    queryText: r.queryText || null, ip: r.ip || null, ts: r.ts,
+  }));
+}
+
+module.exports = {
+  record, list, listPersisted,
+  persistence: () => ({ ok: persistOk, failed: persistFail, lastError: persistLast }),
+};

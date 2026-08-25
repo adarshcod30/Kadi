@@ -420,10 +420,22 @@ function buildApp() {
     };
   }));
 
-  // audit (role-gated)
+  // audit (role-gated) — the state tier plus SP, matching capabilities().canViewAudit.
+  // This used to require ['ACP', 'Admin'] (DSP/SP/Admin), which meant an Analyst or DGP —
+  // both told by the UI that they *can* view audit — got a silent 403 here and the page
+  // just rendered "No audit entries yet", indistinguishable from a genuinely empty log.
   r.get('/audit', handle(async (req) => {
-    rbac.requireRole(req.user, ['ACP', 'Admin']);
-    return { items: audit.list({ limit: Number(req.query.limit) || 100, action: req.query.action }) };
+    rbac.requireRole(req.user, ['Analyst', 'DGP', 'Admin', 'SP']);
+    const limit = Number(req.query.limit) || 100;
+    const buffered = audit.list({ limit, action: req.query.action });
+    // The buffer is this container's in-memory session only, so a fresh cold start —
+    // routine on a low-traffic serverless function — reads back empty even though every
+    // event was written through to the AuditLog table. Fall through to a live read there
+    // whenever the buffer looks thin, so the log reflects real history, not just uptime.
+    if (buffered.length >= limit) return { items: buffered, source: 'buffer' };
+    const persisted = await audit.listPersisted(req, { limit, action: req.query.action });
+    if (persisted) return { items: persisted, source: 'datastore' };
+    return { items: buffered, source: 'buffer' };
   }));
 
   // Row counts read live from Data Store via ZCQL. Exists so the claim "40,836 FIRs are

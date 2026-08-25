@@ -108,8 +108,12 @@ export const useNational = () =>
   useQuery({ queryKey: ['national'], queryFn: () => api.get<any>('/geo/national'), staleTime: Infinity });
 export const useVulnerability = (enabled: boolean) =>
   useQuery({ queryKey: ['vulnerability', role()], queryFn: () => api.get<any>('/analytics/vulnerability'), enabled });
-export const useAudit = (enabled: boolean) =>
-  useQuery({ queryKey: ['audit', role()], queryFn: () => api.get<{ items: any[] }>('/audit?limit=200'), enabled });
+export const useAudit = (enabled: boolean, action?: string) =>
+  useQuery({
+    queryKey: ['audit', role(), action || 'all'],
+    queryFn: () => api.get<{ items: any[]; source?: string }>(`/audit?limit=200${action ? `&action=${encodeURIComponent(action)}` : ''}`),
+    enabled,
+  });
 
 export const useAssistant = () =>
   useMutation({ mutationFn: (body: { text: string; lang: string }) => api.post<AssistantResponse>('/assistant/query', body) });

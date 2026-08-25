@@ -14,7 +14,6 @@ import { setRole, getRole, Role } from '../lib/api';
 import { SeverityDot } from './ui';
 
 const NAV = [
-  { to: '/about', icon: Info, key: 'about' },
   { to: '/', icon: Home, key: 'home', end: true },
   { to: '/graph', icon: Share2, key: 'graph' },
   { to: '/cases', icon: FileText, key: 'cases' },
@@ -24,6 +23,7 @@ const NAV = [
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin'] },
+  { to: '/about', icon: Info, key: 'about' },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -52,10 +52,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20 border-b-[3px] border-kadi-gold">
         <div className="flex items-center gap-2.5">
           <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
-          <div className="flex items-center gap-1.5 font-semibold tracking-tight">
-            <span className="w-6 h-6 rounded bg-white/15 grid place-items-center text-kadi-gold font-bold kn text-sm">ಕ</span>
-            <span>{t('appName')}</span>
-          </div>
+          <span className="font-semibold tracking-tight">{t('appName')}</span>
           <span className="hidden md:inline text-white/70 text-sm font-normal ml-1 border-l border-white/20 pl-3">{t('ksp')}</span>
         </div>
         <form onSubmit={doSearch} className="ml-auto relative hidden sm:block">
@@ -83,7 +80,6 @@ export function Shell({ children }: { children: ReactNode }) {
           </button>
           {showAlerts && <AlertsPanel onClose={() => setShowAlerts(false)} />}
         </div>
-        <RoleMenu current={role} onChange={(r) => { setRole(r); window.location.reload(); }} label={me?.capabilities.label} />
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -101,10 +97,17 @@ export function Shell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <button onClick={() => setCollapsed((c) => !c)}
-            className="p-3 text-ink-muted hover:bg-surface-3 border-t border-line hidden md:block">
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
+          {/* Account control lives here, not the header -- it is the one action that ends
+              the session, so it belongs next to the other chrome-level control (collapse),
+              not mixed in with alerts/search/language which act on the page above it. */}
+          <div className="border-t border-line">
+            <RoleMenu current={role} onChange={(r) => { setRole(r); window.location.reload(); }}
+              label={me?.capabilities.label} collapsed={collapsed} />
+            <button onClick={() => setCollapsed((c) => !c)}
+              className="w-full p-3 text-ink-muted hover:bg-surface-3 border-t border-line hidden md:flex items-center justify-center">
+              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </button>
+          </div>
         </aside>
 
         {/* Main */}
@@ -202,18 +205,16 @@ function ScopeBadge({ me }: { me: any }) {
   );
 }
 
-function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: Role) => void; label?: string }) {
+function RoleMenu({ current, onChange, label, collapsed }: { current: Role; onChange: (r: Role) => void; label?: string; collapsed: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const roles: Role[] = ['Analyst', 'DGP', 'Admin', 'SP', 'DSP', 'SI'];
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white/10">
-        <span className="w-7 h-7 rounded-full bg-white/20 grid place-items-center text-xs font-semibold">{current[0]}</span>
-        <span className="hidden md:inline">{label || current}</span>
-      </button>
+      {/* Opens upward, not downward -- this control sits at the bottom of the sidebar, so a
+          menu dropping below it would run off the viewport. */}
       {open && (
-        <div className="absolute right-0 mt-2 w-56 card p-1 z-30 text-ink">
+        <div className="absolute left-2 bottom-full mb-1 w-56 card p-1 z-30 text-ink">
           <div className="px-3 py-2 text-xs text-ink-muted">{t('switchRole')}</div>
           {roles.map((r) => (
             <button key={r} onClick={() => onChange(r)}
@@ -228,6 +229,11 @@ function RoleMenu({ current, onChange, label }: { current: Role; onChange: (r: R
           </div>
         </div>
       )}
+      <button onClick={() => setOpen((o) => !o)} title={label || current}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-ink-muted hover:bg-surface-3 transition-colors">
+        <span className="w-7 h-7 rounded-full bg-kadi-blue50 text-kadi-blue grid place-items-center text-xs font-semibold shrink-0">{current[0]}</span>
+        {!collapsed && <span className="hidden md:inline truncate">{label || current}</span>}
+      </button>
     </div>
   );
 }
