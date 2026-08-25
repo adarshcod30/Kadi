@@ -4,10 +4,19 @@ const rbac = require('./rbac');
 
 // Zone severity order, shared wherever zones are ranked.
 const ZONE_RANK = { red_pulsing: 0, red: 1, yellow: 2, normal: 3 };
+// Case-health severity as a sortable number. Unflagged cases rank below every flagged one.
+const SEVERITY_RANK = (s) => (s === 'high' ? 2 : s === 'medium' ? 1 : 0);
 const { notFound, forbidden } = require('../lib/envelope');
 
 const FAIRNESS_STATEMENT =
   'KADI links cases and scores offenders using evidence and behaviour only — never caste, religion, or occupation. These fields are excluded from every model by design.';
+
+// Paging parsed from user-supplied query strings, which are not guaranteed to be numbers.
+// parseInt('abc') is NaN, and NaN survives Math.max/Math.min untouched -- so a junk ?page=
+// reached rows.slice(NaN, NaN) and returned an empty list, which reads as "no results" rather
+// than as the bad input it is. `|| fallback` collapses NaN before any clamping happens.
+function pageOf(q) { return Math.max(1, parseInt(q.page, 10) || 1); }
+function pageSizeOf(q, fallback) { return Math.min(200, Math.max(1, parseInt(q.pageSize, 10) || fallback)); }
 
 function scoped(user, list) {
   // The fast path must not skip a state user who has drilled into a district. This
@@ -24,13 +33,16 @@ function listCases(user, q = {}) {
   const db = load();
   let rows = scoped(user, db.caseList);
   const { search, head, subhead, district, unit, status, gravity, category,
-    dateFrom, dateTo, flagged, clusterId, sort = 'date_desc' } = q;
+    dateFrom, dateTo, flagged, clusterId, severity, io, linked, sort = 'date_desc' } = q;
 
   if (search) {
     const s = String(search).toLowerCase();
     rows = rows.filter((c) =>
       c.crimeNo.includes(s) || (c.briefFacts || '').toLowerCase().includes(s) ||
-      (c.crimeSubHead || '').toLowerCase().includes(s) || (c.unitName || '').toLowerCase().includes(s));
+      (c.crimeSubHead || '').toLowerCase().includes(s) || (c.unitName || '').toLowerCase().includes(s) ||
+      // The IO is who a supervisor actually searches by when chasing a specific officer's
+      // pendency, and it was the one indexed name the search could not reach.
+      (c.ioName || '').toLowerCase().includes(s));
   }
   if (head) rows = rows.filter((c) => c.crimeHeadId === String(head));
   if (subhead) rows = rows.filter((c) => c.crimeSubHeadId === String(subhead));
@@ -41,21 +53,39 @@ function listCases(user, q = {}) {
   if (category) rows = rows.filter((c) => c.categoryId === String(category));
   if (clusterId) rows = rows.filter((c) => c.clusterId === clusterId);
   if (flagged === 'true' || flagged === true) rows = rows.filter((c) => c.healthSeverity);
+  if (severity) rows = rows.filter((c) => c.healthSeverity === String(severity));
+  if (io) rows = rows.filter((c) => String(c.ioId) === String(io));
+  // "Only cases that connect to something" is the whole premise of the product, and it was
+  // the one thing the register could not be filtered down to.
+  if (linked === 'true' || linked === true) rows = rows.filter((c) => (c.linkedCount || 0) > 0);
   if (dateFrom) rows = rows.filter((c) => c.crimeRegisteredDate >= dateFrom);
   if (dateTo) rows = rows.filter((c) => c.crimeRegisteredDate <= dateTo);
 
   const sorters = {
     date_desc: (a, b) => (a.crimeRegisteredDate < b.crimeRegisteredDate ? 1 : -1),
     date_asc: (a, b) => (a.crimeRegisteredDate > b.crimeRegisteredDate ? 1 : -1),
-    linked_desc: (a, b) => b.linkedCount - a.linkedCount,
+    linked_desc: (a, b) => b.linkedCount - a.linkedCount || (a.crimeRegisteredDate < b.crimeRegisteredDate ? 1 : -1),
+    // Heinous first, then newest -- the order a supervisor triaging a register actually wants.
+    gravity_desc: (a, b) => Number(a.gravityId) - Number(b.gravityId) || (a.crimeRegisteredDate < b.crimeRegisteredDate ? 1 : -1),
+    severity_desc: (a, b) => SEVERITY_RANK(b.healthSeverity) - SEVERITY_RANK(a.healthSeverity)
+      || (a.crimeRegisteredDate < b.crimeRegisteredDate ? 1 : -1),
+    crimeno_asc: (a, b) => String(a.crimeNo).localeCompare(String(b.crimeNo)),
   };
   rows = rows.slice().sort(sorters[sort] || sorters.date_desc);
 
   const total = rows.length;
-  const page = Math.max(1, parseInt(q.page || '1', 10));
-  const pageSize = Math.min(200, Math.max(1, parseInt(q.pageSize || '25', 10)));
+  const page = pageOf(q);
+  const pageSize = pageSizeOf(q, 25);
   const items = rows.slice((page - 1) * pageSize, page * pageSize);
-  return { items, total, page, pageSize };
+  // Counts for the whole filtered set, not just this page -- so the header can say what the
+  // filter actually selected rather than what happened to land on page 1.
+  const summary = {
+    flagged: rows.reduce((n, c) => n + (c.healthSeverity ? 1 : 0), 0),
+    highSeverity: rows.reduce((n, c) => n + (c.healthSeverity === 'high' ? 1 : 0), 0),
+    linked: rows.reduce((n, c) => n + (c.linkedCount > 0 ? 1 : 0), 0),
+    heinous: rows.reduce((n, c) => n + (String(c.gravityId) === '1' ? 1 : 0), 0),
+  };
+  return { items, total, page, pageSize, summary, sort: sorters[sort] ? sort : 'date_desc' };
 }
 
 function getCase(user, id) {
@@ -238,21 +268,75 @@ function listOffenders(user, q = {}) {
   if (q.crossDistrict === 'true') rows = rows.filter((o) => (o.distinctDistricts || 0) >= 2);
   if (q.band) rows = rows.filter((o) => o.band === q.band);
   if (q.minRisk) rows = rows.filter((o) => (o.riskScore || 0) >= Number(q.minRisk));
+  // Operates with co-offenders -- a group, not a lone repeat offender. Same definition the
+  // dashboard's "active networks" figure uses, so the two agree.
+  if (q.networked === 'true') rows = rows.filter((o) => (o.coOffenders || []).length > 0);
+  if (q.lowConfidence === 'true') rows = rows.filter((o) => o.lowConfidence);
+  // "Still active" is the question that decides whether a watchlist entry is worth acting on
+  // today. Measured against the corpus's own latest activity rather than wall-clock now, so
+  // it stays meaningful no matter when the demo is run.
+  if (q.activeDays) {
+    const cutoff = daysBefore(offenderAsOf(db), Number(q.activeDays));
+    if (cutoff) rows = rows.filter((o) => o.lastSeen && o.lastSeen >= cutoff);
+  }
   if (q.search) {
     const s = String(q.search).toLowerCase();
-    rows = rows.filter((o) => o.canonicalName.toLowerCase().includes(s));
+    // Variants are the point of entity resolution: someone searching an alias should find the
+    // identity it resolved into, not nothing.
+    rows = rows.filter((o) => o.canonicalName.toLowerCase().includes(s)
+      || (o.nameVariants || []).some((v) => String(v).toLowerCase().includes(s)));
   }
-  rows.sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0));
+
+  const sorters = {
+    risk_desc: (a, b) => (b.riskScore || 0) - (a.riskScore || 0),
+    risk_asc: (a, b) => (a.riskScore || 0) - (b.riskScore || 0),
+    cases_desc: (a, b) => (b.distinctCases || 0) - (a.distinctCases || 0) || (b.riskScore || 0) - (a.riskScore || 0),
+    districts_desc: (a, b) => (b.distinctDistricts || 0) - (a.distinctDistricts || 0) || (b.riskScore || 0) - (a.riskScore || 0),
+    arrests_desc: (a, b) => (b.arrestCount || 0) - (a.arrestCount || 0) || (b.riskScore || 0) - (a.riskScore || 0),
+    network_desc: (a, b) => (b.coOffenders || []).length - (a.coOffenders || []).length || (b.riskScore || 0) - (a.riskScore || 0),
+    recent_desc: (a, b) => String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')) || (b.riskScore || 0) - (a.riskScore || 0),
+    name_asc: (a, b) => String(a.canonicalName).localeCompare(String(b.canonicalName)),
+  };
+  const sort = sorters[q.sort] ? q.sort : 'risk_desc';
+  rows = rows.slice().sort(sorters[sort]);
+
   const total = rows.length;
-  const page = Math.max(1, parseInt(q.page || '1', 10));
-  const pageSize = Math.min(200, parseInt(q.pageSize || '50', 10));
+  const page = pageOf(q);
+  const pageSize = pageSizeOf(q, 50);
   return {
-    items: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize,
+    items: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, sort,
     scope: narrowed ? 'district' : 'state',
     reachingIn: narrowed ? rows.filter((o) => o.reachesIn).length : null,
     basedHere: narrowed ? rows.filter((o) => o.basedHere).length : null,
+    // Whole-filtered-set counts, so the summary describes the selection rather than the page.
+    summary: {
+      high: rows.reduce((n, o) => n + (o.band === 'High' ? 1 : 0), 0),
+      crossDistrict: rows.reduce((n, o) => n + ((o.distinctDistricts || 0) >= 2 ? 1 : 0), 0),
+      networked: rows.reduce((n, o) => n + ((o.coOffenders || []).length ? 1 : 0), 0),
+      needsReview: rows.reduce((n, o) => n + (o.lowConfidence ? 1 : 0), 0),
+    },
+    asOf: offenderAsOf(db),
     fairness: FAIRNESS_STATEMENT,
   };
+}
+
+// The corpus's own latest offending date. Cached on the db object because it is a scan over
+// every identity and the underlying bundle is immutable for the container's lifetime.
+function offenderAsOf(db) {
+  if (db.__offenderAsOf === undefined) {
+    let max = null;
+    for (const o of db.offenders) if (o.lastSeen && (!max || o.lastSeen > max)) max = o.lastSeen;
+    db.__offenderAsOf = max;
+  }
+  return db.__offenderAsOf;
+}
+
+function daysBefore(isoDate, days) {
+  if (!isoDate || !Number.isFinite(days)) return null;
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
 }
 
 function getOffender(user, id) {
@@ -283,8 +367,8 @@ function listHealth(user, q = {}) {
       unit: c ? c.unitName : '', ioName: c ? c.ioName : '', gravity: c ? c.gravity : '' };
   };
   const total = rows.length;
-  const page = Math.max(1, parseInt(q.page || '1', 10));
-  const pageSize = Math.min(200, parseInt(q.pageSize || '30', 10));
+  const page = pageOf(q);
+  const pageSize = pageSizeOf(q, 30);
   return { items: rows.slice((page - 1) * pageSize, page * pageSize).map(enrich), total, page, pageSize };
 }
 

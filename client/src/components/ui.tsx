@@ -1,6 +1,6 @@
 // Reusable presentational components — chips, KPI cards, states.
 import { ReactNode } from 'react';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, X } from 'lucide-react';
 
 export function Chip({ children, color = 'default', className = '' }: { children: ReactNode; color?: string; className?: string }) {
   const map: Record<string, string> = {
@@ -90,4 +90,68 @@ export function Spinner() {
 
 export function Mono({ children }: { children: ReactNode }) {
   return <span className="font-mono text-[13px]">{children}</span>;
+}
+
+// Applied filters, shown as removable chips.
+//
+// A filter you cannot see is a filter you cannot undo. Multi-select registers fail the same
+// way every time: someone narrows to nearly nothing, cannot tell which of six controls did
+// it, and concludes the data is missing rather than that the filter is wrong.
+export function FilterChips({ items, onRemove, onClear }: {
+  items: { k: string; label: string }[]; onRemove: (k: string) => void; onClear: () => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center border-t border-line pt-2">
+      <span className="text-[11px] uppercase tracking-wide text-ink-muted">Filtered by</span>
+      {items.map((f) => (
+        <button key={f.k} onClick={() => onRemove(f.k)} title="Remove this filter"
+          className="flex items-center gap-1 bg-kadi-blue50 text-kadi-blue rounded-full pl-2.5 pr-1.5 py-0.5 text-[12px] hover:bg-kadi-blue hover:text-white transition-colors">
+          {f.label} <X size={11} />
+        </button>
+      ))}
+      <button onClick={onClear} className="text-[12px] text-ink-muted hover:text-ink underline ml-1">Clear all</button>
+    </div>
+  );
+}
+
+// Pagination with an honest position readout.
+//
+// "Page 4" alone does not tell you how much is left; "76-100 of 59,985" does, and it is the
+// difference between a list that feels navigable and one that feels bottomless.
+const PAGE_SIZES = [25, 50, 100, 200];
+export function Pager({ page, pageSize, total, onPage, onPageSize }: {
+  page: number; pageSize: number; total: number;
+  onPage: (n: number) => void; onPageSize?: (n: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const btn = 'btn-outline px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed';
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm flex-wrap">
+      <span className="text-ink-muted">
+        <span className="font-num">{from.toLocaleString()}–{to.toLocaleString()}</span> of{' '}
+        <span className="font-num">{total.toLocaleString()}</span>
+        {onPageSize && (
+          <>
+            {' · '}
+            <select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}
+              className="bg-transparent border border-line rounded px-1 py-0.5 text-[12px] ml-0.5">
+              {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} per page</option>)}
+            </select>
+          </>
+        )}
+      </span>
+      {pages > 1 && (
+        <div className="flex items-center gap-1.5">
+          <button disabled={page <= 1} onClick={() => onPage(1)} className={btn} title="First page">«</button>
+          <button disabled={page <= 1} onClick={() => onPage(page - 1)} className={btn}>Prev</button>
+          <span className="px-2 text-ink-muted font-num whitespace-nowrap">{page} / {pages.toLocaleString()}</span>
+          <button disabled={page >= pages} onClick={() => onPage(page + 1)} className={btn}>Next</button>
+          <button disabled={page >= pages} onClick={() => onPage(pages)} className={btn} title="Last page">»</button>
+        </div>
+      )}
+    </div>
+  );
 }

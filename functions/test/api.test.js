@@ -131,3 +131,109 @@ test('fairness: vulnerability endpoint role-gated + excludes protected', () => {
   const v = q.vulnerability(analyst);
   assert.ok(v.disclaimer.toLowerCase().includes('excluded'));
 });
+
+// Paging and sorting are the two things a 60,000-row register cannot be used without, and
+// both fail quietly: a broken page-2 looks like "the list ends here", and a broken sort looks
+// like data that happens to be in that order. Assert them rather than eyeball them.
+test('cases: paging returns disjoint pages and every sort is total', () => {
+  const q = require('../api/services/queries');
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+
+  const p1 = q.listCases(analyst, { pageSize: 25, page: 1 });
+  const p2 = q.listCases(analyst, { pageSize: 25, page: 2 });
+  assert.strictEqual(p1.page, 1);
+  assert.strictEqual(p2.page, 2);
+  assert.strictEqual(p1.items.length, 25);
+  assert.strictEqual(p1.total, p2.total, 'total must not depend on the page requested');
+  const overlap = new Set(p1.items.map((c) => c.caseMasterId));
+  assert.ok(!p2.items.some((c) => overlap.has(c.caseMasterId)), 'pages must be disjoint');
+
+  // The last page must be reachable and non-empty -- an off-by-one here strands the tail.
+  const lastPage = Math.ceil(p1.total / 25);
+  assert.ok(q.listCases(analyst, { pageSize: 25, page: lastPage }).items.length > 0);
+
+  const asc = q.listCases(analyst, { pageSize: 50, sort: 'date_asc' }).items;
+  assert.ok(asc.every((c, i) => i === 0 || asc[i - 1].crimeRegisteredDate <= c.crimeRegisteredDate));
+  const linked = q.listCases(analyst, { pageSize: 50, sort: 'linked_desc' }).items;
+  assert.ok(linked.every((c, i) => i === 0 || linked[i - 1].linkedCount >= c.linkedCount));
+  const heinous = q.listCases(analyst, { pageSize: 50, sort: 'gravity_desc' }).items;
+  assert.ok(heinous.every((c) => c.gravity === 'Heinous'), 'heinous must sort ahead of the rest');
+  const sev = q.listCases(analyst, { pageSize: 50, sort: 'severity_desc' }).items;
+  assert.ok(sev.every((c) => c.healthSeverity === 'high'), 'high severity must sort first');
+
+  // An unknown sort must fall back, not throw or silently return an unsorted page.
+  assert.strictEqual(q.listCases(analyst, { sort: 'nonsense' }).sort, 'date_desc');
+
+  // Summary counts describe the whole filtered set, so they cannot depend on the page.
+  assert.deepStrictEqual(p1.summary, p2.summary);
+  const linkedOnly = q.listCases(analyst, { linked: 'true', pageSize: 1 });
+  assert.strictEqual(linkedOnly.total, p1.summary.linked, 'summary.linked must match the filter it offers');
+  assert.ok(linkedOnly.items.every((c) => c.linkedCount > 0));
+});
+
+test('offenders: whole watchlist is reachable by paging, and filters agree with the summary', () => {
+  const q = require('../api/services/queries');
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+
+  const first = q.listOffenders(analyst, { pageSize: 50 });
+  assert.ok(first.total > 100, 'watchlist should hold the full repeat-offender set');
+  // Walk every page: the union must be the whole list with no duplicates. This is the
+  // regression guard for a list that silently showed only its first page.
+  const seen = new Set();
+  const pages = Math.ceil(first.total / 50);
+  for (let p = 1; p <= pages; p += 1) {
+    for (const o of q.listOffenders(analyst, { pageSize: 50, page: p }).items) seen.add(o.offenderIdentityId);
+  }
+  assert.strictEqual(seen.size, first.total, 'every offender must be reachable by paging');
+
+  const risk = q.listOffenders(analyst, { pageSize: 100, sort: 'risk_desc' }).items;
+  assert.ok(risk.every((o, i) => i === 0 || risk[i - 1].riskScore >= o.riskScore));
+  const recent = q.listOffenders(analyst, { pageSize: 100, sort: 'recent_desc' }).items;
+  assert.ok(recent.every((o, i) => i === 0 || (recent[i - 1].lastSeen || '') >= (o.lastSeen || '')));
+  const reach = q.listOffenders(analyst, { pageSize: 100, sort: 'districts_desc' }).items;
+  assert.ok(reach.every((o, i) => i === 0 || reach[i - 1].distinctDistricts >= o.distinctDistricts));
+
+  // Each headline count must be exactly what its own filter returns, or the chips lie.
+  assert.strictEqual(q.listOffenders(analyst, { band: 'High', pageSize: 1 }).total, first.summary.high);
+  assert.strictEqual(q.listOffenders(analyst, { crossDistrict: 'true', pageSize: 1 }).total, first.summary.crossDistrict);
+  assert.strictEqual(q.listOffenders(analyst, { networked: 'true', pageSize: 1 }).total, first.summary.networked);
+
+  // Recency is measured against the corpus, not wall-clock, so it must stay stable over time.
+  assert.match(String(first.asOf), /^\d{4}-\d{2}-\d{2}$/);
+  const active = q.listOffenders(analyst, { activeDays: '90', pageSize: 1 });
+  assert.ok(active.total > 0 && active.total < first.total, 'recency filter should narrow the set');
+
+  // Entity resolution is the point of this list: an alias must find the identity it merged into.
+  const withAlias = risk.find((o) => (o.nameVariants || []).some((v) => v !== o.canonicalName));
+  if (withAlias) {
+    const alias = withAlias.nameVariants.find((v) => v !== withAlias.canonicalName);
+    const hits = q.listOffenders(analyst, { search: alias, pageSize: 200 }).items;
+    assert.ok(hits.some((o) => o.offenderIdentityId === withAlias.offenderIdentityId),
+      'searching a known alias must return the resolved identity');
+  }
+});
+
+// Query strings are user input, and these list views are deliberately shareable -- so a
+// hand-edited or truncated link is a normal input, not an edge case. It must degrade to
+// page 1, never to an empty table that reads as "no such records".
+test('paging survives junk query params', () => {
+  const q = require('../api/services/queries');
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  const baseline = q.listCases(analyst, {}).total;
+
+  for (const bad of [{ page: 'abc' }, { page: '' }, { page: '-4' }, { page: '0' },
+    { pageSize: 'abc' }, { pageSize: '0' }, { pageSize: '-10' }, { page: 'abc', pageSize: 'xyz' }]) {
+    const r = q.listCases(analyst, bad);
+    assert.ok(r.items.length > 0, `cases must not go empty for ${JSON.stringify(bad)}`);
+    assert.strictEqual(r.total, baseline, 'total must be unaffected by junk paging');
+    assert.ok(r.page >= 1 && Number.isFinite(r.page));
+    assert.ok(r.pageSize >= 1 && r.pageSize <= 200);
+
+    const o = q.listOffenders(analyst, bad);
+    assert.ok(o.items.length > 0, `offenders must not go empty for ${JSON.stringify(bad)}`);
+    assert.ok(o.pageSize >= 1 && o.pageSize <= 200);
+  }
+  // An over-large pageSize is clamped rather than honoured -- one request must not be able to
+  // ask for the whole 60k corpus.
+  assert.strictEqual(q.listCases(analyst, { pageSize: '99999' }).pageSize, 200);
+});

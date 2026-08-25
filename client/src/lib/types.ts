@@ -53,6 +53,11 @@ export interface Paged<T> { items: T[]; total: number; page: number; pageSize: n
   scope?: 'state' | 'district';
   reachingIn?: number | null;
   basedHere?: number | null;
+  sort?: string;
+  // Counts over the whole filtered set, not just the returned page.
+  summary?: Record<string, number>;
+  // Offender list: the corpus's own latest offending date, which "recently active" is measured against.
+  asOf?: string | null;
 }
 
 export interface GraphNode {

@@ -75,3 +75,15 @@ export function qs(params: Record<string, unknown>): string {
   const s = p.toString();
   return s ? `?${s}` : '';
 }
+
+// Page-size and page come out of the URL, which anyone can hand-edit or share. A junk value
+// must fall back, not render an empty table with a nonsensical "1-0 of 578" readout: these
+// views are explicitly shareable, so a malformed link is a normal input, not an edge case.
+export function clampPageSize(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 ? Math.min(200, Math.floor(n)) : fallback;
+}
+export function clampPage(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
