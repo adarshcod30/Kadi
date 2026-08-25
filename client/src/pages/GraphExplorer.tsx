@@ -97,10 +97,11 @@ export default function GraphExplorer() {
         clickable evidence rather than a hunch. Use the switcher above to move between cases.
       </div>
 
-      {/* Responsive: stacks on small screens, 3-column workbench from xl up. Fixed height,
-          same as it always was -- the canvas does not shrink to make room for Intelligence
+      {/* Responsive: stacks on small screens, 3-column workbench from xl up. Fixed height at
+          90% of the viewport-minus-chrome figure (trimmed down from the full 100% -- the
+          canvas read as too tall) -- the canvas does not shrink to make room for Intelligence
           below it; the PAGE scrolls instead (Shell's <main> is already overflow-auto). */}
-      <div className="h-[calc(100vh-8.5rem)] grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
+      <div className="h-[calc((100vh-8.5rem)*0.9)] grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
         {/* Controls */}
         <div className="card overflow-auto p-3 space-y-4 xl:max-h-none max-h-72">
           <Control title="Layout" icon={<GitBranch size={13} />}>
