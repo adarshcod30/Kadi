@@ -10,12 +10,13 @@ import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3, Building2 } from 'lucide-react';
-import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe, useStations } from '../api/hooks';
+import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe, useStations , useGeoIntel } from '../api/hooks';
 import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
 import indiaOutline from '../geo/india_outline.json';
 import { Select } from '../components/Select';
+import { IntelligenceBand } from '../components/IntelligenceBand';
 
 // bright, satellite-legible palette
 const HEAD_COLOR: Record<string, string> = {
@@ -72,6 +73,23 @@ export default function MapPage() {
   const [basemap, setBasemap] = useState<'sat' | 'streets'>('sat');
   const [head, setHead] = useState('');
   const [hours, setHours] = useState<[number, number]>([0, 23]);
+  const { data: intel, isLoading: intelLoading } = useGeoIntel({ head });
+
+  // Map findings drive the map's own controls -- a patrol-window signal sets the hour slider,
+  // a district signal drills the scope. Turning the reading into the view it describes is the
+  // point; a finding you have to reproduce by hand is just a sentence.
+  const applySignal = (query: Record<string, string>) => {
+    if (query.hourFrom !== undefined && query.hourTo !== undefined) {
+      setHours([Number(query.hourFrom), Number(query.hourTo)]);
+      setLayer('heat');
+    }
+    if (query.district) {
+      const u = new URL(window.location.href);
+      u.searchParams.set('district', query.district);
+      window.location.href = u.toString();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const { data: me } = useMe();
   // A district officer should land on their district, not on all Karnataka with their own
   // area as one polygon among 31. State tier still opens on the whole state.
@@ -412,6 +430,10 @@ export default function MapPage() {
           )}
         </div>
       </div>
+
+      <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
+        title="Spatiotemporal reading"
+        subtitle="Where and when, and what to do about the timing" />
 
       {layer !== 'density' && (
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="card px-4 py-2.5 flex items-center gap-3 flex-wrap">

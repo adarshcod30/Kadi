@@ -123,3 +123,24 @@ export const useAssistant = () =>
   useMutation({ mutationFn: (body: { text: string; lang: string }) => api.post<AssistantResponse>('/assistant/query', body) });
 export const useExport = () =>
   useMutation({ mutationFn: (body: { title: string; messages: any[] }) => api.post<{ html: string; filename: string }>('/assistant/export', body) });
+
+// Contextual intelligence. The query mirrors whatever the page is currently filtered to, so
+// the analysis re-runs when the filter changes -- that is the whole point of it.
+export type Signal = {
+  key: string; severity: 'high' | 'medium' | 'info'; title: string; detail: string;
+  query: Record<string, string> | null; queryLabel: string | null;
+};
+export type Intel = {
+  total: number; signals: Signal[]; facts: Record<string, unknown>;
+  insight?: string; insightSource?: string; asOf?: string;
+};
+const intelQuery = (path: string, params: Record<string, unknown>) =>
+  useQuery({
+    queryKey: ['intel', path, role(), params],
+    queryFn: () => api.get<Intel>(`${path}${qs(params)}`),
+    staleTime: 5 * 60 * 1000,
+  });
+export const useCaseIntel = (params: Record<string, unknown>) => intelQuery('/cases/intelligence', params);
+export const useOffenderIntel = (params: Record<string, unknown>) => intelQuery('/offenders/intelligence', params);
+export const useHealthIntel = (params: Record<string, unknown>) => intelQuery('/health/intelligence', params);
+export const useGeoIntel = (params: Record<string, unknown>) => intelQuery('/geo/intelligence', params);

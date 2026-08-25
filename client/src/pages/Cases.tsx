@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCases, useLookups, useMe, useCommand } from '../api/hooks';
+import { useCases, useLookups, useMe, useCommand, useCaseIntel } from '../api/hooks';
 import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { Share2 } from 'lucide-react';
 import { Select } from '../components/Select';
+import { IntelligenceBand } from '../components/IntelligenceBand';
 import { clampPage, clampPageSize } from '../lib/api';
 
 const SORTS: [string, string][] = [
@@ -25,6 +26,8 @@ export default function Cases() {
   const pageSize = clampPageSize(q.pageSize, 25);
   const { data, isLoading } = useCases({ ...q, pageSize });
   const { data: command } = useCommand(false);
+  // Same query as the table, so the analysis always describes exactly what is on screen.
+  const { data: intel, isLoading: intelLoading } = useCaseIntel({ ...q, page: undefined, pageSize: undefined });
   // District tier gets a second view of the register: not "my cases filtered", but the cases
   // registered ELSEWHERE that share evidence with one of mine. That is the silo-breaking
   // answer, and a plain filtered list can never surface it.
@@ -86,6 +89,17 @@ export default function Cases() {
 
   const summary = data?.summary;
 
+  // A finding's query REPLACES the page filter rather than merging into it: the signal
+  // described a slice of the current view, so stacking it on top of the filters that produced
+  // that view would narrow twice and show fewer cases than the finding claims.
+  const applySignal = (query: Record<string, string>) => {
+    const p = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(query)) p.set(k, v);
+    p.delete('page');
+    setParams(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -94,6 +108,10 @@ export default function Cases() {
           <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in your scope` : 'Loading…'} · filter by crime head, district, status or gravity. The <b>Links</b> column shows how many other cases each FIR connects to; open any row for its full detail + network.</p>
         </div>
       </div>
+
+      <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
+        title="What stands out in this view"
+        subtitle={intel ? `Read from ${intel.total.toLocaleString()} case${intel.total === 1 ? '' : 's'} matching your filter` : undefined} />
 
       {/* These read as passive statistics, so they are labelled as the controls they are.
           Each count is computed over the whole filtered set, and clicking it narrows the

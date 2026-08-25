@@ -14,6 +14,7 @@ const quickml = require('./services/quickml');
 const zia = require('./services/zia');
 const datastore = require('./services/datastore');
 const insight = require('./services/insight');
+const intel = require('./services/intelligence');
 const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
@@ -189,6 +190,60 @@ function buildApp() {
     }
     return { ...q.listCases(req.user, req.query), source: 'bundle' };
   }));
+  // NOTE: registered before '/cases/:id' and '/offenders/:id' on purpose. Express matches
+  // routes in order, so a ':id' pattern declared first captures the literal segment and
+  // /cases/intelligence resolves as "the case whose id is 'intelligence'".
+  // ---- contextual intelligence -------------------------------------------------------
+  // One shape for four surfaces: deterministic signals computed over the CURRENT slice, then
+  // narrated. The narration is optional and additive -- if the model is unreachable the
+  // signals still render, because they were never the model's to produce.
+  //
+  // Cached on the exact query string. Two officers looking at the same filtered view get the
+  // same answer, and the second one does not pay for the model call.
+  const withNarrative = async (req, kind, out, maxTokens) => {
+    if (String(req.query.explain) === 'false' || !out.total) return out;
+    const key = `intel:${kind}:${req.user.role}:${req.user.districtId || 'state'}:${JSON.stringify(req.query)}`;
+    const hit = await cache.get(req, key);
+    if (hit) return { ...out, insight: hit, insightSource: 'cache' };
+    // Narrate from the ranked findings rather than the raw fact bag. The findings are
+    // already prose-shaped and already ordered by materiality, so the model cannot open on a
+    // trivial item or miss the strongest one -- both of which it did when handed loose facts.
+    const { text, source } = await insight.generate(req, kind, {
+      findings: out.signals.map((sg, i) => `${i + 1}. ${sg.title} — ${sg.detail}`),
+      recordsInView: (out.total || 0).toLocaleString('en-IN'),
+    }, { maxTokens, system: insight.SIGNALS_SYSTEM });
+    if (text) cache.put(req, key, text, 60);
+    return { ...out, insight: text, insightSource: source };
+  };
+
+  r.get('/cases/intelligence', handle(async (req) => {
+    const { rows } = q.filterCases(req.user, req.query);
+    const applied = Object.fromEntries(Object.entries(req.query)
+      .filter(([k]) => !['page', 'pageSize', 'sort', 'explain', 'district'].includes(k)));
+    const out = intel.caseIntelligence(rows, q.scopeBaseline(req.user), applied);
+    return withNarrative(req, 'what stands out in this filtered slice of the case register', out, 200);
+  }));
+
+  r.get('/offenders/intelligence', handle(async (req) => {
+    const list = q.listOffenders(req.user, { ...req.query, page: 1, pageSize: 200 });
+    const out = intel.offenderIntelligence(list.items, q.db().cases);
+    return withNarrative(req, 'repeat-offender watchlist priorities', out, 200);
+  }));
+
+  r.get('/health/intelligence', handle(async (req) => {
+    const rows = q.filterHealth(req.user, req.query);
+    const out = intel.healthIntelligence(rows, q.db().cases);
+    return withNarrative(req, 'investigation health — where supervision should intervene', out, 190);
+  }));
+
+  r.get('/geo/intelligence', handle(async (req) => {
+    const { rows } = q.filterCases(req.user, req.query);
+    // q.hotspots returns { hotspots, scope, spatiotemporal }, not a bare array.
+    const spots = q.hotspots(req.user, req.query);
+    const out = intel.geoIntelligence(rows, spots.hotspots || []);
+    return withNarrative(req, 'spatiotemporal patterns and patrol timing', out, 190);
+  }));
+
   r.get('/cases/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
     return q.getCase(req.user, req.params.id);

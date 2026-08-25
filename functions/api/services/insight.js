@@ -60,11 +60,11 @@ function fallback(kind, facts) {
   return bits.length ? `${kind}: ${bits.join(', ')}.` : '';
 }
 
-async function generate(req, kind, facts, { maxTokens = 220 } = {}) {
+async function generate(req, kind, facts, { maxTokens = 220, system = SYSTEM } = {}) {
   if (!quickml.configured()) return { text: fallback(kind, facts), source: 'deterministic' };
   try {
     const out = await quickml.complete(req, {
-      system: SYSTEM,
+      system,
       user: factsToPrompt(kind, facts),
       maxTokens,
       temperature: 0.35,
@@ -77,4 +77,43 @@ async function generate(req, kind, facts, { maxTokens = 220 } = {}) {
   }
 }
 
-module.exports = { generate, fallback, SYSTEM };
+// Contract for the contextual intelligence bands.
+//
+// The generic prompt failed here in ways worth recording, because each one is a different
+// species of error and only the first is the obvious one:
+//
+//  1. It spelled figures out ("Seventy-five point four percent"), so percentages are handed
+//     over pre-formatted and it is told they are already final.
+//  2. It restated one finding twice in three sentences, so repetition is banned outright.
+//  3. It opened on the blandest item and skipped a 6.7x over-representation, so it is told
+//     the list arrives ranked and the first entry leads.
+//  4. THE DANGEROUS ONE: it copied every digit correctly and then invented the relationships
+//     between them -- "74 offenders active across districts" became "74 of the currently
+//     active cases", a hotspot holding 70 cases became "Bengaluru City accounts for 70% of
+//     hotspot cases", and a linkage rate became evidence of "repeat offending" when links
+//     also come from MO, place, time and section. No individual number was wrong; every
+//     claim was. Copying facts is not the same as preserving them, so the rules below forbid
+//     combining figures across findings, deriving new ones, and drawing conclusions the
+//     finding text does not already state.
+const SIGNALS_SYSTEM = [
+  'You are a crime analyst briefing a senior police officer in Karnataka.',
+  'You are given FINDINGS already computed from the case records, ranked most important first.',
+  'Write 2-3 sentences that present them as one short brief.',
+  'RULES:',
+  '- Copy every figure EXACTLY as written, including its % sign and its unit.',
+  '  Never spell a number out in words: write 75.4%, never "seventy-five point four percent".',
+  '- Each finding is INDEPENDENT. Never combine figures from two findings into one claim,',
+  '  and never present one finding as a subset, cause or consequence of another.',
+  '- Never compute, derive or estimate a new number. If a figure is a count, it stays a count:',
+  '  do not convert it into a percentage or a share of anything.',
+  '- Carry each number with the exact noun it was given with. A count of offenders is not a',
+  '  count of cases; a count of cases in a cluster is not a share of a district.',
+  '- State only what the finding already says. Do not add an explanation for WHY it is so.',
+  '- Never state the same finding twice. Each sentence must add something new.',
+  '- Lead with the FIRST finding; it is the most significant.',
+  '- Never invent a figure, district, station, offender or FIR number.',
+  '- No preamble, no bullet points, no "the data shows". Plain prose, British English.',
+  '- Never mention caste, religion or occupation.',
+].join(' ');
+
+module.exports = { generate, fallback, SYSTEM, SIGNALS_SYSTEM };

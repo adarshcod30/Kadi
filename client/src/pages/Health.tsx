@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Share2 } from 'lucide-react';
-import { useHealthCases, useHealthSummary , useMe } from '../api/hooks';
+import { useHealthCases, useHealthSummary, useMe, useHealthIntel } from '../api/hooks';
 import { KpiCard, Section, Chip, SeverityDot, Skeleton, Empty, Mono } from '../components/ui';
+import { IntelligenceBand } from '../components/IntelligenceBand';
 
 const FLAG_LABEL: Record<string, string> = {
   investigation_ageing: 'Ageing', pendency: 'Pendency', undetected_risk: 'Undetected risk',
@@ -16,6 +17,15 @@ export default function Health() {
   const [flag, setFlag] = useState('');
   const { data, isLoading } = useHealthCases({ severity, flag, pageSize: 40 });
   const { data: summary } = useHealthSummary();
+  const { data: intel, isLoading: intelLoading } = useHealthIntel({ severity, flag });
+
+  // Health findings act on this page's own controls rather than a URL, so a signal maps onto
+  // the two pieces of state the worklist is driven by.
+  const applySignal = (query: Record<string, string>) => {
+    if (query.flag !== undefined) { setFlag(query.flag); setSeverity(''); }
+    if (query.severity !== undefined) setSeverity(query.severity);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="space-y-4">
@@ -25,6 +35,10 @@ export default function Health() {
             ? `Cases slipping past detection timelines in ${me.capabilities.districtId ? 'this district' : 'your district'} — deterministic, auditable, each with a recommended action. Ordered so the ones nearest failure surface first.`
             : 'Early warning across all 31 districts — deterministic, auditable, with recommended actions. Use the scope control to narrow to one district.'}</p>
       </div>
+
+      <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
+        title="Where supervision should intervene"
+        subtitle="What is driving the flags in this worklist, and where it concentrates" />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Flagged (high)" value={summary?.high?.toLocaleString() ?? '—'} accent="#C0392B" />

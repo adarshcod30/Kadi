@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, Share2 } from 'lucide-react';
-import { useOffenders } from '../api/hooks';
+import { useOffenders, useOffenderIntel } from '../api/hooks';
 import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { clampPage, clampPageSize } from '../lib/api';
 import { Select } from '../components/Select';
+import { IntelligenceBand } from '../components/IntelligenceBand';
 
 const SORTS: [string, string][] = [
   ['risk_desc', 'Highest risk'],
@@ -35,6 +36,7 @@ export default function Offenders() {
   const page = clampPage(q.page);
   const pageSize = clampPageSize(q.pageSize, 50);
   const { data, isLoading } = useOffenders({ ...q, pageSize });
+  const { data: intel, isLoading: intelLoading } = useOffenderIntel({ ...q, page: undefined, pageSize: undefined });
   // A district list mixes two very different people: those based here, and those based
   // elsewhere who reach in. The second group is why a district needs a state-linked system
   // at all, so it gets its own filter rather than being buried among the locals.
@@ -58,6 +60,14 @@ export default function Offenders() {
     const p = new URLSearchParams();
     if (q.sort) p.set('sort', q.sort);
     setParams(p);
+  };
+
+  const applySignal = (query: Record<string, string>) => {
+    const p = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(query)) p.set(k, v);
+    p.delete('page');
+    setParams(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const active = [
@@ -84,6 +94,10 @@ export default function Offenders() {
         Every person here has <b>two or more</b> cases resolved to one identity — this is the
         repeat-offender register, not the full accused list.
       </p>
+
+      <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
+        title="Watchlist intelligence"
+        subtitle="Who to prioritise, and why — recency, reach, escalation and group structure" />
 
       {/* Counts over the whole filtered set, each one a filter in its own right. */}
       {summary && data && data.total > 0 && (

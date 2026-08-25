@@ -29,7 +29,10 @@ function scoped(user, list) {
 }
 
 // ---------------- cases ----------------
-function listCases(user, q = {}) {
+// Filtering and sorting live apart from pagination so the intelligence layer can analyse the
+// WHOLE filtered set. Reading a page and calling it the picture is how a "38% concentrated in
+// three stations" finding becomes 38% of twenty-five rows.
+function filterCases(user, q = {}) {
   const db = load();
   let rows = scoped(user, db.caseList);
   const { search, head, subhead, district, unit, status, gravity, category,
@@ -71,8 +74,15 @@ function listCases(user, q = {}) {
       || (a.crimeRegisteredDate < b.crimeRegisteredDate ? 1 : -1),
     crimeno_asc: (a, b) => String(a.crimeNo).localeCompare(String(b.crimeNo)),
   };
-  rows = rows.slice().sort(sorters[sort] || sorters.date_desc);
+  return { rows: rows.slice().sort(sorters[sort] || sorters.date_desc), sort: sorters[sort] ? sort : 'date_desc' };
+}
 
+// The officer's whole scope, unfiltered -- the denominator every "above the expected rate"
+// finding is measured against.
+function scopeBaseline(user) { return scoped(user, load().caseList); }
+
+function listCases(user, q = {}) {
+  const { rows, sort } = filterCases(user, q);
   const total = rows.length;
   const page = pageOf(q);
   const pageSize = pageSizeOf(q, 25);
@@ -85,7 +95,7 @@ function listCases(user, q = {}) {
     linked: rows.reduce((n, c) => n + (c.linkedCount > 0 ? 1 : 0), 0),
     heinous: rows.reduce((n, c) => n + (String(c.gravityId) === '1' ? 1 : 0), 0),
   };
-  return { items, total, page, pageSize, summary, sort: sorters[sort] ? sort : 'date_desc' };
+  return { items, total, page, pageSize, summary, sort };
 }
 
 function getCase(user, id) {
@@ -353,7 +363,7 @@ function getOffender(user, id) {
 }
 
 // ---------------- health ----------------
-function listHealth(user, q = {}) {
+function filterHealth(user, q = {}) {
   const db = load();
   const scopedCases = new Set(scoped(user, db.caseList).map((c) => c.caseMasterId));
   let rows = db.healthList.filter((h) => scopedCases.has(String(h.caseMasterId)));
@@ -361,6 +371,12 @@ function listHealth(user, q = {}) {
   if (q.flag) rows = rows.filter((h) => h.flagKeys.includes(q.flag));
   if (q.district) rows = rows.filter((h) => String(h.districtId) === String(q.district));
   if (q.unit) rows = rows.filter((h) => String(h.unitId) === String(q.unit));
+  return rows;
+}
+
+function listHealth(user, q = {}) {
+  const db = load();
+  const rows = filterHealth(user, q);
   const enrich = (h) => {
     const c = db.cases.get(String(h.caseMasterId));
     return { ...h, crimeSubHead: c ? c.crimeSubHead : '', district: c ? c.districtName : '',
@@ -525,7 +541,8 @@ function vulnerability(user) {
 }
 
 module.exports = {
-  FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, getCase, graphForCase, getCluster,
+  FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline,
+  filterHealth, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --
