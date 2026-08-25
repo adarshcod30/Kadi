@@ -208,7 +208,45 @@ function buildApp() {
   // graph (the hero)
   r.get('/graph/case/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_graph', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
-    return q.graphForCase(req.user, req.params.id, { maxNeighbors: Number(req.query.maxNeighbors) || 60 });
+    const g = q.graphForCase(req.user, req.params.id, { maxNeighbors: Number(req.query.maxNeighbors) || 60 });
+    if (String(req.query.explain) !== 'true') return g;
+
+    const caseNodes = g.nodes.filter((n) => n.type === 'case');
+    const offNodes = g.nodes.filter((n) => n.type === 'offender');
+    const realEdges = g.edges.filter((e) => e.edgeType !== 'appears_in');
+    const outside = caseNodes.filter((n) => n.outsideScope);
+    const districts = new Set(caseNodes.map((n) => n.district).filter(Boolean));
+    const kindCounts = {};
+    for (const e of realEdges) {
+      for (const t of new Set([e.edgeType, ...(e.allTypes || [])])) kindCounts[t] = (kindCounts[t] || 0) + 1;
+    }
+    const corroborated = realEdges.filter((e) => new Set([e.edgeType, ...(e.allTypes || [])]).size >= 2).length;
+    const topOffenders = offNodes.filter((o) => o.band === 'High').sort((a, b) => b.riskScore - a.riskScore);
+    const center = caseNodes.find((n) => n.isCenter);
+
+    // homeDistrict (set inside graphForCase) only exists for a district-tier or drilled-in
+    // viewer. For a state-tier viewer with no drill, "outside my district" is not a
+    // meaningful question, and outside.length is always 0 by construction -- not a finding.
+    // Including it unconditionally previously produced "spans 15 districts ... all
+    // originating within this district", a self-contradiction: the model read the always-0
+    // count as a real fact and invented a relationship between it and districtsSpanned that
+    // does not hold. Omitted entirely rather than sent in as a misleading zero.
+    const districtScoped = Boolean(req.user && ((req.user.roleMeta && req.user.roleMeta.tier === 'district')
+      || req.user.drilledFromState));
+    const facts = {
+      case: center ? center.label : req.params.id,
+      crimeType: center ? `${center.crimeSubHead} (${center.crimeHead})` : '',
+      linkedCases: caseNodes.length - 1,
+      districtsSpanned: districts.size,
+      ...(districtScoped ? { casesLinkedFromOutsideMyDistrict: outside.length } : {}),
+      offendersInNetwork: offNodes.length,
+      highRiskOffenders: topOffenders.length,
+      topHighRiskOffender: topOffenders[0] ? topOffenders[0].label : null,
+      evidenceKindCounts: kindCounts,
+      linksWithTwoPlusEvidenceKinds: corroborated,
+    };
+    const { text, source } = await insight.generate(req, 'case-linkage network briefing', facts, { maxTokens: 180 });
+    return { ...g, insight: text, insightSource: source };
   }));
   r.get('/graph/featured', handle(async (req) => {
     // ~20 for state, ~12 for a district -- enough variety to browse, few enough to scan.

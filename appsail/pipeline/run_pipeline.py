@@ -167,8 +167,27 @@ def run(data_dir: str):
     # adjacency index (per case -> its linked cases with evidence) — the fast graph read
     crimeno = {row.CaseMasterID: row.CrimeNo for row in cases.itertuples(index=False)}
     adjacency = defaultdict(list)
+    # Cheap per-case summary (link count, offender-link count, evidence-kind set) for
+    # /graph/featured to pick from -- built once here, alongside the adjacency it is
+    # already deriving from the same edge list, rather than recomputed from the FULL
+    # adjacency graph on every request. That endpoint used to do exactly that: iterate
+    # every case's full evidence-linked neighbour list just to read edges.length and an
+    # edge-type set. At 40K cases it stayed under a second by accident; at 60K it forced
+    # the API's lazy adjacency-rehydration Proxy to fully decode ~34K cases per request,
+    # and under the function's 512MB ceiling that measured 0.6-24s per call in production
+    # -- wide, unpredictable, and the empty responses came back as a plain 200 with no
+    # body rather than a clean error.
+    link_summary = defaultdict(lambda: {"links": 0, "offenderLinks": 0, "signalTypes": set()})
     for e in edges:
         a, b = e["srcId"], e["dstId"]
+        kinds = set(e["allTypes"] or [e["edgeType"]])
+        is_offender = "shared_offender" in kinds
+        for cid in (a, b):
+            rec = link_summary[cid]
+            rec["links"] += 1
+            if is_offender:
+                rec["offenderLinks"] += 1
+            rec["signalTypes"] |= kinds
         adjacency[a].append({"neighborId": b, "neighborCrimeNo": crimeno.get(b),
                              "edgeType": e["edgeType"], "allTypes": e["allTypes"],
                              "strength": e["strength"], "evidence": e["evidence"],
@@ -177,6 +196,9 @@ def run(data_dir: str):
                              "edgeType": e["edgeType"], "allTypes": e["allTypes"],
                              "strength": e["strength"], "evidence": e["evidence"],
                              "clusterId": e.get("clusterId")})
+    link_summary = {cid: {"links": v["links"], "offenderLinks": v["offenderLinks"],
+                          "signalTypes": sorted(v["signalTypes"])}
+                    for cid, v in link_summary.items()}
 
     # offenders present per case (resolved multi-case identities)
     offender_of_case = defaultdict(list)
@@ -276,6 +298,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "offender_map", mapping)
     common.write_json(data_dir, "link_edges", edges)
     common.write_json(data_dir, "graph_adjacency", adjacency)
+    common.write_json(data_dir, "link_summary", link_summary)
     common.write_json(data_dir, "offender_of_case", offender_of_case)
     common.write_json(data_dir, "clusters", clusters)
     common.write_json(data_dir, "case_health", health)

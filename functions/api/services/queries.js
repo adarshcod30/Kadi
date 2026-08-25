@@ -797,18 +797,20 @@ module.exports = {
     const districtOnly = user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState)
       ? String(user.districtId) : null;
 
+    // Reads the precomputed link_summary rather than db.adjacency. Iterating every case's
+    // full evidence-linked neighbour list here (edges.length, an edge-type set) was doing
+    // real work the pipeline had already done once -- and against db.adjacency specifically,
+    // which is lazily rehydrated from an interned, string-deduplicated format on first
+    // access, so this loop forced a full decode of every linked case's evidence on every
+    // request. At 40K cases that stayed fast by accident; at 60K it measured 0.6-24s per
+    // call in production. link_summary carries only the three numbers this needs.
     const cand = [];
-    for (const [caseId, edges] of Object.entries(db.adjacency)) {
-      if (!Array.isArray(edges) || !edges.length) continue;
+    for (const [caseId, ls] of Object.entries(db.linkSummary)) {
+      if (!ls || !ls.links) continue;
       const c = db.cases.get(String(caseId));
       if (!c) continue;
       if (districtOnly && String(c.districtId) !== districtOnly) continue;
-      let offenderLinks = 0;
-      const signals = new Set();
-      for (const e of edges) {
-        if (e.edgeType === 'shared_offender') offenderLinks += 1;
-        for (const t of (e.allTypes || [e.edgeType])) signals.add(t);
-      }
+      const signals = ls.signalTypes || [];
       cand.push({
         caseMasterId: caseId,
         crimeNo: c.crimeNo,
@@ -816,17 +818,26 @@ module.exports = {
         districtName: c.districtName || '',
         crimeHead: c.crimeHead || '',
         crimeSubHead: c.crimeSubHead || '',
-        links: edges.length,
-        offenderLinks,
-        signalTypes: [...signals],
+        links: ls.links,
+        offenderLinks: ls.offenderLinks,
+        signalTypes: signals,
         // richness: evidence diversity first, then people, then raw size
-        score: signals.size * 100 + Math.min(offenderLinks, 12) * 8 + Math.min(edges.length, 40),
+        score: signals.length * 100 + Math.min(ls.offenderLinks, 12) * 8 + Math.min(ls.links, 40),
       });
     }
     cand.sort((a, b) => b.score - a.score);
 
     // Round-robin across crime head, then across evidence-mix signature, so the picker
     // shows genuinely different networks rather than twenty of the strongest one kind.
+    //
+    // Was Array.shift() inside this loop: shift() is O(n) (it re-indexes every remaining
+    // element), called inside a while-loop that can itself run the length of the list, inside
+    // an outer 40-round loop -- effectively O(rounds x n^2) per head in the worst case. At the
+    // ~23K-linked-case corpus this stayed fast by accident; at 60K's ~34K it measured 14-22s
+    // in production and the gateway returned an empty 200 rather than a real error, silently
+    // breaking the Graph tab's own landing page. Walking each head's list with an index
+    // cursor instead of mutating it makes every step O(1): same selection semantics (same
+    // round-robin order, same "allow a duplicate signature after round 2" rule), no shift().
     const byHead = new Map();
     for (const x of cand) {
       const k = x.crimeHead || 'Other';
@@ -834,6 +845,7 @@ module.exports = {
       byHead.get(k).push(x);
     }
     const heads = [...byHead.keys()];
+    const cursor = new Map(heads.map((h) => [h, 0]));
     const picked = [];
     const seenSig = new Set();
     for (let round = 0; picked.length < limit && round < 40; round += 1) {
@@ -841,8 +853,10 @@ module.exports = {
       for (const h of heads) {
         if (picked.length >= limit) break;
         const list = byHead.get(h);
-        while (list.length) {
-          const x = list.shift();
+        let i = cursor.get(h);
+        while (i < list.length) {
+          const x = list[i];
+          i += 1;
           const sig = x.signalTypes.slice().sort().join('|');
           // allow a signature twice, so a common-but-real mix is not starved out
           const n = seenSig.has(sig) ? 2 : 0;
@@ -853,6 +867,7 @@ module.exports = {
           addedThisRound = true;
           break;
         }
+        cursor.set(h, i);
       }
       if (!addedThisRound) break;
     }
