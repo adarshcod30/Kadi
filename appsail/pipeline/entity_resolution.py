@@ -21,7 +21,15 @@ from common import assert_no_protected, normalize_name, soundex
 ER_FEATURES = ["AccusedName", "CaseMasterID", "co_accused_tokens", "section", "geocell"]
 STRUCT_THRESHOLD = 66          # link when first-name AND surname structurally agree
 NAME_ONLY_THRESHOLD = 93       # link on overall name similarity alone
-SURNAME_RARE = 20              # surname appearing in <= this many accused is "distinctive"
+# "Distinctive" is a RELATIVE concept, not an absolute count, so the surname-rarity gate is
+# expressed as a rate and scaled at compute() time to len(records). A fixed count silently
+# erodes as the corpus grows: tuned as 20 against a ~37,094-accused corpus, at 54,176
+# accused (the 60K-case corpus) it stopped protecting 97 of 238 planted cross-district
+# surnames (41%) -- exactly the "serial offender working across districts is invisible"
+# signal this gate exists to catch, quietly degrading as more data made the product richer.
+SURNAME_RARE_BASELINE = 20
+SURNAME_RARE_BASELINE_POPULATION = 37_094
+SURNAME_RARE_RATE = SURNAME_RARE_BASELINE / SURNAME_RARE_BASELINE_POPULATION
 MAX_IDENTITY_SIZE = 40         # safety cap against runaway merges
 
 
@@ -126,11 +134,14 @@ def resolve(tables: dict):
         records.append(rec)
         case_to_recs[row.CaseMasterID].append(rec)
 
-    # surname frequency across the dataset — a rare surname is a distinctive identity signal
+    # surname frequency across the dataset — a rare surname is a distinctive identity signal.
+    # The bar itself scales with how many accused records exist, so it holds the same
+    # RELATIVE meaning ("shared by well under 0.1% of accused people") at any corpus size.
     surname_freq = defaultdict(int)
     for r in records:
         if r["surname"]:
             surname_freq[r["surname"]] += 1
+    surname_rare = max(SURNAME_RARE_BASELINE, round(len(records) * SURNAME_RARE_RATE))
 
     # co-accused signals per accused (name tokens + surnames of the others in the case)
     for recs in case_to_recs.values():
@@ -173,13 +184,13 @@ def resolve(tables: dict):
                 # crowd of common-named strangers into a single identity.
                 sur_a, sur_b = ri["surname"], rj["surname"]
                 distinctive = (bool(sur_a) and bool(sur_b)
-                               and surname_freq[sur_a] <= SURNAME_RARE
-                               and surname_freq[sur_b] <= SURNAME_RARE)
+                               and surname_freq[sur_a] <= surname_rare
+                               and surname_freq[sur_b] <= surname_rare)
                 # A distinctive shared co-accused is specific corroboration. A shared
                 # location cell alone is NOT trusted for common surnames — dense metros
                 # (Bengaluru) collide heavily and would chain unrelated same-name people.
                 fine_cell = bool(ri["geo3"]) and ri["geo3"] == rj["geo3"]
-                shared_dist_co = any(surname_freq.get(s, 999) <= SURNAME_RARE
+                shared_dist_co = any(surname_freq.get(s, 999) <= surname_rare
                                      for s in (ri["co_surnames"] & rj["co_surnames"]))
                 corroborated = shared_dist_co or (fine_cell and shared_dist_co)
 

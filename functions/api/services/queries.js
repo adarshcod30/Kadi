@@ -438,7 +438,7 @@ function vulnerability(user) {
 }
 
 module.exports = {
-  FAIRNESS_STATEMENT, listCases, getCase, graphForCase, getCluster,
+  FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --

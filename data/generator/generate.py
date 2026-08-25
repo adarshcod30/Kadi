@@ -6,7 +6,7 @@ Produces schema-faithful CSVs (one per table in docs/03_DATABASE_SCHEMA.md Part 
 a `_ground_truth.json` of planted patterns, and a `_manifest.json`.
 
 Deterministic (SEED). Run:
-    python data/generator/generate.py --cases 40000 --out data/output
+    python data/generator/generate.py --cases 59150 --out data/output
     python data/generator/generate.py --cases 6000            # fast dev scale
 
 Design: a single `Builder` mints every row and keeps FK integrity + CrimeNo serials
@@ -35,6 +35,26 @@ from patterns import PLANTED_SURNAMES
 SEED = 2026
 DATE_START = date(2023, 1, 1)
 DATE_END = date(2026, 6, 30)
+
+# Real departments run hotter now than three years ago: staffing grows, reporting improves,
+# digitisation catches more incidents that used to go unrecorded. A flat rate across the
+# whole span reads as synthetic in exactly the way a uniform map does. 25% of cases land in
+# the last 6 months (RECENT_START..DATE_END); the remaining 75% spread over the other 37.
+# That is roughly 4x the monthly rate recently vs the long tail before it.
+def _months_back(d: date, n: int) -> date:
+    """First day of the month that starts an N-calendar-month window ending in d's month.
+    n=6 from June means Jan-Feb-Mar-Apr-May-Jun -- 6 months inclusive -- so the shift is
+    n-1, not n; shifting by n lands one month too early (Dec-...-Jun is 7 months)."""
+    y, m = d.year, d.month - (n - 1)
+    while m <= 0:
+        m += 12
+        y -= 1
+    return date(y, m, 1)
+
+
+RECENT_MONTHS = 6
+RECENT_SHARE = 0.25
+RECENT_START = _months_back(DATE_END, RECENT_MONTHS)
 TODAY = date(2026, 7, 13)  # "now" for the demo (matches currentDate)
 
 
@@ -556,7 +576,10 @@ def generate_base_cases(b: Builder, rng: Rng, n_cases: int):
 
 
 def _sample_incident_dt(rng: Rng, shid: int) -> datetime:
-    d = rng.date_between(DATE_START, DATE_END)
+    if rng.random() < RECENT_SHARE:
+        d = rng.date_between(RECENT_START, DATE_END)
+    else:
+        d = rng.date_between(DATE_START, RECENT_START - timedelta(days=1))
     # festival-season bump (Oct-Nov) for property crime — nudge some dates there
     head = next(sh[1] for sh in K.CRIME_SUBHEADS if sh[0] == shid)
     if head == 2 and rng.random() < 0.15:
@@ -673,7 +696,7 @@ def write_outputs(b: Builder, out_dir: str, ground_truth: dict):
 # ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description="KADI synthetic FIR generator")
-    ap.add_argument("--cases", type=int, default=40000, help="number of base FIRs")
+    ap.add_argument("--cases", type=int, default=59150, help="number of base FIRs")
     ap.add_argument("--out", type=str, default=os.path.join(os.path.dirname(__file__), "..", "output"))
     args = ap.parse_args()
 

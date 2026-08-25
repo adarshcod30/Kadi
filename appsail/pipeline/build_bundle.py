@@ -85,6 +85,27 @@ def _add_strength_percentiles(adj):
 
 def main():
     os.makedirs(OUT_DERIVED, exist_ok=True)
+
+    # A build fingerprint the API can fold into cache keys. /stats round-trips through
+    # Catalyst Cache with a 6-hour TTL; without something that changes on every rebuild, a
+    # redeploy after a corpus regeneration would keep serving the PREVIOUS corpus's cached
+    # KPIs for up to 6 hours -- discovered when a 60K-case regeneration deployed cleanly but
+    # /stats still reported 40,829 (the old total) because the cache didn't know anything
+    # had changed underneath it. Content-derived (case count + hash of a few files' mtimes),
+    # not wall-clock time, so re-running the pipeline on unchanged inputs doesn't bust the
+    # cache for no reason.
+    import hashlib
+    with open(os.path.join(SRC, "CaseMaster.csv")) as f:
+        case_count = sum(1 for _ in f) - 1
+    # Fingerprints the actual cached artifact (stats.json), not just the source corpus --
+    # a pipeline rerun changes derived analytics (offender bands, risk scores) even when
+    # CaseMaster.csv itself is untouched, and that must invalidate the cache too.
+    stats_path = os.path.join(DERIVED, "stats.json")
+    fp_src = str(os.path.getmtime(stats_path)) if os.path.exists(stats_path) else "0"
+    build_id = hashlib.sha1(f"{case_count}:{fp_src}".encode()).hexdigest()[:12]
+    with open(os.path.join(OUT, "build_info.json"), "w") as f:
+        json.dump({"buildId": build_id, "caseCount": case_count}, f)
+    print(f"  build_info.json  buildId={build_id}  caseCount={case_count:,}")
     total_before = total_after = 0.0
 
     # ---- small artifacts, copied verbatim ----

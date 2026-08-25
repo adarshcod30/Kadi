@@ -182,9 +182,17 @@ function load() {
   const national = readJson('national', { states: [] });
   const socio = readJson('socio', { districts: [], correlations: [], composition: [] });
   const forecast = readJson('forecast', { districts: [], state: null, accuracy: null });
+  // Cache-busting fingerprint: written by build_bundle.py, changes whenever the corpus is
+  // regenerated. Threaded into /stats' cache key so a redeploy after a data update can
+  // never serve the previous corpus's cached KPIs for the rest of the TTL window.
+  let buildId = 'dev';
+  try {
+    buildId = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'build_info.json'), 'utf8')).buildId;
+  } catch { /* local dev without a built bundle: fall back to a stable dev key */ }
 
   DB = {
     dataDir: DATA_DIR,
+    buildId,
     loadedMs: Date.now() - t0,
     lookups: { districts, units, employees, heads, subheads, statuses, categories, gravities,
       genders, religions, castes, occupations, sectionDesc, unitDistrict, ranks, designations, courts, arrestSurrenderTypes },

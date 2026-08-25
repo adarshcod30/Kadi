@@ -69,7 +69,7 @@ function buildApp() {
       // Every axis scoped() filters on must appear in the key. drillUnitId was missing:
       // two SIs in different stations of one district would have shared a cache entry.
       req,
-      `stats:${req.user.role}:${req.user.districtId || 'state'}:${req.user.drillUnitId || 'all'}`,
+      `stats:${q.buildId()}:${req.user.role}:${req.user.districtId || 'state'}:${req.user.drillUnitId || 'all'}`,
       async () => q.stats(req.user),
     );
     if (String(req.query.explain) !== 'true') return data;
