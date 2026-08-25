@@ -200,9 +200,18 @@ function buildApp() {
   //
   // Cached on the exact query string. Two officers looking at the same filtered view get the
   // same answer, and the second one does not pay for the model call.
+  // Cache keys go into Catalyst's cache_name field, which will not take raw JSON: the first
+  // version embedded JSON.stringify(req.query) and every write silently failed, so the model
+  // was re-run on every request (3.2s each) while the code looked like it was caching.
+  // Hashed to a short alphanumeric token instead.
+  const keyHash = (s2) => {
+    let h = 5381;
+    for (let i = 0; i < s2.length; i += 1) h = ((h * 33) ^ s2.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  };
   const withNarrative = async (req, kind, out, maxTokens) => {
     if (String(req.query.explain) === 'false' || !out.total) return out;
-    const key = `intel:${kind}:${req.user.role}:${req.user.districtId || 'state'}:${JSON.stringify(req.query)}`;
+    const key = `intel_${keyHash(`${kind}:${req.user.role}:${req.user.districtId || 'state'}:${JSON.stringify(req.query)}`)}`;
     const hit = await cache.get(req, key);
     if (hit) return { ...out, insight: hit, insightSource: 'cache' };
     // Narrate from the ranked findings rather than the raw fact bag. The findings are
@@ -212,7 +221,7 @@ function buildApp() {
       findings: out.signals.map((sg, i) => `${i + 1}. ${sg.title} — ${sg.detail}`),
       recordsInView: (out.total || 0).toLocaleString('en-IN'),
     }, { maxTokens, system: insight.SIGNALS_SYSTEM });
-    if (text) cache.put(req, key, text, 60);
+    if (text) await cache.put(req, key, text);
     return { ...out, insight: text, insightSource: source };
   };
 
@@ -221,7 +230,29 @@ function buildApp() {
     const applied = Object.fromEntries(Object.entries(req.query)
       .filter(([k]) => !['page', 'pageSize', 'sort', 'explain', 'district'].includes(k)));
     const out = intel.caseIntelligence(rows, q.scopeBaseline(req.user), applied);
+
     return withNarrative(req, 'what stands out in this filtered slice of the case register', out, 200);
+  }));
+
+  // Zia reads the free-text narratives that the structured fields cannot reach. A sub-head
+  // says a case is Online Financial Fraud; only the narrative says whether the method was a
+  // fake KYC call or a QR-code scam -- and a series shares the method, not the sub-head.
+  //
+  // Deliberately its own route rather than part of /cases/intelligence. Zia is an external
+  // call and took ~9s against a 40-narrative sample, which would have held the whole panel
+  // behind it. The deterministic signals render immediately; this arrives when it arrives.
+  // Same reasoning as /cases/:id/entities, which is split out for exactly this reason.
+  r.get('/cases/themes', handle(async (req) => {
+    const { rows } = q.filterCases(req.user, req.query);
+    if (rows.length < 8) return { themes: [], available: false, reason: 'too few narratives to find a recurring pattern' };
+    const key = `themes_${keyHash(`${req.user.role}:${req.user.districtId || 'state'}:${JSON.stringify(req.query)}`)}`;
+    const hit = await cache.get(req, key);
+    if (hit) return { ...hit, cached: true };
+    const out = await zia.narrativeThemes(req, rows.slice(0, 40).map((c) => c.briefFacts));
+    if (!out) return { themes: [], available: false, reason: zia.status().lastError || 'Zia unavailable' };
+    const body = { ...out, available: true };
+    await cache.put(req, key, body);
+    return body;
   }));
 
   r.get('/offenders/intelligence', handle(async (req) => {

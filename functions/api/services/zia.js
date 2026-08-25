@@ -175,6 +175,66 @@ async function analyseNarrative(req, text) {
   return { entities: grouped, keywords, keyphrases, engine: 'zia-text-analytics' };
 }
 
+
+/**
+ * Emergent MO themes across a SET of case narratives.
+ *
+ * Zia was wired but doing one job -- named entities on a single FIR that an officer already
+ * has open. Its value at set level is different and larger: the modus-operandi field is free
+ * text, so the method an emerging series shares is written down in every one of its FIRs and
+ * indexed by nothing. Counting sub-heads cannot find it, because "Online Financial Fraud" is
+ * one sub-head whether the method is a fake KYC call or a QR-code scam.
+ *
+ * Batched into a handful of documents rather than one call per case: the endpoint takes a
+ * document array, and 200 separate round trips would blow the 30s request budget.
+ *
+ * Returns null on any failure. A missing theme list must degrade the panel, never the page.
+ */
+async function narrativeThemes(req, texts, { maxDocs = 40, chunk = 8 } = {}) {
+  const docs = (texts || []).map((t) => String(t || '').trim()).filter(Boolean).slice(0, maxDocs);
+  if (docs.length < 5) return null;
+
+  const batches = [];
+  for (let i = 0; i < docs.length; i += chunk) {
+    batches.push(docs.slice(i, i + chunk).map((d) => d.slice(0, 900)).join('. '));
+  }
+  const results = await Promise.all(
+    batches.slice(0, 6).map((b) => ziaHttp(req, '/ml/text-analytics/keyword-extraction', { document: [b] })),
+  );
+
+  const freq = new Map();
+  let ok = 0;
+  for (const r of results) {
+    if (!r.ok) continue;
+    ok += 1;
+    try {
+      const k = JSON.parse(r.body).data[0].keyword_extractor || {};
+      for (const phrase of [...(k.keyphrases || []), ...(k.keywords || [])]) {
+        const t = String(phrase).toLowerCase().trim();
+        // Single tokens and stock FIR vocabulary carry no signal -- every narrative contains
+        // "accused" and "complainant", so they would top every list on every filter.
+        if (t.length < 6 || STOP_THEMES.has(t)) continue;
+        freq.set(t, (freq.get(t) || 0) + 1);
+      }
+    } catch { /* one bad batch must not lose the rest */ }
+  }
+  if (!ok) { lastError = 'themes: all batches failed'; return null; }
+
+  const themes = [...freq.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([phrase, n]) => ({ phrase, documents: n }));
+  if (!themes.length) return null;
+  return { themes, sampled: docs.length, batches: ok, engine: 'zia-text-analytics' };
+}
+
+const STOP_THEMES = new Set([
+  'accused', 'complainant', 'victim', 'police', 'station', 'case', 'cases', 'report',
+  'reported', 'incident', 'offence', 'offences', 'person', 'persons', 'unknown', 'crime',
+  'complaint', 'registered', 'investigation', 'district', 'karnataka',
+]);
+
 /** Transcribe audio. Returns null when Zia is unavailable so the browser path is used. */
 async function speechToText(req, audioBuffer, lang = 'en') {
   const z = zia(req);
@@ -290,4 +350,4 @@ async function probe(req) {
   return out;
 }
 
-module.exports = { analyseNarrative, probe, configured, status, speechToText, textToSpeech, translate, translateThenSpeak };
+module.exports = { analyseNarrative, narrativeThemes, probe, configured, status, speechToText, textToSpeech, translate, translateThenSpeak };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCases, useLookups, useMe, useCommand, useCaseIntel } from '../api/hooks';
+import { useCases, useLookups, useMe, useCommand, useCaseIntel, useCaseThemes } from '../api/hooks';
 import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { Share2 } from 'lucide-react';
 import { Select } from '../components/Select';
@@ -28,6 +28,7 @@ export default function Cases() {
   const { data: command } = useCommand(false);
   // Same query as the table, so the analysis always describes exactly what is on screen.
   const { data: intel, isLoading: intelLoading } = useCaseIntel({ ...q, page: undefined, pageSize: undefined });
+  const { data: themes, isLoading: themesLoading } = useCaseThemes({ ...q, page: undefined, pageSize: undefined, sort: undefined });
   // District tier gets a second view of the register: not "my cases filtered", but the cases
   // registered ELSEWHERE that share evidence with one of mine. That is the silo-breaking
   // answer, and a plain filtered list can never surface it.
@@ -111,7 +112,8 @@ export default function Cases() {
 
       <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
         title="What stands out in this view"
-        subtitle={intel ? `Read from ${intel.total.toLocaleString()} case${intel.total === 1 ? '' : 's'} matching your filter` : undefined} />
+        subtitle={intel ? `Read from ${intel.total.toLocaleString()} case${intel.total === 1 ? '' : 's'} matching your filter` : undefined}
+        extra={<NarrativeThemes data={themes} loading={themesLoading} />} />
 
       {/* These read as passive statistics, so they are labelled as the controls they are.
           Each count is computed over the whole filtered set, and clicking it narrows the
@@ -264,6 +266,47 @@ export default function Cases() {
         <Pager page={page} pageSize={pageSize} total={data.total}
           onPage={goPage} onPageSize={(n) => set('pageSize', n === 25 ? '' : String(n))} />
       )}
+    </div>
+  );
+}
+
+// Recurring language in the free-text narratives, read by Zia.
+//
+// Worth its own row rather than folding into the signal list: it is the only finding on the
+// page that did not come from a structured column. A sub-head cannot distinguish a fake-KYC
+// series from a QR-code series -- both are Online Financial Fraud -- but the narratives can,
+// and a series shares its method.
+function NarrativeThemes({ data, loading }: {
+  data?: { themes: { phrase: string; documents: number }[]; sampled?: number; available: boolean };
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="px-4 py-2.5 border-t border-line text-[12px] text-ink-muted flex items-center gap-2">
+        <span className="w-3 h-3 border-2 border-kadi-blue border-t-transparent rounded-full animate-spin" />
+        Reading the case narratives…
+      </div>
+    );
+  }
+  if (!data?.available || !data.themes?.length) return null;
+  return (
+    <div className="px-4 py-2.5 border-t border-line bg-surface-2/40">
+      <div className="text-[11px] uppercase tracking-wide text-ink-muted mb-1.5">
+        Recurring in the narratives · read from {data.sampled} case descriptions
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {data.themes.map((t) => (
+          <span key={t.phrase}
+            title={`Appears across ${t.documents} sampled batches of narratives`}
+            className="text-[12px] bg-kadi-teal/10 text-kadi-teal border border-kadi-teal/25 rounded-full px-2.5 py-0.5">
+            {t.phrase}
+          </span>
+        ))}
+      </div>
+      <div className="text-[11px] text-ink-muted mt-1.5">
+        Extracted from free-text modus operandi, which no structured field indexes — the method
+        a series shares is written here and nowhere else.
+      </div>
     </div>
   );
 }

@@ -144,3 +144,16 @@ export const useCaseIntel = (params: Record<string, unknown>) => intelQuery('/ca
 export const useOffenderIntel = (params: Record<string, unknown>) => intelQuery('/offenders/intelligence', params);
 export const useHealthIntel = (params: Record<string, unknown>) => intelQuery('/health/intelligence', params);
 export const useGeoIntel = (params: Record<string, unknown>) => intelQuery('/geo/intelligence', params);
+
+// Zia narrative themes. Its own query on purpose: an external call that takes seconds must
+// not hold the intelligence panel behind it, so the deterministic signals paint first and
+// this row appears when it resolves.
+export const useCaseThemes = (params: Record<string, unknown>) =>
+  useQuery({
+    queryKey: ['case-themes', role(), params],
+    queryFn: () => api.get<{
+      themes: { phrase: string; documents: number }[];
+      sampled?: number; available: boolean; reason?: string; engine?: string;
+    }>(`/cases/themes${qs(params)}`),
+    staleTime: 10 * 60 * 1000,
+  });
