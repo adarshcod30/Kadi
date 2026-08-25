@@ -41,7 +41,12 @@ export default function Assistant() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
   useEffect(() => {
     const about = params.get('about');
+    // From the graph's Intelligence panel "Ask the Assistant" -- a free-text follow-up
+    // referencing the case just being viewed, sent immediately like the ?about= deep link
+    // rather than dropped in the box for a second click that repeats work the user already did.
+    const q = params.get('q');
     if (about) send(`Tell me about FIR ${about} and its linked cases`);
+    else if (q) send(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

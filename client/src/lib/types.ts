@@ -60,7 +60,7 @@ export interface GraphNode {
   caseId?: string; offenderId?: string; crimeHead?: string; crimeSubHead?: string;
   district?: string; unit?: string; status?: string; gravity?: string; date?: string;
   clusterId?: string | null; isCenter?: boolean; riskScore?: number; band?: string; cases?: number;
-  outsideScope?: boolean;
+  outsideScope?: boolean; latitude?: number | null; longitude?: number | null;
 }
 export interface EvidenceItem { type: string; detail: string; offenderIds?: string[] }
 export interface GraphEdge {
@@ -71,6 +71,7 @@ export interface GraphEdge {
 export interface GraphData {
   center: string; clusterId: string | null; nodes: GraphNode[]; edges: GraphEdge[];
   explanation: { summary: string; edgeTypes: string[]; fairness: string };
+  insight?: string; insightSource?: string;
 }
 
 export interface RiskFactor { factor: string; label: string; value: number; contribution: number }

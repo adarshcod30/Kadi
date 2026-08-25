@@ -22,7 +22,6 @@ const NAV = [
   { to: '/health', icon: Activity, key: 'health' },
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
-  { to: '/assistant', icon: MessageSquare, key: 'assistant' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin'] },
 ];
@@ -64,6 +63,12 @@ export function Shell({ children }: { children: ReactNode }) {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search')}
             className="bg-white/10 placeholder-white/50 text-white text-sm rounded-ctl pl-9 pr-3 py-1.5 w-64 focus:bg-white/20 outline-none" />
         </form>
+        <NavLink to="/assistant"
+          className={({ isActive }) => `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-ctl transition-colors ${
+            isActive ? 'bg-kadi-gold text-kadi-navy' : 'bg-white/10 text-white hover:bg-white/20'}`}
+          title="Ask KADI anything about a case, offender, or district">
+          <MessageSquare size={16} /> <span className="hidden sm:inline">{t('assistant')}</span>
+        </NavLink>
         <button onClick={() => setLang(lang === 'en' ? 'kn' : 'en')}
           className="text-sm px-2 py-1 rounded hover:bg-white/10" title="Language">
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}

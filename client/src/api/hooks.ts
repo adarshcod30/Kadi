@@ -58,7 +58,7 @@ export const useCase = (id?: string) =>
   useQuery({ queryKey: ['case', id], queryFn: () => api.get<CaseDetail>(`/cases/${id}`), enabled: !!id });
 
 export const useGraphCase = (id?: string) =>
-  useQuery({ queryKey: ['graph', role(), 'case', id], queryFn: () => api.get<GraphData>(`/graph/case/${id}`), enabled: !!id });
+  useQuery({ queryKey: ['graph', role(), 'case', id], queryFn: () => api.get<GraphData>(`/graph/case/${id}?explain=true`), enabled: !!id });
 export const useGraphCluster = (id?: string) =>
   useQuery({ queryKey: ['graph', role(), 'cluster', id], queryFn: () => api.get<GraphData & { cluster: any }>(`/graph/cluster/${id}`), enabled: !!id });
 

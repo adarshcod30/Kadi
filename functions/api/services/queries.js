@@ -136,6 +136,9 @@ function graphForCase(user, id, opts = {}) {
       crimeHead: c.crimeHead, crimeSubHead: c.crimeSubHead, district: c.districtName,
       unit: c.unitName, status: c.status, gravity: c.gravity, date: c.crimeRegisteredDate,
       clusterId: c.clusterId, isCenter,
+      // So the graph's "Map" button can fly straight to and pin this exact incident,
+      // instead of dropping the viewer on the state-wide view with no idea where to look.
+      latitude: c.latitude, longitude: c.longitude,
       outsideScope: Boolean(homeDistrict && String(c.districtId) !== homeDistrict),
     });
   };

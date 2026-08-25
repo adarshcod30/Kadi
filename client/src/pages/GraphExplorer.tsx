@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch } from 'lucide-react';
+import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch, Sparkles, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGraphCase, useGraphCluster, useFeaturedNetworks } from '../api/hooks';
 import { GraphCanvas, EDGE_COLOR, HEAD_COLOR, GraphFilters } from '../features/graph/GraphCanvas';
 import { WhyPanel } from '../features/graph/WhyPanel';
@@ -61,7 +61,11 @@ export default function GraphExplorer() {
   if (!caseId && !clusterId) return <GraphEntry />;
 
   return (
-    <div className="h-[calc(100vh-8.5rem)] flex flex-col">
+    // NOT a fixed page height any more -- that forced the 3-column workbench to shrink and
+    // fight the Intelligence panel for room inside one screen's worth of space. The
+    // workbench below keeps its own original height instead, and the page scrolls (the
+    // Shell's <main> is already overflow-auto) to reveal Intelligence underneath it.
+    <div className="flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 gap-2 sm:gap-3">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-kadi-navy flex items-center gap-2"><Network size={18} className="shrink-0" /> Case-Linkage Graph</h1>
@@ -71,7 +75,14 @@ export default function GraphExplorer() {
         <div className="flex gap-2 shrink-0 items-center">
           <CaseSwitcher current={caseId} />
           {caseId && <button onClick={() => nav(`/cases/${caseId}`)} className="btn-outline text-sm"><FileText size={14} /> Case</button>}
-          <button onClick={() => nav('/map')} className="btn-outline text-sm"><MapIcon size={14} /> Map</button>
+          <button onClick={() => {
+            // Fly straight to and pin the case actually open here, not the state-wide view --
+            // the center node carries its own coordinates for exactly this.
+            const center = (data?.nodes || []).find((n: any) => n.type === 'case' && n.isCenter);
+            nav(center?.latitude != null
+              ? `/map?lat=${center.latitude}&lng=${center.longitude}&crimeNo=${encodeURIComponent(center.label)}`
+              : '/map');
+          }} className="btn-outline text-sm"><MapIcon size={14} /> Map</button>
         </div>
       </div>
 
@@ -86,8 +97,10 @@ export default function GraphExplorer() {
         clickable evidence rather than a hunch. Use the switcher above to move between cases.
       </div>
 
-      {/* Responsive: stacks on small screens, 3-column workbench from xl up */}
-      <div className="flex-1 grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
+      {/* Responsive: stacks on small screens, 3-column workbench from xl up. Fixed height,
+          same as it always was -- the canvas does not shrink to make room for Intelligence
+          below it; the PAGE scrolls instead (Shell's <main> is already overflow-auto). */}
+      <div className="h-[calc(100vh-8.5rem)] grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
         {/* Controls */}
         <div className="card overflow-auto p-3 space-y-4 xl:max-h-none max-h-72">
           <Control title="Layout" icon={<GitBranch size={13} />}>
@@ -169,6 +182,83 @@ export default function GraphExplorer() {
           </AnimatePresence>
         </div>
       </div>
+
+      <div className="mt-3">
+        <GraphIntelligence data={data} />
+      </div>
+    </div>
+  );
+}
+
+// Quick, AI-grounded read of the currently open network -- not a replacement for reading
+// the graph, a way in: what is this network telling me, and who is worth a closer look.
+// "Ask the Assistant" hands the same case off to a full conversation rather than trying to
+// cram every possible follow-up into this panel.
+function GraphIntelligence({ data }: { data: any }) {
+  const nav = useNavigate();
+  const [open, setOpen] = useState(true);
+  if (!data) return null;
+
+  const caseNodes = (data.nodes || []).filter((n: any) => n.type === 'case');
+  const offNodes = (data.nodes || []).filter((n: any) => n.type === 'offender');
+  const highRisk = offNodes.filter((o: any) => o.band === 'High');
+  const districts = new Set(caseNodes.map((n: any) => n.district).filter(Boolean));
+  const center = caseNodes.find((n: any) => n.isCenter);
+
+  const askAssistant = () => {
+    const qtext = center
+      ? `Tell me more about case ${center.label} and the network around it.`
+      : 'Tell me more about the case I was just looking at.';
+    nav(`/assistant?q=${encodeURIComponent(qtext)}`);
+  };
+
+  return (
+    <div className="card overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-3 transition-colors">
+        <span className="flex items-center gap-2 font-medium text-sm text-kadi-navy">
+          <Sparkles size={16} className="text-kadi-blue" /> Intelligence
+        </span>
+        {open ? <ChevronUp size={16} className="text-ink-muted" /> : <ChevronDown size={16} className="text-ink-muted" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
+          {data.insight ? (
+            <p className="text-[13px] text-ink leading-relaxed">{data.insight}</p>
+          ) : (
+            <p className="text-[13px] text-ink-muted">Reading the network…</p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <StatPill label="Linked cases" value={Math.max(0, caseNodes.length - 1)} />
+            <StatPill label="Districts spanned" value={districts.size} />
+            <StatPill label="Offenders in network" value={offNodes.length} />
+            {highRisk.length > 0 && (
+              <StatPill label="High-risk offenders" value={highRisk.length} tone="danger" />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <span className="text-[11.5px] text-ink-subtle">
+              Grounded in this network&rsquo;s own evidence — never caste, religion or occupation.
+            </span>
+            <button onClick={askAssistant}
+              className="btn-outline text-[12.5px] shrink-0 whitespace-nowrap">
+              <MessageSquare size={13} /> Ask the Assistant
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatPill({ label, value, tone }: { label: string; value: number; tone?: 'danger' }) {
+  return (
+    <div className={`rounded-ctl border px-2.5 py-1.5 text-center min-w-[86px] ${
+      tone === 'danger' ? 'border-danger/30 bg-danger/5' : 'border-line bg-surface-2'}`}>
+      <div className={`font-num text-base font-semibold ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}>{value}</div>
+      <div className="text-[10.5px] text-ink-muted leading-tight">{label}</div>
     </div>
   );
 }

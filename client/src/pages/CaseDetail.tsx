@@ -168,7 +168,9 @@ export default function CaseDetail() {
           )}
 
           {c.latitude && (
-            <Section title="Location" action={<button onClick={() => nav('/map')} className="text-xs link">Open map</button>}>
+            <Section title="Location" action={<button
+              onClick={() => nav(`/map?lat=${c.latitude}&lng=${c.longitude}&crimeNo=${encodeURIComponent(c.crimeNo)}`)}
+              className="text-xs link">Open map</button>}>
               <div className="p-4 text-sm text-ink-muted flex items-center gap-2"><MapPin size={16} className="text-kadi-blue" /> {c.latitude.toFixed(4)}, {c.longitude?.toFixed(4)}</div>
             </Section>
           )}

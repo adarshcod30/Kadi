@@ -5,7 +5,7 @@
 // zones, and clicking a district flies in and drills down. India is drawn with its
 // official boundary (datameet composite).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -43,6 +43,14 @@ type LayerMode = 'density' | 'heat' | 'points';
 
 export default function MapPage() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  // A specific incident someone navigated here to locate -- from a case detail's "Open
+  // map" or the graph's "Map" button. Parsed once; NaN (no lat/lng in the URL) means "not
+  // a deep link", handled below.
+  const focusLat = Number(params.get('lat'));
+  const focusLng = Number(params.get('lng'));
+  const focusCrimeNo = params.get('crimeNo') || '';
+  const hasFocusIncident = Number.isFinite(focusLat) && Number.isFinite(focusLng) && !!params.get('lat');
   const ref = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
@@ -304,6 +312,33 @@ export default function MapPage() {
     const d = districts.districts.find((x: any) => x.districtId === selDistrict);
     if (d) m.flyTo({ center: [d.centroidLng, d.centroidLat], zoom: 8.4, duration: 900 });
   }, [ready, selDistrict, districts]);
+
+  // ---- deep-linked incident: Incidents layer, fly in tight, drop a pin ----
+  // "Open map" from a case, or "Map" from the graph, should land the viewer looking at the
+  // one FIR they came from -- not the state-wide choropleth with no idea where to look.
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !hasFocusIncident || focusedRef.current) return;
+    focusedRef.current = true;
+    setLayer('points');
+    m.flyTo({ center: [focusLng, focusLat], zoom: 15, duration: 1400 });
+    const el = document.createElement('div');
+    el.className = 'incident-pin';
+    el.innerHTML = `<svg viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 22 12 22s12-13 12-22c0-6.6-5.4-12-12-12z" fill="#E8871E" stroke="#0B3D75" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="4.5" fill="#0B3D75"/>
+    </svg>`;
+    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([focusLng, focusLat]);
+    if (focusCrimeNo) {
+      marker.setPopup(new maplibregl.Popup({ offset: 28, closeButton: false })
+        .setHTML(`<div style="font:600 12px system-ui;color:#0B3D75">${focusCrimeNo}</div>`));
+    }
+    marker.addTo(m);
+    if (focusCrimeNo) marker.togglePopup();
+    markers.current.push(marker);
+  }, [ready, hasFocusIncident, focusLat, focusLng, focusCrimeNo]);
 
   const selData = useMemo(() => districts?.districts.find((d: any) => d.districtId === selDistrict), [districts, selDistrict]);
   const resetView = () => { setSelDistrict(null); map.current?.fitBounds(KA_BOUNDS, { padding: 24, duration: 700 }); };
