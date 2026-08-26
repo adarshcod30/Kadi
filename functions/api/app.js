@@ -13,6 +13,7 @@ const cache = require('./services/cache');
 const quickml = require('./services/quickml');
 const zia = require('./services/zia');
 const datastore = require('./services/datastore');
+const auth = require('./services/auth');
 const insight = require('./services/insight');
 const intel = require('./services/intelligence');
 const smartbrowz = require('./services/smartbrowz');
@@ -45,6 +46,59 @@ function buildApp() {
     fairness: q.FAIRNESS_STATEMENT,
     roles: Object.keys(rbac.DEMO_USERS),
   })));
+
+  // ---- authentication ---------------------------------------------------------------
+  // Real sign-in sits alongside the demo role switch rather than replacing it. The demo path
+  // is honest about being one; this path is where scope stops being negotiable.
+  r.post('/auth/login', handle(async (req) => {
+    const { email, password } = req.body || {};
+    const out = await auth.login(req, email, password);
+    if (!out.ok) {
+      const e = new Error(out.error);
+      e.status = out.pending ? 403 : 401;
+      e.code = out.pending ? 'pending_approval' : 'invalid_credentials';
+      throw e;
+    }
+    audit.record({ user: { appUserId: out.user.email, name: out.user.fullName, role: out.user.role },
+      action: 'sign_in', targetType: 'account', targetId: out.user.email, ip: req.clientIp, req });
+    return out;
+  }));
+
+  r.post('/auth/signup', handle(async (req) => {
+    const out = await auth.signup(req, req.body || {});
+    if (!out.ok) { const e = new Error(out.error); e.status = 400; e.code = 'signup_rejected'; throw e; }
+    return out;
+  }));
+
+  // Who the current token says you are. Returns authenticated:false rather than 401 so the
+  // client can decide between "show the demo shell" and "send them back to sign in".
+  r.get('/auth/session', handle(async (req) => ({
+    authenticated: Boolean(req.user.authenticated),
+    user: req.user.authenticated
+      ? { email: req.user.email, name: req.user.name, role: req.user.role,
+        districtId: req.user.districtId, unitId: req.user.unitId }
+      : null,
+    capabilities: rbac.capabilities(req.user),
+  })));
+
+  r.get('/auth/requests', handle(async (req) => {
+    if (!rbac.capabilities(req.user).canApproveAccounts) throw forbidden('Requires DGP or Administrator.');
+    const items = await auth.listRequests(req, req.query.status || 'pending');
+    if (items === null) return { items: [], available: false, reason: 'Access requests are unavailable right now.' };
+    return { items, available: true };
+  }));
+
+  r.post('/auth/requests/:id/decide', handle(async (req) => {
+    if (!rbac.capabilities(req.user).canApproveAccounts) throw forbidden('Requires DGP or Administrator.');
+    const approve = String((req.body || {}).decision) === 'approve';
+    const out = await auth.decide(req, req.params.id, approve, req.user.email || req.user.role);
+    if (!out.ok) { const e = new Error(out.error); e.status = 500; e.code = 'decide_failed'; throw e; }
+    audit.record({ user: req.user, action: approve ? 'approve_account' : 'reject_account',
+      targetType: 'account', targetId: req.params.id, ip: req.clientIp, req });
+    return out;
+  }));
+
+  r.get('/auth/status', handle(async () => auth.status()));
 
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));

@@ -18,6 +18,11 @@ export interface Me {
     canSwitchDistrict: boolean;
     canViewWholeState: boolean;
     canViewVulnerability: boolean; canViewAudit: boolean; canAdmin: boolean;
+    // Sign-up requests are decided by the two posts that hold the whole state.
+    canApproveAccounts?: boolean;
+    // True only for a token-backed session, so the shell can tell a real sign-in from the demo.
+    authenticated?: boolean;
+    email?: string | null;
   };
   fairness: string;
   roles: string[];

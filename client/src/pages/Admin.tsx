@@ -1,19 +1,26 @@
-import { CheckCircle2, ShieldCheck, Database, Cpu } from 'lucide-react';
-import { useMe, useEval, useStats } from '../api/hooks';
+import { useState } from 'react';
+import { CheckCircle2, ShieldCheck, Database, Cpu, UserPlus, Check, X, Loader2 } from 'lucide-react';
+import { useMe, useEval, useStats, useAccessRequests, useDecideRequest } from '../api/hooks';
 import { Section, Empty, Chip } from '../components/ui';
 
 export default function Admin() {
   const { data: me } = useMe();
   const { data: ev } = useEval();
   const { data: stats } = useStats();
-  if (!me?.capabilities.canAdmin) return <Empty title="Admin area is restricted" hint="Requires Admin role." />;
+  const canApprove = Boolean(me?.capabilities?.canApproveAccounts);
+  const canAdmin = Boolean(me?.capabilities?.canAdmin);
+  if (!me || (!canAdmin && !canApprove)) {
+    return <Empty title="Admin area is restricted" hint="Requires Administrator or DGP." />;
+  }
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-kadi-navy">Administration</h1>
-        <p className="text-sm text-ink-muted">Users & roles, data ingestion, model recompute, fairness & evaluation.</p>
+        <p className="text-sm text-ink-muted">Access requests, data ingestion, model recompute, fairness &amp; evaluation.</p>
       </div>
+
+      {canApprove && <AccessRequests />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title={<span className="flex items-center gap-2"><ShieldCheck size={16} className="text-kadi-blue" /> Fairness & evaluation</span>}>
@@ -67,3 +74,98 @@ const Metric = ({ label, value, pass }: { label: string; value: string; pass?: b
 const Row = ({ label, ok }: { label: string; ok?: boolean }) => (
   <div className="flex items-center gap-2"><CheckCircle2 size={14} className={ok ? 'text-success' : 'text-line'} /> {label}</div>
 );
+
+// Sign-up requests awaiting a decision.
+//
+// The approval chain is enforced at the login endpoint, not here: a pending account is already
+// refused a token, so this panel decides an outcome rather than merely revealing a queue. That
+// distinction matters — an approval screen that only hides rows is theatre.
+function AccessRequests() {
+  const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const { data, isLoading, refetch } = useAccessRequests(true, status);
+  const decide = useDecideRequest();
+  const items = data?.items || [];
+
+  const act = async (id: string, decision: 'approve' | 'reject') => {
+    await decide.mutateAsync({ id, decision });
+    refetch();
+  };
+
+  return (
+    <Section
+      title={<span className="flex items-center gap-2">
+        <UserPlus size={16} className="text-kadi-gold" /> Access requests
+        {status === 'pending' && items.length > 0 && (
+          <span className="text-[11px] font-medium bg-kadi-gold/20 text-kadi-navy rounded-full px-2 py-0.5">
+            {items.length} waiting
+          </span>
+        )}
+      </span>}
+      action={
+        <div className="flex gap-1">
+          {(['pending', 'approved', 'rejected'] as const).map((s) => (
+            <button key={s} onClick={() => setStatus(s)}
+              className={`chip capitalize ${status === s ? 'bg-kadi-navy text-white' : 'bg-surface-3 text-ink-muted hover:bg-kadi-blue50'}`}>
+              {s}
+            </button>
+          ))}
+        </div>
+      }>
+      {isLoading ? (
+        <div className="p-4 text-sm text-ink-muted flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin" /> Loading…
+        </div>
+      ) : data && !data.available ? (
+        <Empty title="Requests are unavailable" hint={data.reason} />
+      ) : !items.length ? (
+        <Empty title={`No ${status} requests`}
+          hint={status === 'pending' ? 'New officers who request access will appear here for a decision.' : undefined} />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-surface-3 text-ink-muted text-xs uppercase tracking-wide">
+              <tr>
+                <th className="text-left px-4 py-2 font-medium">Officer</th>
+                <th className="text-left px-4 py-2 font-medium">Requested post</th>
+                <th className="text-left px-4 py-2 font-medium">Scope</th>
+                <th className="text-right px-4 py-2 font-medium">Decision</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {items.map((r) => (
+                <tr key={r.id}>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium">{r.fullName}</div>
+                    <div className="text-xs text-ink-muted">{r.email}</div>
+                  </td>
+                  <td className="px-4 py-2.5"><Chip color="blue">{r.role}</Chip></td>
+                  <td className="px-4 py-2.5 text-ink-muted text-[12.5px]">
+                    {r.unitId ? `Station ${r.unitId}` : r.districtId ? `District ${r.districtId}` : 'State-wide'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {status === 'pending' ? (
+                      <div className="inline-flex gap-1.5">
+                        <button onClick={() => act(r.id, 'approve')} disabled={decide.isPending}
+                          className="inline-flex items-center gap-1 text-[12.5px] font-medium text-success border border-success/30 hover:bg-success hover:text-white rounded-full px-2.5 py-1 transition-colors disabled:opacity-50">
+                          <Check size={12} /> Approve
+                        </button>
+                        <button onClick={() => act(r.id, 'reject')} disabled={decide.isPending}
+                          className="inline-flex items-center gap-1 text-[12.5px] font-medium text-danger border border-danger/30 hover:bg-danger hover:text-white rounded-full px-2.5 py-1 transition-colors disabled:opacity-50">
+                          <X size={12} /> Decline
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-ink-muted">
+                        {r.approvedBy ? `by ${r.approvedBy}` : '—'}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}

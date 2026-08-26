@@ -157,3 +157,23 @@ export const useCaseThemes = (params: Record<string, unknown>) =>
     }>(`/cases/themes${qs(params)}`),
     staleTime: 10 * 60 * 1000,
   });
+
+// Access requests. Only the DGP and the Administrator can read or decide these; the server
+// refuses everyone else, so the hook is enabled on the capability rather than the role name.
+export type AccessRequest = {
+  id: string; email: string; fullName: string; role: string;
+  districtId: string | null; unitId: string | null; status: string;
+  requestedAt?: string; approvedBy?: string | null; decidedAt?: string | null;
+};
+export const useAccessRequests = (enabled: boolean, status = 'pending') =>
+  useQuery({
+    queryKey: ['access-requests', role(), status],
+    queryFn: () => api.get<{ items: AccessRequest[]; available: boolean; reason?: string }>(
+      `/auth/requests${qs({ status })}`),
+    enabled,
+  });
+export const useDecideRequest = () =>
+  useMutation({
+    mutationFn: (v: { id: string; decision: 'approve' | 'reject' }) =>
+      api.post<{ ok: boolean; status: string }>(`/auth/requests/${v.id}/decide`, { decision: v.decision }),
+  });

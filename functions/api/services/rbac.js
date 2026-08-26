@@ -40,10 +40,10 @@ const ROLES = {
   SP: { level: 3, label: 'Superintendent of Police', scope: 'district', tier: 'district' },
   DSP: { level: 4, label: 'DySP / ACP', scope: 'district', tier: 'district' },
   // --- station tier ---
+  // Both posts work out of a single station, so both read one register. An SI investigating
+  // from a station desk has exactly the visibility problem this tier exists to show.
   SHO: { level: 5, label: 'Station House Officer', scope: 'unit', tier: 'station' },
-  // SI keeps its district scope so existing saved links and cached clients do not silently
-  // narrow. New station-level access is SHO.
-  SI: { level: 5, label: 'Sub-Inspector (IO)', scope: 'district', tier: 'district' },
+  SI: { level: 5, label: 'Sub-Inspector (IO)', scope: 'unit', tier: 'station' },
 };
 
 // Older role names still arrive from cached clients and saved links. Map rather than 404.
@@ -55,7 +55,7 @@ const DEMO_USERS = {
   Admin: { appUserId: 'U-ADM', name: 'System Administrator', role: 'Admin', unitId: null, districtId: null },
   SP: { appUserId: 'U-SP', name: 'SP Bengaluru City', role: 'SP', unitId: null, districtId: '1' },
   DSP: { appUserId: 'U-DSP', name: 'DySP M. Rao', role: 'DSP', unitId: null, districtId: '1' },
-  SI: { appUserId: 'U-SI', name: 'PSI R. Kumar', role: 'SI', unitId: '1', districtId: '1' },
+  SI: { appUserId: 'U-SI', name: `PSI ${STATION_NAME}`, role: 'SI', unitId: STATION_UNIT_ID, districtId: '1' },
   SHO: { appUserId: 'U-SHO', name: `SHO ${STATION_NAME}`, role: 'SHO', unitId: STATION_UNIT_ID, districtId: '1' },
 };
 
@@ -64,7 +64,48 @@ function resolveRole(raw) {
   return ROLES[r] ? r : (ALIASES[r] || 'Analyst');
 }
 
+// A signed-in user's scope comes from their token, never from a header.
+//
+// This is the whole security boundary. The demo path deliberately trusts x-kadi-role, which
+// is fine while it is only a demo -- but a real account must not be widenable by anything the
+// browser can set, so when a valid token is present the header is ignored entirely and the
+// district and station are read out of the signed payload.
+function userFromToken(req) {
+  // NOT the Authorization header. Catalyst's gateway claims that one for its own OAuth and
+  // rejects the request with INVALID_TOKEN before it ever reaches this function -- the session
+  // token has to travel under a name the platform does not already own.
+  const token = req.headers['x-kadi-token'] || null;
+  if (!token) return null;
+  // Required late to avoid a cycle: auth.js reads datastore, which does not read rbac.
+  // eslint-disable-next-line global-require
+  const payload = require('./auth').verifyToken(token);
+  if (!payload) return null;
+  const role = resolveRole(payload.role);
+  const meta = ROLES[role];
+  const user = {
+    appUserId: payload.sub,
+    name: payload.name || meta.label,
+    role,
+    email: payload.sub,
+    authenticated: true,
+    districtId: payload.districtId || null,
+    unitId: payload.unitId || null,
+    roleMeta: meta,
+  };
+  // A state-tier account may still drill into a district -- that is a narrowing, and the
+  // whole point of holding the state view. District and station accounts are pinned.
+  if (meta.tier === 'state') {
+    const q = req.query || {};
+    if (q.district) { user.districtId = String(q.district); user.drilledFromState = true; }
+    if (q.unit) user.drillUnitId = String(q.unit);
+  }
+  return user;
+}
+
 function userFromRequest(req) {
+  const authed = userFromToken(req);
+  if (authed) return authed;
+
   const role = resolveRole(req.headers['x-kadi-role']);
   const base = DEMO_USERS[role];
   // District-tier users may switch which district they are looking at (?district=), and any
@@ -133,11 +174,22 @@ function capabilities(user) {
     canViewAudit: stateTier || user.role === 'SP',
     isStation: stationTier,
     canAdmin: user.role === 'Admin',
+    // Sign-up requests are decided by the two posts that hold the whole state.
+    canApproveAccounts: user.role === 'DGP' || user.role === 'Admin',
+    // True only for a token-backed session. The interface uses it to say which way you came
+    // in, because "demo" and "signed in as SP Mysuru" must never look the same.
+    authenticated: Boolean(user.authenticated),
+    email: user.email || null,
     // Everyone can move between districts. Only a state user can step back out to the whole
     // state, which is the difference the two tiers actually encode.
-    // A station officer has exactly one register. Offering a district switcher would
-    // imply a choice that does not exist for them.
-    canSwitchDistrict: !stationTier,
+    // Who may move between districts.
+    //
+    // A station officer never can. Neither can a SIGNED-IN district officer: SP Mysuru holds
+    // Mysuru, and the server already refuses anything else -- but a switcher that silently
+    // returns the same district is worse than no switcher, because it looks broken rather
+    // than bounded. The demo district tier keeps it, since switching freely is the whole
+    // point of a demonstration.
+    canSwitchDistrict: !stationTier && !(user.authenticated && user.roleMeta.tier === 'district'),
     canViewWholeState: stateTier,
     drilledFromState: drilled,
     effectiveScope: stationTier ? 'unit' : (drilled ? 'district' : user.roleMeta.scope),
@@ -145,6 +197,6 @@ function capabilities(user) {
 }
 
 module.exports = {
-  ROLES, ALIASES, DEMO_USERS, userFromRequest, caseInScope, requireRole, capabilities,
+  ROLES, ALIASES, DEMO_USERS, userFromRequest, userFromToken, caseInScope, requireRole, capabilities,
   STATION_UNIT_ID, STATION_NAME,
 };

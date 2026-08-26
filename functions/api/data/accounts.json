@@ -1,0 +1,295 @@
+{
+  "generatedAt": "2026-08-26T07:35:15.357Z",
+  "domain": "ksp.gov.in",
+  "note": "Provisioned accounts. Password hashes only - the plaintext lives in docs/ACCESS_CREDENTIALS.md.",
+  "accounts": [
+    {
+      "email": "dgp@ksp.gov.in",
+      "fullName": "DGP Karnataka",
+      "role": "DGP",
+      "districtId": null,
+      "unitId": null,
+      "passwordHash": "scrypt$59ad80ddf209a2018e4d947d9741fa53$dce46a0026f61a53fd62c72233c54fce20a929cd70deb3ff460d609039b5d0431fd6e45600ded8c6f0bd79128528a1351c02a310ec25da8d1fe519008d66c888"
+    },
+    {
+      "email": "scrb.analyst@ksp.gov.in",
+      "fullName": "SCRB Analyst",
+      "role": "Analyst",
+      "districtId": null,
+      "unitId": null,
+      "passwordHash": "scrypt$247372863d86ed5af439088ae386e5b3$cadcd253ab1820397d17a7a6fbbcfe67c0430d56a8db93d066b293bd3e596d0f124ea131bdb1f3353e1c828447d91de0e722cb45ea3f91ccebfe72a15e7c95e6"
+    },
+    {
+      "email": "admin@ksp.gov.in",
+      "fullName": "System Administrator",
+      "role": "Admin",
+      "districtId": null,
+      "unitId": null,
+      "passwordHash": "scrypt$c86a6b1e260005656ae66e2e008dd1e9$1ce46022b79f15179ff6b8dee5b100288eb55c6298d2586ddf39e85bb3f993abab762ce19e2c5a0997c7c22969f93cb00b667e77916ebc8533ad149f565a9f6d"
+    },
+    {
+      "email": "sp.bengalurucity@ksp.gov.in",
+      "fullName": "SP Bengaluru City",
+      "role": "SP",
+      "districtId": "1",
+      "unitId": null,
+      "passwordHash": "scrypt$afaed6163980e2cd5a845bf193c1157c$04f36e08853edb05b4e179a6b49917b9f91934a9278925c854c396ca961becb75956aa0b53ede5214ff19f92292c8778f45440b50a4d22a90f58553707c47bf0"
+    },
+    {
+      "email": "sp.bengalururural@ksp.gov.in",
+      "fullName": "SP Bengaluru Rural",
+      "role": "SP",
+      "districtId": "2",
+      "unitId": null,
+      "passwordHash": "scrypt$87ed8d69aa32edbb80901ad73949e671$adb25b09b9bc9bf3073c49b94ed42ab0cc4a55e19de535f40a62df98289ccdd49690f94562c03c45d9c9dd8d2229e91bf30fa64a1ec01fd8eea825fb587ac1c5"
+    },
+    {
+      "email": "sp.mysuru@ksp.gov.in",
+      "fullName": "SP Mysuru",
+      "role": "SP",
+      "districtId": "3",
+      "unitId": null,
+      "passwordHash": "scrypt$d919a66dd3a4ec28a66cf1e6630bef19$a9c0791b7cb64f92bfdfdebec81c1728733024296a4816f3918849d1ce3fe35eae1a004f937d9624f217bd9fe10cc6a6d41d5efd811b5aab780c902482f8b461"
+    },
+    {
+      "email": "sp.mandya@ksp.gov.in",
+      "fullName": "SP Mandya",
+      "role": "SP",
+      "districtId": "4",
+      "unitId": null,
+      "passwordHash": "scrypt$04cbd069f1edcda03ac3b435bfcffa6f$8ab7a5b9eda47986d632f048010d7077b5e22ef4a65813a2739c2324741c124128f4e246b6d3f0ab9f19d039f84faaf6cb384fb59cd65c7a210dbb5268c70567"
+    },
+    {
+      "email": "sp.hassan@ksp.gov.in",
+      "fullName": "SP Hassan",
+      "role": "SP",
+      "districtId": "5",
+      "unitId": null,
+      "passwordHash": "scrypt$57e49e7e6f152f47fda973d1116c39a1$6097e783ab7cef247d963c0e6739855fa58ba0c94985af7ff523466011a4821ba237618c7ac9f7ce29bf5f8d0b7f5f1bec850a12b1d5c4207d38b63dfa6de301"
+    },
+    {
+      "email": "sp.tumakuru@ksp.gov.in",
+      "fullName": "SP Tumakuru",
+      "role": "SP",
+      "districtId": "6",
+      "unitId": null,
+      "passwordHash": "scrypt$b1e1a7fe0083c3c13752b971130dcb97$a863d734851d0b6aa5d223e6ff03ff27b4e9181aaeb92c114e1ec0f180df790e3abe7500b384e946a171ef7e1603c6c970a801c5240ba4ba3fd55b0a8e4bd45f"
+    },
+    {
+      "email": "sp.kalaburagi@ksp.gov.in",
+      "fullName": "SP Kalaburagi",
+      "role": "SP",
+      "districtId": "7",
+      "unitId": null,
+      "passwordHash": "scrypt$f080687223b2661d6e83e0b307e159b5$c01e999b88f99b733d2586843916f75e137432b6506acb384852e40602fbce219637cea8cc59220b6e28089450f6c117c9fc5f69937c7b76471c4c3f51fe4a7e"
+    },
+    {
+      "email": "sp.ballari@ksp.gov.in",
+      "fullName": "SP Ballari",
+      "role": "SP",
+      "districtId": "8",
+      "unitId": null,
+      "passwordHash": "scrypt$000cb79e4a730b50145e86fa2cc9dc50$6a1d206913b5edb10aaabadb60c7a3a525459ac01227226bf1d31ca005cf179bafbfb73bf3199c76024c86cfc815e0f11ae5d203c2d6ea1cb6682e8ea34d9bc2"
+    },
+    {
+      "email": "sp.vijayapura@ksp.gov.in",
+      "fullName": "SP Vijayapura",
+      "role": "SP",
+      "districtId": "9",
+      "unitId": null,
+      "passwordHash": "scrypt$5fa6cb0d637a8fc6133598d134ff86b7$150946d3ccf3068cb7d258dc6589db60d9a78b4f9e3737b557e689cb1649ad0be1b71edac3570c7ad35801225c89069800a27e6c58d064cf6227a441d7d95811"
+    },
+    {
+      "email": "sp.belagavi@ksp.gov.in",
+      "fullName": "SP Belagavi",
+      "role": "SP",
+      "districtId": "10",
+      "unitId": null,
+      "passwordHash": "scrypt$957edb532c6948a98480e8705b5beb31$9ab1918b8778d1f91a2b8fc61b099a5240ae9e5fc3038ad414b0552a8faa7d63fd6ec07f5fe68ae2b7be721de77c90d6afd09447eb01c57ade78ef3b200a58a7"
+    },
+    {
+      "email": "sp.dharwad@ksp.gov.in",
+      "fullName": "SP Dharwad",
+      "role": "SP",
+      "districtId": "11",
+      "unitId": null,
+      "passwordHash": "scrypt$9a1111b1a6a2bd23351a9efa727748aa$e4c7a1e18680d8420e275f4047394b79507ce5aab32a837c22703ae209fae60e691ce822ef3bbf880b1a97e4e2dc1c9f181c45b6fb7cb2b6d71713eaa4eb43be"
+    },
+    {
+      "email": "sp.hubballidharwad@ksp.gov.in",
+      "fullName": "SP Hubballi-Dharwad",
+      "role": "SP",
+      "districtId": "12",
+      "unitId": null,
+      "passwordHash": "scrypt$736df7c3274e0fc52f6b407b6c766802$e28ab3f04718a379720e2d7c95ada599d50b3c22f4c8fbd4d30eea9334873de3a16a9a4678b75f89514015eb1a828e1bb75bd555d3a5566e58c4cfa2ca243d6e"
+    },
+    {
+      "email": "sp.udupi@ksp.gov.in",
+      "fullName": "SP Udupi",
+      "role": "SP",
+      "districtId": "13",
+      "unitId": null,
+      "passwordHash": "scrypt$e9442b75521d75d18cb452048e158e85$eddbce234b7d6bd630e11fd2d8e013eca34272d8dd00f1ba02fac16bca84e16fc85b6f253f35c716cd12e17222255441d0c8f77e3ca025f24b7286acd6456102"
+    },
+    {
+      "email": "sp.dakshinakannada@ksp.gov.in",
+      "fullName": "SP Dakshina Kannada",
+      "role": "SP",
+      "districtId": "14",
+      "unitId": null,
+      "passwordHash": "scrypt$628278de1636247a57300dc3ef098de1$c2e0e62031cff027790be304b611a40e79daf51de4c2c0209b1e2ef86db89001ad6706c2498bf19dea2f1d67ab1b6e3e4e76b8bbdef7e6fc2fb712662599891e"
+    },
+    {
+      "email": "sp.uttarakannada@ksp.gov.in",
+      "fullName": "SP Uttara Kannada",
+      "role": "SP",
+      "districtId": "15",
+      "unitId": null,
+      "passwordHash": "scrypt$f509e3dce75c4d9da2e056f83c6116b8$8eaeb6695359e825080b3f181e4fe31af36193234db48ffda51991e5b08c029ba9ba78de63f003c9daf9faaaf67744151811f06b47783a7ec370f65a390a010a"
+    },
+    {
+      "email": "sp.shivamogga@ksp.gov.in",
+      "fullName": "SP Shivamogga",
+      "role": "SP",
+      "districtId": "16",
+      "unitId": null,
+      "passwordHash": "scrypt$1f265525462cf710e6a2541e53fa1b13$d676a968b0781e3b8c5a38514808e1579082b6f8a7540dfcd4ff7ea53d2a96ddcfc3c05413801f769f20fab7d11b2f9796bbbab908efc3e761c1e17cd3ce9b09"
+    },
+    {
+      "email": "sp.chitradurga@ksp.gov.in",
+      "fullName": "SP Chitradurga",
+      "role": "SP",
+      "districtId": "17",
+      "unitId": null,
+      "passwordHash": "scrypt$9e4ba823cb52ff3887c67f9b84e64c91$067e5e78e1a109265a1779ba5e1646e1461c0fa9a7a0bf31f49645d0cbb8ed57438062126f9ebb8062d2223c53c27a555530c299b153f5cf5e49b0a033e16aa5"
+    },
+    {
+      "email": "sp.davanagere@ksp.gov.in",
+      "fullName": "SP Davanagere",
+      "role": "SP",
+      "districtId": "18",
+      "unitId": null,
+      "passwordHash": "scrypt$ef74a6c34e8f95b125fc5b35e304fc66$16df1b2d9db12a4a002766151de7b498b2b08e8ae5c81c482b582c4fc329f08bb7003aa3d9e332fe10f31c0ef9dafb62289c3dfa332ac0de1dcb4c7175dcd717"
+    },
+    {
+      "email": "sp.kolar@ksp.gov.in",
+      "fullName": "SP Kolar",
+      "role": "SP",
+      "districtId": "19",
+      "unitId": null,
+      "passwordHash": "scrypt$49be69540789836d7b72669d35325f51$d0ac214856886df5b0b87673051092089868b6496762637f9bfa47b29ce14e29d94bac0279d26eee52783dd118a728a6fd139f032304ab406cc3c684c7f4712c"
+    },
+    {
+      "email": "sp.chikkaballapura@ksp.gov.in",
+      "fullName": "SP Chikkaballapura",
+      "role": "SP",
+      "districtId": "20",
+      "unitId": null,
+      "passwordHash": "scrypt$e80e91df0a4433172925475f84d54537$4abb3288a009e60dca3ddc5b52ed5eb90c9aa7e8430c3517ee5742893e2649591a8335cacc73c96363783b5e61269f79b2893951d54077ae3134432e2bb4e13e"
+    },
+    {
+      "email": "sp.ramanagara@ksp.gov.in",
+      "fullName": "SP Ramanagara",
+      "role": "SP",
+      "districtId": "21",
+      "unitId": null,
+      "passwordHash": "scrypt$c03e4adfd2acb6f93f4bbecd7f2522aa$1d50b81307df6631c57a378fe2b75fb0c2ab82c47727731cc03d893e93c2b3d50bc9b1c0121db222d4806f30de571407d9733257c9cc21fff3d3e84c7c772ede"
+    },
+    {
+      "email": "sp.chamarajanagar@ksp.gov.in",
+      "fullName": "SP Chamarajanagar",
+      "role": "SP",
+      "districtId": "22",
+      "unitId": null,
+      "passwordHash": "scrypt$bf3ef2b904d54d158e213bafa156441d$c093a30c6dc2e1f7fcf7004fb1f09551ac01094e58e90934ab4a52a3ffa6d273bc4f9dd842c01b948d061655d50eb133a41461805e36b6c8519ed8088f1d2028"
+    },
+    {
+      "email": "sp.kodagu@ksp.gov.in",
+      "fullName": "SP Kodagu",
+      "role": "SP",
+      "districtId": "23",
+      "unitId": null,
+      "passwordHash": "scrypt$3446fdad848f128bf48e71063d937d71$ae708fbbffcbec6c3a8d4bd1d5a81a9b44128b528578aeb54cfdb548ffc459bbd03dfc19cfba7e73a3372219166fff18f21f6a02901a7919743e862ad32ba8f1"
+    },
+    {
+      "email": "sp.chikkamagaluru@ksp.gov.in",
+      "fullName": "SP Chikkamagaluru",
+      "role": "SP",
+      "districtId": "24",
+      "unitId": null,
+      "passwordHash": "scrypt$b5ceec48e73e401324c1971663edf520$08e163acc303de732179e7aee3a2a2be6d1c9355172cf7402cd40bf27a05dc962041f2e3c7b1d2f4abd7173c461638cc1c8c6a717cea29efc3a644a4248dc3c9"
+    },
+    {
+      "email": "sp.haveri@ksp.gov.in",
+      "fullName": "SP Haveri",
+      "role": "SP",
+      "districtId": "25",
+      "unitId": null,
+      "passwordHash": "scrypt$73074edf1fe5ca3f4d2dd024c85ce77e$ba4e3ba3a164b0d0d01ae039cf1824321eb340b18175ebd2dcf826794819e83a92a35371958a104a36e28825c04a50fce7b945adaa4e8491acf63991c91aaf67"
+    },
+    {
+      "email": "sp.gadag@ksp.gov.in",
+      "fullName": "SP Gadag",
+      "role": "SP",
+      "districtId": "26",
+      "unitId": null,
+      "passwordHash": "scrypt$51734ed87139b9a4742db5845d5cd211$da1e9496d6dc04b0be7ccaea91f800d7233d4a7bd27f0f8a93c75f716490a8c1eb8b75d6ea6d152ba8b4ce36c1d8b4c11a400915b20fed26915e191bd701ffef"
+    },
+    {
+      "email": "sp.bagalkote@ksp.gov.in",
+      "fullName": "SP Bagalkote",
+      "role": "SP",
+      "districtId": "27",
+      "unitId": null,
+      "passwordHash": "scrypt$9a9796fa25c49ab0aec3c83b0b96f3b1$5327e849ec32f70a3f7500d47ad8cccb3a9bd4f9ec46251f3029e4a33a6f810c4d0b80cfb34afbdece17d085c0f21dfb46173f50ed52eb21b8c9cb7aec0b4545"
+    },
+    {
+      "email": "sp.koppal@ksp.gov.in",
+      "fullName": "SP Koppal",
+      "role": "SP",
+      "districtId": "28",
+      "unitId": null,
+      "passwordHash": "scrypt$2f4cb9b22344d596afddf161edf4a0d1$b404a5283af3f80979bf5d8c84e13d18992368965e8c2c6e9baefd4324528c6d38a98b6f49d658ef45cf7a7d931703b041d1b19d9e1032d9bb6c0948650f29ec"
+    },
+    {
+      "email": "sp.raichur@ksp.gov.in",
+      "fullName": "SP Raichur",
+      "role": "SP",
+      "districtId": "29",
+      "unitId": null,
+      "passwordHash": "scrypt$2c759f2de48ee53edd1bda1ff465e544$7fd8911aa0febe57edd1d120de6ee447fbbf037ad55611d535068f7639c7085f10394d5e6f571abf62c3757c5c4aef2a70dde8aaae0ba7aaa148457270f2c430"
+    },
+    {
+      "email": "sp.yadgir@ksp.gov.in",
+      "fullName": "SP Yadgir",
+      "role": "SP",
+      "districtId": "30",
+      "unitId": null,
+      "passwordHash": "scrypt$8ce526aff3e0f136d98e66f2b9650b54$c50c78c88d33d9f12c7c774baba9ca9d0bd5d311c6451c9528717df0420c65078655165d82221b968f8e79267241a0f3e1013a21c35c27fc7b3a5238f23d9cda"
+    },
+    {
+      "email": "sp.bidar@ksp.gov.in",
+      "fullName": "SP Bidar",
+      "role": "SP",
+      "districtId": "31",
+      "unitId": null,
+      "passwordHash": "scrypt$cadc246e96cc60f0f1c51c9482ce322d$c8c53195f712a0245b507a06ea537679d346d28f13cd036f645adddbad38cc58c8e174dba82adfb651540b88f53b4b960722997bd95cdda8d5d9b8ea592fdc2c"
+    },
+    {
+      "email": "sho.bengalurubazaar@ksp.gov.in",
+      "fullName": "SHO Bengaluru Bazaar PS",
+      "role": "SHO",
+      "districtId": "1",
+      "unitId": "46",
+      "passwordHash": "scrypt$480eec9f30bcf061d3556ce364a67ea9$b93bf4af297f2e909c603a0b0f62259d5bf416f64c3800629278a4323d8a2132da0fc3ce2446bc902b6b30115725ea8b045ef3111d8c9cd47a21729e40b3757f"
+    },
+    {
+      "email": "si.bengalurubazaar@ksp.gov.in",
+      "fullName": "PSI Bengaluru Bazaar PS",
+      "role": "SI",
+      "districtId": "1",
+      "unitId": "46",
+      "passwordHash": "scrypt$c26ffb6fdb19b9172cd3877b2226be87$0f247a9f25733a52674df9f83e5294552099b5f2bf4ba528225b7248502bf6325a6462dfdd029fcac7f2b21d1527057bcb0148b06125743c17fb952d3ae2ed2b"
+    }
+  ]
+}

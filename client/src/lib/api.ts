@@ -39,6 +39,29 @@ export function setRole(r: Role) {
   try { globalThis.localStorage?.setItem('kadi.role', r); } catch { /* storage unavailable */ }
 }
 
+// ---- session token -------------------------------------------------------------------
+// A signed-in session carries a bearer token; the demo path carries only the role header.
+// Both are sent, and the SERVER decides: when a valid token is present it ignores the header
+// entirely, so a demo role cannot be used to widen a real account's scope.
+const TOKEN_KEY = 'kadi.token';
+export function getToken(): string | null {
+  try { return globalThis.localStorage?.getItem(TOKEN_KEY) ?? null; } catch { return null; }
+}
+export function setToken(t: string | null) {
+  try {
+    if (t) globalThis.localStorage?.setItem(TOKEN_KEY, t);
+    else globalThis.localStorage?.removeItem(TOKEN_KEY);
+  } catch { /* storage unavailable */ }
+}
+export function signOut() {
+  setToken(null);
+  try { globalThis.localStorage?.removeItem('kadi.role'); } catch { /* ignore */ }
+  // currentRole is read from storage once, at import. Clearing storage alone left the old
+  // role in memory and every subsequent request still carried it -- which is why the login
+  // page kept showing the previous session's station-scoped figures after signing out.
+  currentRole = 'Analyst';
+}
+
 export class ApiError extends Error {
   code: string;
   constructor(code: string, message: string) { super(message); this.code = code; }
@@ -56,9 +79,21 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       'x-kadi-role': currentRole,
+      // x-kadi-token, not Authorization: Catalyst's gateway intercepts the latter as its
+      // own OAuth credential and rejects the request before the function runs.
+      ...(getToken() ? { 'x-kadi-token': getToken() as string } : {}),
       ...(opts.headers || {}),
     },
   });
+  // An expired or revoked token must return the user to the door rather than leaving them in
+  // a shell whose every request 401s. Only bounce when a token was actually presented --
+  // otherwise a demo session would be ejected by any unrelated 401.
+  if (res.status === 401 && getToken() && !path.startsWith('/auth/')) {
+    signOut();
+    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+      window.location.href = '/app/login';
+    }
+  }
   const body = await res.json().catch(() => ({ ok: false, error: { code: 'bad_json', message: 'Invalid response' } }));
   if (!body.ok) throw new ApiError(body.error?.code || 'error', body.error?.message || 'Request failed');
   return body.data as T;

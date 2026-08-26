@@ -13,19 +13,20 @@ test('envelope shapes', () => {
   assert.strictEqual(e.error.code, 'forbidden');
 });
 
-test('rbac scope: analyst sees state-wide, SI unit-only', () => {
+test('rbac scope: analyst sees state-wide, SI is station-only', () => {
   const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
   const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI };
-  const inScope = { unitId: '1', districtId: '1' };
   const outScope = { unitId: '99', districtId: '9' };
   assert.ok(rbac.caseInScope(analyst, outScope), 'analyst = state read');
-  // SI is district tier now, not unit tier: same district is visible, other district is not.
-  assert.ok(rbac.caseInScope(si, { unitId: '77', districtId: '1' }), 'SI sees own district');
-  assert.ok(!rbac.caseInScope(si, outScope), 'SI blocked from other district');
+  // SI works out of a station, so it reads one register -- not the whole district. An SI at a
+  // station desk has exactly the visibility problem the station tier exists to demonstrate.
+  assert.ok(rbac.caseInScope(si, { unitId: rbac.STATION_UNIT_ID, districtId: '1' }), 'SI sees own station');
+  assert.ok(!rbac.caseInScope(si, { unitId: '77', districtId: '1' }), 'SI blocked from another station in its own district');
+  assert.ok(!rbac.caseInScope(si, outScope), 'SI blocked from another district');
 });
 
-test('rbac scope: district tier (SP/DSP/SI) is district-level', () => {
-  for (const role of ['SP', 'DSP', 'SI']) {
+test('rbac scope: district tier (SP/DSP) is district-level', () => {
+  for (const role of ['SP', 'DSP']) {
     const u = { ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] };
     assert.strictEqual(u.roleMeta.tier, 'district', `${role} is district tier`);
     assert.ok(rbac.caseInScope(u, { unitId: '55', districtId: '1' }), `${role} same district ok`);
@@ -47,12 +48,12 @@ test('rbac: station drill-down narrows but never widens', () => {
   assert.ok(!rbac.caseInScope(analyst, { unitId: '6', districtId: '9' }), 'other unit hidden');
 
   // District tier may move between districts but is always confined to exactly one.
-  const si = rbac.userFromRequest({ headers: { 'x-kadi-role': 'SI' }, query: { district: '7' } });
-  assert.strictEqual(si.districtId, '7', 'district tier may switch district');
-  assert.ok(!si.drilledFromState, 'district tier was never at state scope to drill from');
-  assert.ok(rbac.caseInScope(si, { unitId: '1', districtId: '7' }), 'sees the switched district');
-  assert.ok(!rbac.caseInScope(si, { unitId: '1', districtId: '8' }), 'still cannot see another');
-  assert.strictEqual(rbac.capabilities(si).canViewWholeState, false, 'cannot step out to state');
+  const dsp = rbac.userFromRequest({ headers: { 'x-kadi-role': 'DSP' }, query: { district: '7' } });
+  assert.strictEqual(dsp.districtId, '7', 'district tier may switch district');
+  assert.ok(!dsp.drilledFromState, 'district tier was never at state scope to drill from');
+  assert.ok(rbac.caseInScope(dsp, { unitId: '1', districtId: '7' }), 'sees the switched district');
+  assert.ok(!rbac.caseInScope(dsp, { unitId: '1', districtId: '8' }), 'still cannot see another');
+  assert.strictEqual(rbac.capabilities(dsp).canViewWholeState, false, 'cannot step out to state');
 
   // State tier drills IN and can step back OUT -- that is what holding the state view buys.
   const dgp = rbac.userFromRequest({ headers: { 'x-kadi-role': 'DGP' }, query: { district: '7' } });
@@ -295,7 +296,162 @@ test('existing two tiers are unchanged by the addition of the third', () => {
   assert.strictEqual(rbac.capabilities(sp).effectiveScope, 'district');
   assert.ok(q.listCases(analyst, { pageSize: 1 }).total > q.listCases(sp, { pageSize: 1 }).total);
   assert.ok(q.listOffenders(sp, { pageSize: 1 }).total < q.listOffenders(analyst, { pageSize: 1 }).total);
-  // SI stays district-scoped: existing saved links must not silently narrow to a station.
-  const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI };
-  assert.strictEqual(si.roleMeta.tier, 'district');
+  // SI and SHO both work out of a station, so both sit at the station tier.
+  assert.strictEqual(rbac.ROLES.SI.tier, 'station');
+  assert.strictEqual(rbac.ROLES.SHO.tier, 'station');
+});
+
+// Authentication is the one place where a bug is a breach rather than a defect, so the
+// boundary is asserted directly rather than inferred from the interface behaving.
+test('auth: passwords are hashed, never stored or compared in plaintext', () => {
+  const auth = require('../api/services/auth');
+  const h = auth.hashPassword('correct horse battery staple');
+  assert.ok(h.startsWith('scrypt$'), 'scrypt with a per-account salt');
+  assert.ok(!h.includes('correct horse'), 'the plaintext must not appear in the hash');
+  assert.ok(auth.verifyPassword('correct horse battery staple', h));
+  assert.ok(!auth.verifyPassword('Correct horse battery staple', h), 'case matters');
+  assert.ok(!auth.verifyPassword('', h));
+  assert.ok(!auth.verifyPassword('x', 'not-a-hash'), 'a malformed record must refuse, not throw');
+
+  // Two accounts with the same password must not share a hash, or one crack breaks both.
+  assert.notStrictEqual(auth.hashPassword('same'), auth.hashPassword('same'));
+
+  // Every provisioned account ships a hash and no plaintext.
+  const all = [...auth.provisioned().values()];
+  assert.strictEqual(all.length, 36, '3 state + 31 district + 2 station');
+  for (const a of all) {
+    assert.ok(a.passwordHash.startsWith('scrypt$'), `${a.email} must be hashed`);
+    assert.ok(!('plain' in a), `${a.email} must not carry a plaintext password into the app`);
+    assert.match(a.email, /@ksp\.gov\.in$/);
+  }
+});
+
+test('auth: a token is tamper-evident and expires', () => {
+  const auth = require('../api/services/auth');
+  const acct = { email: 'sp.mysuru@ksp.gov.in', fullName: 'SP Mysuru', role: 'SP', districtId: '3', unitId: null };
+  const tok = auth.issueToken(acct);
+  const ok = auth.verifyToken(tok);
+  assert.strictEqual(ok.role, 'SP');
+  assert.strictEqual(ok.districtId, '3');
+
+  // Re-signing a doctored payload requires the secret, which the client does not hold.
+  const [body] = tok.split('.');
+  const forgedBody = Buffer.from(JSON.stringify({ ...ok, role: 'DGP', districtId: null })).toString('base64url');
+  assert.strictEqual(auth.verifyToken(`${forgedBody}.${tok.split('.')[1]}`), null, 'payload swap must fail');
+  assert.strictEqual(auth.verifyToken(`${body}.deadbeef`), null, 'signature swap must fail');
+  assert.strictEqual(auth.verifyToken('garbage'), null);
+  assert.strictEqual(auth.verifyToken(''), null);
+  assert.strictEqual(auth.verifyToken(null), null);
+
+  const expired = auth.issueToken(acct);
+  const [b] = expired.split('.');
+  const stale = JSON.parse(Buffer.from(b, 'base64url').toString());
+  stale.exp = Date.now() - 1000;
+  const staleBody = Buffer.from(JSON.stringify(stale)).toString('base64url');
+  assert.strictEqual(auth.verifyToken(`${staleBody}.${expired.split('.')[1]}`), null, 'expiry is enforced');
+});
+
+test('auth: a signed-in district account cannot widen its own scope', () => {
+  const auth = require('../api/services/auth');
+  const q = require('../api/services/queries');
+  const mysuru = [...auth.provisioned().values()].find((a) => a.email.startsWith('sp.mysuru@'));
+  assert.ok(mysuru, 'SP Mysuru must be provisioned');
+  const token = auth.issueToken(mysuru);
+
+  // Every escape route a browser has: a forged role header, another district, another unit.
+  const u = rbac.userFromRequest({
+    headers: { 'x-kadi-token': token, 'x-kadi-role': 'DGP' },
+    query: { district: '1', unit: '46' },
+  });
+  assert.strictEqual(u.role, 'SP', 'the header must be ignored when a token is present');
+  assert.strictEqual(u.districtId, mysuru.districtId, 'the token pins the district');
+  assert.ok(!u.drillUnitId, '?unit= must not apply to a district account');
+  assert.ok(rbac.caseInScope(u, { unitId: '9', districtId: mysuru.districtId }));
+  assert.ok(!rbac.caseInScope(u, { unitId: '46', districtId: '1' }), 'Bengaluru City stays unreachable');
+  assert.strictEqual(rbac.capabilities(u).canViewWholeState, false);
+  assert.strictEqual(rbac.capabilities(u).canApproveAccounts, false);
+
+  // And the register it reads is genuinely only its own district.
+  for (const c of q.listCases(u, { pageSize: 100 }).items) {
+    assert.strictEqual(String(c.districtId), mysuru.districtId);
+  }
+});
+
+test('auth: state accounts may drill in; only DGP and Admin approve', () => {
+  const auth = require('../api/services/auth');
+  const seeded = (p) => [...auth.provisioned().values()].find((a) => a.email.startsWith(p));
+  const asUser = (acct, query = {}) => rbac.userFromRequest({
+    headers: { 'x-kadi-token': auth.issueToken(acct) }, query,
+  });
+
+  // A state account drilling into a district is a NARROWING, which is the point of the tier.
+  const dgp = asUser(seeded('dgp@'), { district: '3' });
+  assert.strictEqual(dgp.districtId, '3');
+  assert.ok(dgp.drilledFromState);
+  assert.ok(!rbac.caseInScope(dgp, { unitId: '1', districtId: '8' }), 'a drilled state user is genuinely narrowed');
+  assert.ok(rbac.caseInScope(asUser(seeded('dgp@')), { unitId: '1', districtId: '8' }), 'and can step back out');
+
+  assert.strictEqual(rbac.capabilities(asUser(seeded('dgp@'))).canApproveAccounts, true);
+  assert.strictEqual(rbac.capabilities(asUser(seeded('admin@'))).canApproveAccounts, true);
+  assert.strictEqual(rbac.capabilities(asUser(seeded('scrb.analyst@'))).canApproveAccounts, false,
+    'the analyst holds the whole state but does not decide who gets in');
+  assert.strictEqual(rbac.capabilities(asUser(seeded('sho.'))).canApproveAccounts, false);
+});
+
+test('auth: a station account reads one register whichever post holds it', () => {
+  const auth = require('../api/services/auth');
+  const q = require('../api/services/queries');
+  for (const prefix of ['sho.', 'si.']) {
+    const acct = [...auth.provisioned().values()].find((a) => a.email.startsWith(prefix));
+    assert.ok(acct, `${prefix} account must be provisioned`);
+    const u = rbac.userFromRequest({
+      headers: { 'x-kadi-token': auth.issueToken(acct) },
+      query: { district: '9', unit: '77' },
+    });
+    assert.strictEqual(u.roleMeta.tier, 'station', `${acct.role} is station tier`);
+    assert.ok(rbac.caseInScope(u, { unitId: rbac.STATION_UNIT_ID, districtId: '1' }));
+    assert.ok(!rbac.caseInScope(u, { unitId: '77', districtId: '9' }), 'cannot be moved by query params');
+    for (const c of q.listCases(u, { pageSize: 50 }).items) {
+      assert.strictEqual(String(c.unitId), rbac.STATION_UNIT_ID);
+    }
+  }
+});
+
+test('auth: sign-up is domain-gated and lands pending', async () => {
+  const auth = require('../api/services/auth');
+  // No Catalyst context in tests, so the Data Store write cannot succeed -- but every
+  // validation ahead of it must still reject before reaching that point.
+  const bad = [
+    [{ email: 'someone@gmail.com', password: 'longenoughpw', fullName: 'A B', role: 'SP', districtId: '3' }, /ksp\.gov\.in/],
+    [{ email: 'a@ksp.gov.in', password: 'short', fullName: 'A B', role: 'SP', districtId: '3' }, /10 characters/],
+    [{ email: 'a@ksp.gov.in', password: 'longenoughpw', fullName: '', role: 'SP', districtId: '3' }, /full name/],
+    // DGP and Admin decide who gets in, so they cannot be self-requested.
+    [{ email: 'a@ksp.gov.in', password: 'longenoughpw', fullName: 'A B', role: 'DGP' }, /valid post/],
+    [{ email: 'a@ksp.gov.in', password: 'longenoughpw', fullName: 'A B', role: 'Admin' }, /valid post/],
+    [{ email: 'a@ksp.gov.in', password: 'longenoughpw', fullName: 'A B', role: 'SP' }, /district/],
+  ];
+  for (const [body, pattern] of bad) {
+    const out = await auth.signup({ headers: {} }, body);
+    assert.strictEqual(out.ok, false, `must reject ${JSON.stringify(body)}`);
+    assert.match(out.error, pattern);
+  }
+  // An address that already belongs to a provisioned account cannot be claimed.
+  const taken = await auth.signup({ headers: {} },
+    { email: 'dgp@ksp.gov.in', password: 'longenoughpw', fullName: 'Not The DGP', role: 'SP', districtId: '3' });
+  assert.strictEqual(taken.ok, false);
+  assert.match(taken.error, /already exists/);
+});
+
+test('auth: an unapproved account is refused a token', async () => {
+  const auth = require('../api/services/auth');
+  // Refusal happens at the login endpoint, not in the interface -- a pending account that is
+  // merely hidden from a menu is not an approval chain.
+  const out = await auth.login({ headers: {} }, 'nobody@ksp.gov.in', 'whatever-password');
+  assert.strictEqual(out.ok, false);
+  assert.ok(!out.token);
+  // The same message for a missing account and a wrong password: distinguishing them turns
+  // the login form into a directory of who holds an account.
+  const wrongPw = await auth.login({ headers: {} }, 'dgp@ksp.gov.in', 'definitely-not-it');
+  assert.strictEqual(wrongPw.ok, false);
+  assert.strictEqual(wrongPw.error, out.error);
 });

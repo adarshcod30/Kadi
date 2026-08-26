@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useMe, useAlerts, useLookups } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
-import { setRole, getRole, Role } from '../lib/api';
+import { setRole, getRole, signOut as clearSession, Role } from '../lib/api';
 import { SeverityDot } from './ui';
 import { useDismiss } from '../lib/useDismiss';
 
@@ -23,7 +23,7 @@ const NAV = [
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
-  { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin'] },
+  { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
   { to: '/about', icon: Info, key: 'about' },
 ];
 
@@ -120,8 +120,9 @@ export function Shell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <SidebarFooter
-            role={role} label={me?.capabilities.label} scopeLabel={me?.capabilities.scope}
+            role={role} label={me?.capabilities.label} scopeLabel={me?.capabilities.effectiveScope}
             unitName={me?.capabilities.unitName} districtName={me?.capabilities.districtName}
+            authenticated={me?.capabilities.authenticated} email={me?.capabilities.email}
             collapsed={collapsed}
             onChangeRole={(r) => { setRole(r); window.location.reload(); }}
           />
@@ -174,6 +175,17 @@ function ScopeBadge({ me }: { me: any }) {
   // A station officer holds exactly one register. Offering a district picker would imply a
   // choice they do not have, and the server would refuse it anyway -- so show the scope as a
   // fixed badge instead of a control.
+  // A signed-in district officer is pinned to their own district: show what they hold, not a
+  // picker that cannot go anywhere.
+  if (cap.effectiveScope === 'district' && !cap.canSwitchDistrict) {
+    return (
+      <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-gold/20 border-kadi-gold/40"
+        title={`${cap.districtName || 'Your district'} — this is the whole of your read scope`}>
+        <MapPin size={13} />
+        <span className="truncate max-w-[150px]">{cap.districtName || current?.name || 'Your district'}</span>
+      </div>
+    );
+  }
   if (cap.effectiveScope === 'unit') {
     return (
       <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-teal/20 border-kadi-teal/40"
@@ -258,15 +270,18 @@ const TIER_META: Record<string, { icon: any; tint: string; ring: string }> = {
   unit: { icon: Building2, tint: 'text-kadi-teal', ring: 'ring-kadi-teal/30' },
 };
 
-function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collapsed, onChangeRole }: {
+function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collapsed, onChangeRole, authenticated, email }: {
   role: Role; label?: string; scopeLabel?: string; unitName?: string | null;
   districtName?: string | null; collapsed: boolean; onChangeRole: (r: Role) => void;
+  authenticated?: boolean; email?: string | null;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const { ref, hoverProps } = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
   const roles: Role[] = ['DGP', 'Analyst', 'Admin', 'SP', 'DSP', 'SI', 'SHO'];
-  const signOut = () => { localStorage.removeItem('kadi.role'); window.location.href = '/app/login'; };
+  // Clears the session token as well as the demo role. Dropping only the role left a
+  // valid token in storage, so 'sign out' returned you to the door already signed in.
+  const signOut = () => { clearSession(); window.location.href = '/app/login'; };
 
   const tier = scopeLabel === 'unit' ? 'unit' : scopeLabel === 'district' ? 'district' : 'state';
   const meta = TIER_META[tier];
@@ -281,18 +296,27 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
       {open && (
         <div className="absolute left-2 right-2 bottom-full mb-2 w-[15.5rem] card p-0 z-40 text-ink shadow-xl overflow-hidden">
           <div className="px-3 py-2.5 bg-kadi-navy text-white">
-            <div className="text-[10.5px] uppercase tracking-[0.14em] text-white/55">Signed in as</div>
+            <div className="text-[10.5px] uppercase tracking-[0.14em] text-white/55">
+              {authenticated ? 'Signed in as' : 'Demo access'}
+            </div>
             <div className="text-[14px] font-semibold leading-tight mt-0.5">{label || role}</div>
+            {authenticated && email && (
+              <div className="text-[11px] text-white/60 truncate mt-0.5">{email}</div>
+            )}
             <div className="flex items-center gap-1.5 mt-1.5 text-[11.5px] text-white/75">
               <TierIcon size={12} className="shrink-0" />
               <span className="truncate">{scopeText}</span>
             </div>
           </div>
 
-          <div className="px-3 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.14em] text-ink-muted">
-            {t('switchRole')}
-          </div>
-          <div className="pb-1 max-h-[13rem] overflow-auto">
+          {/* Role switching belongs to the demo path only. A signed-in officer's scope comes
+              from their account -- offering a switcher would imply it is theirs to change. */}
+          {!authenticated && (
+            <div className="px-3 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.14em] text-ink-muted">
+              {t('switchRole')}
+            </div>
+          )}
+          <div className={`pb-1 max-h-[13rem] overflow-auto ${authenticated ? 'hidden' : ''}`}>
             {roles.map((r) => (
               <button key={r} onClick={() => { setOpen(false); onChangeRole(r); }}
                 className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-kadi-blue50 ${
