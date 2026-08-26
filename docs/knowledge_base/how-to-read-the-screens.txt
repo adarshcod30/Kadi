@@ -24,6 +24,18 @@ baseline.
 Intelligence — the analytical layer: per-capita rates, socio-economic correlation,
 forecasting, station roster.
 
+React — one ranked queue of what needs a response today, merged from four signal sources.
+Severity first, then how far past the peer median for its own crime type a case has run.
+Every item names the action, not only the finding. Nothing here is predicted.
+
+Forecast — what is coming and what changed: emerging risk ranked against each area's own
+history, co-occurring crime types, momentum, the busiest hours, and three-month projections
+shown alongside their measured backtest error.
+
+Register — file an FIR from a station, or decide the ones your stations have filed. A case
+approved here appears in the register at once, marked as awaiting overnight analysis until
+the pipeline has looked at it.
+
 Audit — who read what, and when.
 
 Assistant — ask in English or Kannada. Answers cite the FIR numbers they drew from.

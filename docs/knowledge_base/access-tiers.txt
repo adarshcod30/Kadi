@@ -25,3 +25,22 @@ Audit
 
 Every sensitive read — case detail, offender detail, linkage graph, assistant query — is
 written to an audit trail recording who, what and when.
+
+Who may register a case, and who may approve one
+
+Registering a case is a station action: an SI or SHO files it from the station they serve.
+No district or state officer files an FIR, because in the force no district or state officer
+files an FIR.
+
+Approving one is a supervisory action. An SP approves cases filed by stations in their own
+district and nothing beyond it. The DGP and the Administrator approve anywhere. An SP shown
+a submission from another district is refused, not merely prevented from seeing the button.
+
+The same split applies to lifecycle changes on a case that already exists — an arrest, a
+chargesheet, a closure. The station or the supervising DySP requests it; an SP, the DGP or
+the Administrator decides it.
+
+Account requests are separate again: someone signing up with an @ksp.gov.in address creates
+a PENDING account, and only the DGP or the Administrator can approve it. A pending account
+is refused a session at sign-in, not merely hidden from a menu.
+

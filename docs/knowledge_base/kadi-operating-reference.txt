@@ -126,6 +126,17 @@ Three-month projections use a linear trend plus month-of-year seasonality.
 Accuracy is a hold-out backtest: the last three months are hidden from the model,
 predicted, and scored against what actually happened. Current error is 7.8% MAPE.
 
+The forecaster detects level shifts and refits from after them. If registrations step to a
+new level and stay there, that is a change of level, not a steep trend, and extrapolating a
+line drawn across it under-forecasts from then on. Fitting across the break in the present
+corpus scored 24.4% MAPE and predicted low every single month; refitting from after it
+scored 7.8%. Where a forecast was fitted from after a break it is fitted on fewer months, so
+it is a weaker statement than one fitted on the full window.
+
+Whether a projection comes from the statistical forecaster or from a trained model, the
+served answer is whichever of the two backtests better, and the platform states which one
+answered and what both scored. A model is not preferred for being a model.
+
 A projected move smaller than the model's own error is inside the noise and should not be
 acted on as if it were a finding.
 
@@ -177,3 +188,74 @@ which is why the assistant cannot invent an FIR number.
 
 Zia text analytics reads the free-text account of an offence to extract people, places,
 vehicles and property. It reads the narrative only.
+
+---
+
+12. Registering a case, and what "awaiting overnight analysis" means
+
+A station officer registers an FIR in KADI; it does not enter the register until a
+supervisor approves it. An SP approves cases from their own district. The DGP and the
+Administrator approve anywhere. A submission can be approved, rejected, or returned for
+correction, and a rejection or a return requires a reason so the station can act on it.
+
+The district and station on a submission are taken from the signed-in officer's account,
+never from the form. An officer cannot file a case into a district they do not serve.
+
+Changes to a case that already exists — an arrest, a chargesheet, a closure, a status
+change, a party added later — go through the same approval gate. Each request records the
+state BEFORE the change alongside the state after it, so the trail says what changed rather
+than only that something changed. Only one request of a given kind can be pending on a case
+at a time.
+
+What "registered, awaiting overnight analysis" means
+
+An approved case appears in the register immediately, and is marked as awaiting overnight
+analysis until the pipeline next runs.
+
+Nothing has looked at it yet. Case linkage, entity resolution, offender risk scoring and
+investigation health are all computed by the offline pipeline across the whole corpus; none
+of them can run for a single new case inside a web request. So on a case carrying this
+label, an empty link list means "not yet analysed" and NOT "unconnected", a blank risk score
+means "not yet scored" and NOT "low risk", and the absence of a health flag means "not yet
+checked" and NOT "healthy".
+
+This is why the label exists. Reading an un-analysed case as an analysed one with no
+findings would invert the answer.
+
+---
+
+13. The React and Forecast screens
+
+React answers "what do I do today". It merges four kinds of signal that each already exist
+on their own screen into a single ranked queue: cases failing their investigation-health
+rules, high-risk offenders who are still active, stations sharply above their own baseline,
+and cases registered outside your scope that link into one of yours.
+
+The ranking is severity first, then urgency within severity. A case's urgency is how far
+past the peer median FOR ITS OWN CRIME TYPE it has run, not its raw age — an old case of a
+slow type is not in trouble, and a young case of a fast type may be. Every item names the
+action to take, not only the finding.
+
+Nothing on React is predicted. It is all recorded fact, in the present tense.
+
+Forecast is the forward-looking counterpart. It carries four readings:
+
+Emerging risk — district and crime-type combinations rising against their OWN history,
+ranked in standard deviations rather than by absolute rise. A district that always runs 400
+cases a month going to 430 is noise; one that runs 12 going to 40 is a signal. Ranking by
+size would surface the first and bury the second. A combination needs at least six months of
+history and a baseline of three or more before a rise can mean anything.
+
+Co-occurring crime types — how much more often two crime types appear in the same
+district-month than they would if they were unrelated, scored by lift. This is a
+relationship between crime TYPES, not a link between specific cases; case-to-case links are
+on the graph and carry evidence. Within a single district there are too few buckets and the
+common types appear in nearly every month, so this reads at state scope.
+
+Momentum — the scope's own monthly trajectory. Trailing partial months are excluded, because
+a month holding only a fortnight of data always reads as a collapse.
+
+When to be there — the share of incidents falling in each three-hour block, read against the
+12.5% each would hold if the day were flat. Location says where; this says when; together
+they make a patrol window, which is the deployable output.
+
