@@ -637,6 +637,15 @@ module.exports = {
   // a few hundred rows that never change between pipeline runs.
   db: () => load(),
   dataDir: () => load().dataDir,
+  // Area-level indicators keyed by district, for the model's feature set. Population, literacy,
+  // urbanisation and density describe a PLACE and are never joined to a person -- the same rule
+  // the socio-economic screen works under.
+  socioByDistrict: () => {
+    const db = load();
+    const out = {};
+    for (const d of ((db.socio && db.socio.districts) || [])) out[String(d.districtId)] = d;
+    return out;
+  },
   // What the current training set holds, for the console upload step. Written by the pipeline
   // alongside the CSV so the two can never disagree about row count or date range.
   trainingSetMeta: () => {

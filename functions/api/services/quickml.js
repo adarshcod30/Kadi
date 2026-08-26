@@ -498,4 +498,8 @@ async function complete(req, { system, user, maxTokens = 220, temperature = 0.35
 }
 
 module.exports = {
-  listDocuments, syncKnowledgeBase, ragProbe, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };
+  listDocuments, syncKnowledgeBase, ragProbe, configured, status, phrase, ragAnswer, selfTest, complete,
+  // Shared with mlforecast.js, which needs the same credential to reach a prediction
+  // endpoint. Exported rather than duplicated so the token cache stays in one place.
+  accessToken,
+  SYSTEM_PROMPT };

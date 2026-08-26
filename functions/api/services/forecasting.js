@@ -14,6 +14,8 @@
 // See docs/10_REACT_FORECAST_PLAN.md §0.2 for the measurement.
 
 const RECENT_DAYS = 90;
+const MIN_SERIES_MONTHS = 13;   // twelve months of lag plus one, so lag_12 is real
+const SPIKE_MIN_BASE = 5;       // matches the training label's eligibility gate
 
 const iso = (d) => d.toISOString().slice(0, 10);
 function shiftDays(isoDate, n) {
@@ -256,4 +258,113 @@ function shiftProfile(rows) {
   return { timed, evenShare: Math.round((100 / 8) * 10) / 10, blocks: ranked };
 }
 
-module.exports = { emergingRisk, patterns, momentum, shiftProfile, RECENT_DAYS, shiftDays };
+
+/**
+ * Feature rows for the trained spike classifier, at the grain it was trained on.
+ *
+ * Emerging risk above works at district x SUB-head and ranks by z-score. The model works at
+ * district x crime HEAD -- coarser, because that is where the cells were dense enough for a
+ * classifier to learn anything (see appsail/pipeline/training_set.py). So this is a separate,
+ * coarser read of the same question, and the two are shown as what they are rather than
+ * pretended to be one thing.
+ *
+ * The column names and order are the contract with mlforecast.js FEATURES and with the CSV the
+ * model trained on. A mismatch here would score nonsense silently, so the caller asserts the
+ * set before sending.
+ */
+function spikeCandidates(rows, { socio = {}, limit = 40 } = {}) {
+  const series = new Map();
+  const distTot = new Map();
+  const headTot = new Map();
+  const detected = new Map();
+  const stateTot = new Map();
+  const names = new Map();
+  const bump = (m, k, v = 1) => m.set(k, (m.get(k) || 0) + v);
+
+  for (const c of rows) {
+    const m = monthOf(c.crimeRegisteredDate);
+    if (!m) continue;
+    const did = String(c.districtId);
+    const hid = String(c.crimeHeadId);
+    if (!did || !hid) continue;
+    const key = `${did}|${hid}`;
+    names.set(key, { districtName: c.districtName, crimeHead: c.crimeHead });
+    let e = series.get(key);
+    if (!e) { e = new Map(); series.set(key, e); }
+    bump(e, m);
+    bump(distTot, `${did}|${m}`);
+    bump(headTot, `${hid}|${m}`);
+    bump(stateTot, m);
+    // "Detected" is chargesheeted or closed. Whether a series is being cleared or accumulating
+    // is context the model uses and the z-score rule cannot see.
+    if (c.statusId === '2' || c.statusId === '3') bump(detected, `${key}|${m}`);
+  }
+  if (!stateTot.size) return { asOfMonth: null, items: [] };
+
+  const months = completeMonths(stateTot);
+  if (months.length < MIN_SERIES_MONTHS) return { asOfMonth: null, items: [] };
+  const origin = months[months.length - 1];      // last complete month = what we predict FROM
+  const at = (i) => months[months.length - 1 - i];
+  const prev = (map, key, back = 1) => map.get(`${key}|${at(back - 1)}`) || 0;
+
+  const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const nextMonth = (() => {
+    const y = Number(origin.slice(0, 4));
+    const mo = Number(origin.slice(5, 7));
+    const t = y * 12 + mo;      // one past origin
+    return `${String(Math.floor(t / 12)).padStart(4, '0')}-${String((t % 12) + 1).padStart(2, '0')}`;
+  })();
+
+  const out = [];
+  for (const [key, byMonth] of series.entries()) {
+    const [did, hid] = key.split('|');
+    const hist = months.map((m) => byMonth.get(m) || 0);
+    if (hist.length < MIN_SERIES_MONTHS) continue;
+    const lag1 = hist[hist.length - 1];
+    const r3 = mean(hist.slice(-3));
+    const r6 = mean(hist.slice(-6));
+    const r12 = mean(hist.slice(-12));
+    // Same eligibility gate the training labels used. Below it a 40% rise is one extra case.
+    if (r3 < SPIKE_MIN_BASE) continue;
+    const dl1 = distTot.get(`${did}|${origin}`) || 0;
+    const dHist = months.map((m) => distTot.get(`${did}|${m}`) || 0);
+    const hHist = months.map((m) => headTot.get(`${hid}|${m}`) || 0);
+    const sHist = months.map((m) => stateTot.get(m) || 0);
+    const deHist = months.map((m) => detected.get(`${key}|${m}`) || 0);
+    const s = socio[did] || {};
+    const sd12 = stdev(hist.slice(-12));
+    const nm = names.get(key) || {};
+    out.push({
+      row_key: `${did}-${hid}-${nextMonth}`,
+      districtId: did, districtName: nm.districtName || '',
+      crimeHeadId: hid, crimeHead: nm.crimeHead || '',
+      forMonth: nextMonth, fromMonth: origin,
+      district_id: Number(did), crime_head_id: Number(hid),
+      month_index: Number(nextMonth.slice(0, 4)) * 12 + Number(nextMonth.slice(5, 7)) - 1,
+      month_of_year: Number(nextMonth.slice(5, 7)),
+      lag_1: lag1, lag_2: hist[hist.length - 2], lag_3: hist[hist.length - 3],
+      lag_12: hist[hist.length - 12] || 0,
+      roll_3: r3, roll_6: r6, roll_12: r12,
+      district_lag_1: dl1, head_share: dl1 ? lag1 / dl1 : 0,
+      std_6: stdev(hist.slice(-6)), std_12: sd12,
+      accel_3_12: r12 ? r3 / r12 : 0, accel_1_12: r12 ? lag1 / r12 : 0,
+      head_state_lag_1: hHist[hHist.length - 1], head_state_roll_3: mean(hHist.slice(-3)),
+      state_lag_1: sHist[sHist.length - 1], state_roll_3: mean(sHist.slice(-3)),
+      head_state_share: sHist[sHist.length - 1] ? hHist[hHist.length - 1] / sHist[sHist.length - 1] : 0,
+      district_roll_3: mean(dHist.slice(-3)),
+      district_accel: mean(dHist.slice(-12)) ? dl1 / mean(dHist.slice(-12)) : 0,
+      detected_share_lag_1: lag1 ? deHist[deHist.length - 1] / lag1 : 0,
+      detected_roll_6: mean(deHist.slice(-6)),
+      population_m: (s.population || 0) / 1e6, literacy_pct: s.literacyPct || 0,
+      urban_pct: s.urbanPct || 0, pop_density_k: (s.popDensity || 0) / 1000,
+      days_in_month: DAYS[Number(nextMonth.slice(5, 7)) - 1],
+      // The rule's own score, kept so the shortlist can be ordered before the model sees it and
+      // so the ranking can fall back to it if the endpoint is unreachable.
+      ruleScore: sd12 ? (lag1 - r12) / sd12 : 0,
+    });
+  }
+  out.sort((a, b) => b.ruleScore - a.ruleScore);
+  return { asOfMonth: origin, forMonth: nextMonth, total: out.length, items: out.slice(0, limit) };
+}
+
+module.exports = { emergingRisk, patterns, momentum, shiftProfile, spikeCandidates, RECENT_DAYS, shiftDays };

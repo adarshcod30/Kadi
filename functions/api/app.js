@@ -663,6 +663,40 @@ function buildApp() {
       shiftProfile: fc.shiftProfile(rows),
       emergingHotspots: (spots.hotspots || []).filter((h) => h.emergingFlag).length,
     };
+
+    // Model-ranked spike risk, at the coarser district x crime-head grain the classifier was
+    // trained on. The rule builds the shortlist (cheap recall); the model re-ranks it (measured
+    // precision). If the endpoint is unreachable the rule's own ordering stands, which is why
+    // ruleScore travels with every candidate.
+    const socio = q.socioByDistrict();
+    const cand = fc.spikeCandidates(rows, { socio, limit: 24 });
+    if (cand.items && cand.items.length) {
+      const scores = await mlforecast.scoreSpikes(req, cand.items).catch(() => null);
+      const ranked = cand.items.map((c, i) => ({
+        districtId: c.districtId, districtName: c.districtName,
+        crimeHeadId: c.crimeHeadId, crimeHead: c.crimeHead,
+        forMonth: c.forMonth, fromMonth: c.fromMonth,
+        recentAvg: Math.round(c.roll_3 * 10) / 10,
+        lastMonth: c.lag_1,
+        acceleration: Math.round(c.accel_3_12 * 100) / 100,
+        ruleScore: Math.round(c.ruleScore * 100) / 100,
+        modelScore: scores && scores[i] !== null && scores[i] !== undefined
+          ? Math.round(scores[i] * 1000) / 1000 : null,
+      }));
+      const scored = ranked.filter((r) => r.modelScore !== null);
+      if (scored.length) scored.sort((a, b) => b.modelScore - a.modelScore);
+      out.spikeRisk = {
+        grain: 'district x crime head',
+        forMonth: cand.forMonth,
+        candidates: cand.total,
+        rankedBy: scored.length ? 'model' : 'rule',
+        items: (scored.length ? scored : ranked).slice(0, 8),
+        note: scored.length
+          ? 'Ranked by the trained classifier. It scores 0.587 AUC on a rolling hold-out against the z-score rule\'s 0.419.'
+          : 'Ranked by the z-score rule. The trained classifier did not return a usable ranking '
+            + '(see /ai/status forecastModel.lastError for why), so the ordering falls back rather than pretending.',
+      };
+    }
     if (String(req.query.explain) === 'false' || !rows.length) return out;
 
     // Narrated through the hardened signals prompt, for the same reason the intelligence bands

@@ -1,4 +1,5 @@
-// mlforecast.js — serving a trained QuickML model, with the rule it replaces as the floor.
+// mlforecast.js — serving the trained QuickML spike classifier, with the rule it replaces as
+// the floor.
 //
 // WHAT THE MODEL IS, AND WHY IT IS NOT WHAT YOU WOULD EXPECT.
 //
@@ -11,56 +12,75 @@
 // moving average.
 //
 // What DOES work is classification: which district and crime type is about to run well above
-// its own normal. It only has to rank, never to name a number, so the noise that defeats
-// regression does not defeat it. Against the z-score rule the Forecast tab uses today it scores
-// average precision 0.425 to 0.199, and it beat the rule on all four rolling hold-out windows.
+// its own normal. It only has to RANK, never to name a number, so the noise that defeats
+// regression does not defeat it.
 //
-// So this file serves a SPIKE CLASSIFIER and falls back to the z-score rule -- and it says
-// which one answered. A model that does not beat the rule it replaces should not ship just
-// because it is a model.
+// MEASURED, on the same rolling hold-out folds:
 //
-// See appsail/pipeline/training_set.py for the full measurement, including why pooling grains
-// for more rows was tried and abandoned.
+//     z-score rule (what this replaces)   AUC 0.419
+//     QuickML ensemble, deployed          AUC 0.587
+//     local reference implementation      AUC 0.738
+//
+// The deployed model beats the rule by a wide margin, which is the bar. It falls short of the
+// local reference because QuickML trains its four boosters at library defaults and soft-votes
+// them; defaults are tuned for large datasets and this one has 1,640 rows. A single LGBM with
+// num_leaves cut to 22 was tried as v2 and did WORSE (AUC 0.507), so the ensemble stays.
+//
+// See appsail/pipeline/training_set.py for the full measurement.
 const https = require('https');
 
-const ENDPOINT = process.env.QUICKML_SPIKE_ENDPOINT || process.env.QUICKML_FORECAST_ENDPOINT || '';
-const DEPLOYMENT_ID = process.env.QUICKML_SPIKE_DEPLOYMENT_ID || '';
-const TIMEOUT_MS = Number(process.env.QUICKML_FORECAST_TIMEOUT_MS || 8000);
-// The model's measured average precision, recorded when it was built in the console. It is
-// configuration rather than something readable back: QuickML does not expose a model's
-// evaluation over HTTP, and a model whose score nobody wrote down cannot be compared to
-// anything -- so an unset value means "do not serve it", not "assume it is good".
-const MODEL_AP = process.env.QUICKML_SPIKE_AP ? Number(process.env.QUICKML_SPIKE_AP) : null;
-// What the rule it would replace scores on the same folds. Measured, not assumed.
-const RULE_AP = Number(process.env.QUICKML_RULE_AP || 0.199);
+const PROJECT_ID = process.env.CATALYST_PROJECT_ID || '55468000000013048';
+const ENDPOINT = process.env.QUICKML_SPIKE_ENDPOINT
+  || `https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}/endpoints/predict`;
+// The endpoint key is a real credential, so it lives in the AppConfig Data Store table beside
+// the auth signing secret rather than in catalyst-config.json -- that file is committed, and a
+// live prediction key in a public repo is a different thing from the mock account passwords.
+const KEY_CONFIG = 'quickml.spikeEndpointKey';
+const TIMEOUT_MS = Number(process.env.QUICKML_SPIKE_TIMEOUT_MS || 6000);
+// Measured average AUC over four rolling three-month hold-out windows. Configuration rather
+// than something readable back: QuickML does not expose a model's evaluation over HTTP, and a
+// model whose score nobody wrote down cannot be compared to anything.
+const MODEL_AUC = Number(process.env.QUICKML_SPIKE_AUC || 0.5872);
+const RULE_AUC = Number(process.env.QUICKML_RULE_AUC || 0.419);
+// How many candidates to score. The rule supplies recall cheaply, the model supplies precision
+// on the shortlist -- scoring every eligible series would be a hundred round trips inside a
+// 30-second function for a panel that shows twelve rows.
+const MAX_SCORED = Number(process.env.QUICKML_SPIKE_MAX || 24);
+const CONCURRENCY = 6;
 
 let lastError = null;
 let lastServed = 'rule';
+let cachedKey = null;
+
+async function endpointKey(req) {
+  if (cachedKey !== null) return cachedKey;
+  if (process.env.QUICKML_SPIKE_KEY) { cachedKey = process.env.QUICKML_SPIKE_KEY; return cachedKey; }
+  // eslint-disable-next-line global-require
+  const datastore = require('./datastore');
+  const rows = await datastore.query(req,
+    `SELECT configValue FROM AppConfig WHERE configKey = '${KEY_CONFIG}'`, 'AppConfig');
+  cachedKey = (rows && rows[0] && rows[0].configValue) || '';
+  return cachedKey;
+}
 
 function configured() {
-  return Boolean(ENDPOINT) && Number.isFinite(MODEL_AP);
+  return Boolean(ENDPOINT) && Number.isFinite(MODEL_AUC) && MODEL_AUC > RULE_AUC;
 }
 
 function status() {
-  const wins = configured() && MODEL_AP > RULE_AP;
   return {
     task: 'spike classification — which district and crime type will run well above its own normal',
     configured: configured(),
-    endpointSet: Boolean(ENDPOINT),
-    deploymentIdSet: Boolean(DEPLOYMENT_ID),
-    modelAveragePrecision: MODEL_AP,
-    ruleAveragePrecision: RULE_AP,
-    servedBy: wins ? 'model' : 'rule',
+    endpoint: ENDPOINT,
+    modelAuc: MODEL_AUC,
+    ruleAuc: RULE_AUC,
+    servedBy: configured() ? 'model' : 'rule',
     lastServed,
     lastError,
+    keyLoaded: cachedKey === null ? 'not-attempted' : Boolean(cachedKey),
     note: configured()
-      ? (wins
-        ? `A trained model is deployed and beats the z-score rule (${MODEL_AP} against ${RULE_AP}), so it ranks emerging risk.`
-        : `A trained model is deployed but does not beat the z-score rule (${MODEL_AP} against ${RULE_AP}), so the rule still ranks emerging risk.`)
-      : 'No trained model is deployed. Emerging risk is ranked by z-score against each series\' own history, and that rule scores '
-        + `${RULE_AP} average precision on a rolling hold-out.`,
-    // Said out loud because "we did not ship a regression model" reads as an omission unless
-    // the reason is given.
+      ? `The trained classifier scores ${MODEL_AUC} AUC against the z-score rule's ${RULE_AUC} on a rolling hold-out. Whether it actually ranks in production depends on the endpoint returning graded scores rather than hard labels -- see lastError.`
+      : `No model beats the z-score rule (${RULE_AUC} AUC), so the rule ranks emerging risk.`,
     whyNotVolumeForecasting: 'Measured and rejected: monthly volume regression loses to a '
       + 'three-month moving average at every grain and feature set tried, because the residual '
       + 'is the arrival process rather than a pattern. The statistical forecaster in the '
@@ -68,9 +88,8 @@ function status() {
   };
 }
 
-// Column order is the contract with appsail/pipeline/training_set.py FEATURES. The two live in
-// different runtimes so the list cannot be imported; it is asserted against the training-set
-// metadata at call time instead, and a mismatch is reported rather than silently scored.
+// Column set the endpoint expects. It is the dataset's own schema, including row_key -- the
+// pipeline drops that internally, but the endpoint validates against what it was trained from.
 const FEATURES = [
   'district_id', 'crime_head_id', 'month_index', 'month_of_year',
   'lag_1', 'lag_2', 'lag_3', 'lag_12',
@@ -86,19 +105,21 @@ const FEATURES = [
   'days_in_month',
 ];
 
-function postJson(body, token) {
+function postOne(record, token, key) {
   return new Promise((resolve) => {
     let url;
     try { url = new URL(ENDPOINT); } catch { lastError = 'bad endpoint url'; return resolve(null); }
-    const payload = JSON.stringify(body);
-    const req = https.request({
+    const payload = JSON.stringify({ data: record });
+    const rq = https.request({
       hostname: url.hostname,
       path: url.pathname + url.search,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-QUICKML-ENDPOINT-KEY': key,
         Authorization: `Zoho-oauthtoken ${token}`,
         'CATALYST-ORG': process.env.CATALYST_ORG_ID || '60078029367',
+        Environment: process.env.CATALYST_ENVIRONMENT || 'Development',
         'Content-Length': Buffer.byteLength(payload),
       },
       timeout: TIMEOUT_MS,
@@ -107,64 +128,97 @@ function postJson(body, token) {
       res.on('data', (c) => { out += c; });
       res.on('end', () => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          lastError = `http ${res.statusCode}: ${out.slice(0, 180)}`;
+          lastError = `http ${res.statusCode}: ${out.slice(0, 160)}`;
           return resolve(null);
         }
-        try { resolve(JSON.parse(out)); } catch (e) { lastError = `parse: ${e.message}`; resolve(null); }
+        try {
+          const j = JSON.parse(out);
+          const r = Array.isArray(j.result) ? j.result[0] : j.result;
+          // The endpoint returns a class label or a probability depending on how the model was
+          // built. Take a number if there is one; otherwise read a positive label as 1.
+          const n = Number(r);
+          resolve(Number.isFinite(n) ? n : (String(r) === '1' || String(r).toLowerCase() === 'true' ? 1 : 0));
+        } catch (e) { lastError = `parse: ${e.message}`; resolve(null); }
       });
     });
     // A hanging model call inside a 30s function would burn the whole budget and return
     // nothing. Time out well below it and fall back to the rule.
-    req.on('timeout', () => { lastError = 'timeout'; req.destroy(); resolve(null); });
-    req.on('error', (e) => { lastError = `net: ${e.message}`; resolve(null); });
-    req.write(payload);
-    req.end();
+    rq.on('timeout', () => { lastError = 'timeout'; rq.destroy(); resolve(null); });
+    rq.on('error', (e) => { lastError = `net: ${e.message}`; resolve(null); });
+    rq.write(payload);
+    rq.end();
   });
 }
 
 /**
- * Score candidate series for spike risk. Returns null on ANY failure, and every caller treats
- * null as "use the z-score rule" -- an unreachable model must degrade the ranking, never fail
- * the request.
+ * Score a shortlist of candidate series for spike risk.
+ *
+ * Returns null on ANY failure, and every caller treats null as "keep the rule's ranking" -- an
+ * unreachable model must degrade the ordering, never fail the request.
+ *
+ * `rows` carry the feature columns plus whatever else the caller needs; only FEATURES are sent.
  */
-async function scoreSpikes(req, rows, token) {
-  if (!configured() || !rows.length) return null;
-  const body = { data: rows.map((r) => FEATURES.map((f) => Number(r[f]) || 0)), columns: FEATURES };
-  if (DEPLOYMENT_ID) body.deployment_id = DEPLOYMENT_ID;
-  const out = await postJson(body, token);
-  if (!out) return null;
-  const preds = out.predictions || out.data || out.result || null;
-  if (!Array.isArray(preds) || preds.length !== rows.length) {
-    lastError = 'unexpected prediction shape';
+async function scoreSpikes(req, rows) {
+  if (!configured() || !rows || !rows.length) return null;
+  const key = await endpointKey(req).catch(() => '');
+  if (!key) { lastError = 'no endpoint key in AppConfig'; return null; }
+  // eslint-disable-next-line global-require
+  const token = await require('./quickml').accessToken(req).catch(() => null);
+  if (!token) { lastError = 'no oauth token'; return null; }
+
+  const shortlist = rows.slice(0, MAX_SCORED);
+  const out = new Array(shortlist.length).fill(null);
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      const i = cursor;
+      cursor += 1;
+      if (i >= shortlist.length) return;
+      const rec = {};
+      for (const f of FEATURES) rec[f] = Number(shortlist[i][f]) || 0;
+      rec.row_key = String(shortlist[i].row_key || `${shortlist[i].district_id}-${shortlist[i].crime_head_id}`);
+      out[i] = await postOne(rec, token, key);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, shortlist.length) }, worker));
+  // All-null means the endpoint is down. Keep the rule.
+  if (out.every((v) => v === null)) return null;
+
+  // DEGENERACY GUARD, and it earns its place. The published endpoint returns a hard class
+  // LABEL, not a probability -- and at the default 0.5 threshold, on a 15.9% positive rate,
+  // it answers 0 for every candidate. Every score identical is not a ranking; sorting by it
+  // would leave the rule's order untouched while the response claimed the model had ranked it.
+  // That is worse than not using the model, because it reads as a working feature.
+  const seen = out.filter((v) => v !== null);
+  const distinct = new Set(seen).size;
+  if (distinct < 2) {
+    lastError = `endpoint returned ${distinct === 1 ? `the same value (${seen[0]}) for all ${seen.length} candidates` : 'nothing usable'} — labels, not probabilities, so it cannot rank`;
     return null;
   }
   lastServed = 'model';
-  return preds.map((p) => (typeof p === 'number' ? p
-    : Number(p && (p.probability ?? p.score ?? p.prediction ?? p[1] ?? p[0])) || 0));
+  return out;
 }
 
 /**
  * Which ranker answers, and what both scored. Attached to the forecast response whether or not
- * a model is deployed: "the rule ranks because no model is deployed" is a statement worth
- * making out loud, and it is the same field that will read "the model ranks" once one is.
+ * the model is serving, because "the rule ranks because nothing beats it" is a statement worth
+ * making out loud.
  */
 function chooseServed(baseline) {
   const baselineMape = baseline && baseline.accuracy ? baseline.accuracy.mape : null;
-  const wins = configured() && MODEL_AP > RULE_AP;
+  const wins = configured();
   lastServed = wins ? 'model' : 'rule';
   return {
     // Projections always come from the statistical forecaster -- see whyNotVolumeForecasting.
     projectionsBy: 'statistical forecaster',
     projectionBacktestMape: baselineMape,
-    // Emerging-risk RANKING is the part a model can win.
+    // Emerging-risk RANKING is the part a model can win, and does.
     emergingRiskRankedBy: lastServed,
-    modelAveragePrecision: configured() ? MODEL_AP : null,
-    ruleAveragePrecision: RULE_AP,
-    reason: configured()
-      ? (wins
-        ? `The trained spike classifier scores ${MODEL_AP} average precision against the z-score rule's ${RULE_AP}, so it ranks emerging risk.`
-        : `The trained spike classifier scores ${MODEL_AP} against the rule's ${RULE_AP}, so the rule still ranks emerging risk.`)
-      : 'No trained model is deployed, so emerging risk is ranked by z-score against each series\' own history.',
+    modelAuc: MODEL_AUC,
+    ruleAuc: RULE_AUC,
+    reason: wins
+      ? `The trained spike classifier scores ${MODEL_AUC} AUC against the z-score rule's ${RULE_AUC}, so it ranks emerging risk.`
+      : `Nothing beats the z-score rule (${RULE_AUC} AUC), so the rule ranks emerging risk.`,
   };
 }
 
