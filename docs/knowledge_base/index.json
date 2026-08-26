@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-08-26T09:30:36.067Z",
+  "corpusAsOf": "2026-07-13",
+  "documents": [
+    {
+      "name": "kadi-what-it-is.md",
+      "title": "What KADI is",
+      "bytes": 1503
+    },
+    {
+      "name": "case-linkage-explained.md",
+      "title": "What a link between two cases means",
+      "bytes": 1799
+    },
+    {
+      "name": "offender-risk-score.md",
+      "title": "How the offender risk score is built",
+      "bytes": 1651
+    },
+    {
+      "name": "entity-resolution.md",
+      "title": "How offender identities are merged",
+      "bytes": 1342
+    },
+    {
+      "name": "investigation-health.md",
+      "title": "Investigation health flags and what to do about them",
+      "bytes": 1633
+    },
+    {
+      "name": "zones-and-hotspots.md",
+      "title": "Zones, hotspots and what \"emerging\" means",
+      "bytes": 1339
+    },
+    {
+      "name": "fairness-policy.md",
+      "title": "The fairness policy, and how it is enforced",
+      "bytes": 1308
+    },
+    {
+      "name": "access-tiers.md",
+      "title": "Who can see what",
+      "bytes": 1269
+    },
+    {
+      "name": "data-dictionary.md",
+      "title": "Data dictionary",
+      "bytes": 1337
+    },
+    {
+      "name": "per-capita-and-forecast.md",
+      "title": "Rates per capita, and the forecast",
+      "bytes": 1320
+    },
+    {
+      "name": "how-to-read-the-screens.md",
+      "title": "How to read each screen",
+      "bytes": 1740
+    }
+  ]
+}

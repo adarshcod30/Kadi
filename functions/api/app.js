@@ -739,6 +739,8 @@ function buildApp() {
   })));
 
   r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
+  r.get('/ai/kb-probe', handle(async (req) => quickml.probeKnowledgeBase(req)));
+  r.get('/ai/kb-upload-probe', handle(async (req) => quickml.probeUpload(req)));
 
   r.get('/ai/status', handle(async () => ({
     quickml: quickml.status(),

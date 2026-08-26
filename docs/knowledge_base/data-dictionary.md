@@ -1,0 +1,38 @@
+# Data dictionary
+
+## Crime heads
+
+Crimes Against Body, Crimes Against Property, Crimes Against Women, Cyber Crime, Economic
+Offences, NDPS, Missing / UDR, Traffic / PAR. Each divides into sub-heads — Cyber Crime, for
+example, contains Online Financial Fraud (UPI/OTP), Sextortion, Phishing and others.
+
+**Why the sub-head matters.** A sub-head says a case is Online Financial Fraud. It cannot say
+whether the method was a fake KYC call or a QR-code scam — and a criminal series shares the
+*method*, not the sub-head. That distinction is why the free-text modus operandi is read
+separately.
+
+## Case status
+
+Under Investigation, Charge Sheeted, Closed, Undetected.
+
+## Gravity
+
+Heinous and Non-Heinous, under the KSP gravity scale.
+
+## Case category
+
+FIR, UDR (unnatural death report), PAR (police assistance request), Zero FIR.
+
+## Police station types
+
+Law and Order (Town/City), Law and Order (Rural), Traffic, Women, CEN (Cyber, Economic and
+Narcotics), Cyber Crime, and Railway. Deployment is not uniform: traffic policing concentrates
+in high-urbanisation districts, CEN and Women's stations run roughly one per district, and
+Cyber Crime stations concentrate in Bengaluru City.
+
+## CrimeNo
+
+The FIR identifier. It embeds the unit and the year, and it is the field to quote when
+referring to a case.
+
+_Corpus as of 2026-07-13._

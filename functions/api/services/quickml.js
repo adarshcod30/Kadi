@@ -256,6 +256,91 @@ async function ragAnswer(req, { question, lang }) {
   }
 }
 
+/**
+ * Probe the QuickML management surface.
+ *
+ * The RAG call path is written and waiting on one value: a knowledge-base id. Before asking
+ * anyone to create one by hand, find out whether the platform exposes a REST route to list or
+ * create knowledge bases -- if it does, the KB can be provisioned and refreshed by the same
+ * pipeline that produces the corpus, rather than by console clicks that drift out of date.
+ *
+ * Reports each candidate path's status verbatim. A 404 means the route does not exist; a 401
+ * or 403 means it exists and the credential lacks scope, which is a different problem with a
+ * different fix.
+ */
+async function probeKnowledgeBase(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}`;
+  const paths = [
+    '/rag/knowledgebase', '/rag/knowledge_base', '/rag/knowledgebases',
+    '/knowledgebase', '/rag/documents', '/rag', '/datasets', '/models', '/endpoints',
+  ];
+  const results = [];
+  for (const path of paths) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await new Promise((resolve) => {
+      const u = new URL(base + path);
+      const rq = https.request({
+        hostname: u.hostname, path: u.pathname, method: 'GET',
+        headers: { Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG, Accept: 'application/json' },
+        timeout: 8000,
+      }, (res) => {
+        let out = '';
+        res.on('data', (c) => { out += c; });
+        res.on('end', () => resolve({ path, status: res.statusCode, body: out.slice(0, 220) }));
+      });
+      rq.on('error', (e) => resolve({ path, status: 0, body: String(e.message).slice(0, 100) }));
+      rq.on('timeout', () => { rq.destroy(); resolve({ path, status: 0, body: 'timeout' }); });
+      rq.end();
+    });
+    results.push(r);
+  }
+  return { ok: true, base, results };
+}
+
+/**
+ * Learn what POST /rag/documents wants.
+ *
+ * The probe found the route exists and the knowledge base is empty. An error body from a
+ * deliberately-wrong payload names the missing field, which is faster than guessing the
+ * schema -- the same technique that eventually cracked the LLM endpoint's model-id format.
+ */
+async function probeUpload(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token' };
+  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}`;
+  const attempts = [
+    { label: 'empty', ct: 'application/json', body: JSON.stringify({}) },
+    { label: 'name+content', ct: 'application/json', body: JSON.stringify({ name: 'kadi-probe.txt', content: 'KADI probe document.' }) },
+    { label: 'document_name+text', ct: 'application/json', body: JSON.stringify({ document_name: 'kadi-probe.txt', text: 'KADI probe document.' }) },
+  ];
+  const out = [];
+  for (const a of attempts) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await new Promise((resolve) => {
+      const u = new URL(`${base}/rag/documents`);
+      const rq = https.request({
+        hostname: u.hostname, path: u.pathname, method: 'POST',
+        headers: {
+          Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG,
+          'Content-Type': a.ct, 'Content-Length': Buffer.byteLength(a.body),
+        },
+        timeout: 10000,
+      }, (res) => {
+        let b = '';
+        res.on('data', (c) => { b += c; });
+        res.on('end', () => resolve({ attempt: a.label, status: res.statusCode, body: b.slice(0, 300) }));
+      });
+      rq.on('error', (e) => resolve({ attempt: a.label, status: 0, body: String(e.message) }));
+      rq.on('timeout', () => { rq.destroy(); resolve({ attempt: a.label, status: 0, body: 'timeout' }); });
+      rq.write(a.body); rq.end();
+    });
+    out.push(r);
+  }
+  return { ok: true, attempts: out };
+}
+
 // Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant
 // is switched onto it. Returns the raw upstream reply either way.
 async function selfTest(req) {
@@ -303,4 +388,5 @@ async function complete(req, { system, user, maxTokens = 220, temperature = 0.35
   return extractText(out);
 }
 
-module.exports = { configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };
+module.exports = {
+  probeKnowledgeBase, probeUpload, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };
