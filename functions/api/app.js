@@ -958,17 +958,25 @@ function buildApp() {
       ...meta,
       available: Boolean(meta && meta.rows),
       download: '/server/api/ml/training-set.csv',
+      downloadAlternate: '/server/api/ml/training-set.csv?grain=district',
       serving: mlforecast.status(),
+      // The feature order the serving code will send at scoring time. Published so a mismatch
+      // between the CSV that trained the model and the payload that queries it is visible
+      // rather than silently producing nonsense.
+      servingFeatureOrder: mlforecast.FEATURES,
     };
   }));
 
+  // ?grain=district serves the coarser, better-conditioned dataset. Both are written every
+  // pipeline run; which to train on is a judgement the metadata gives the numbers for.
   r.get('/ml/training-set.csv', (req, res) => {
-    const p = require('path').join(q.dataDir(), 'derived', 'training_set.csv');
+    const file = String(req.query.grain) === 'district' ? 'training_set_district.csv' : 'training_set.csv';
+    const p = require('path').join(q.dataDir(), 'derived', file);
     if (!require('fs').existsSync(p)) {
       return res.status(404).json({ ok: false, error: { code: 'not_found', message: 'Run the pipeline to build the training set.' } });
     }
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="kadi_training_set.csv"');
+    res.setHeader('Content-Disposition', `attachment; filename="kadi_${file}"`);
     require('fs').createReadStream(p).pipe(res);
   });
 

@@ -1,51 +1,90 @@
-// mlforecast.js — serving a trained QuickML model, with the statistical forecast as the floor.
+// mlforecast.js — serving a trained QuickML model, with the rule it replaces as the floor.
 //
-// The shape of this file is the point. There are two forecasters:
+// WHAT THE MODEL IS, AND WHY IT IS NOT WHAT YOU WOULD EXPECT.
 //
-//   BASELINE   appsail/pipeline/forecast.py — decomposition, backtested, always available.
-//   MODEL      a QuickML regressor trained on derived/training_set.csv, called over HTTP.
+// The obvious model on a crime corpus forecasts next month's case count. That was built and it
+// does not work: predicting a count means predicting an arrival process, and for a Poisson
+// count with mean L even a perfect predictor still misses by sqrt(2/(pi*L)). A three-month
+// moving average already sits close to that floor, so a tree with thirty features has more
+// capacity than the remaining signal justifies and overfits. Raw target, ratio target, lean and
+// rich features, multi-horizon, and a blend tuned on a separate validation fold all lost to the
+// moving average.
 //
-// and the served answer is WHICHEVER BACKTESTS BETTER. A model that loses to the baseline does
-// not ship just because it is a model, and the response says which one answered and what both
-// scored, so nobody has to take it on faith.
+// What DOES work is classification: which district and crime type is about to run well above
+// its own normal. It only has to rank, never to name a number, so the noise that defeats
+// regression does not defeat it. Against the z-score rule the Forecast tab uses today it scores
+// average precision 0.425 to 0.199, and it beat the rule on all four rolling hold-out windows.
 //
-// Model building is a console workflow because QuickML exposes no REST surface for datasets,
-// pipelines or models. Everything either side of it is automated: the pipeline writes the
-// training set every run, and this serves the endpoint once someone puts its id in the
-// environment. Retraining stays a deliberate act -- a police system that silently retrains and
-// starts serving a new model is a liability, and someone should read the backtest first.
+// So this file serves a SPIKE CLASSIFIER and falls back to the z-score rule -- and it says
+// which one answered. A model that does not beat the rule it replaces should not ship just
+// because it is a model.
+//
+// See appsail/pipeline/training_set.py for the full measurement, including why pooling grains
+// for more rows was tried and abandoned.
 const https = require('https');
 
-const ENDPOINT = process.env.QUICKML_FORECAST_ENDPOINT || '';
-const DEPLOYMENT_ID = process.env.QUICKML_FORECAST_DEPLOYMENT_ID || '';
+const ENDPOINT = process.env.QUICKML_SPIKE_ENDPOINT || process.env.QUICKML_FORECAST_ENDPOINT || '';
+const DEPLOYMENT_ID = process.env.QUICKML_SPIKE_DEPLOYMENT_ID || '';
 const TIMEOUT_MS = Number(process.env.QUICKML_FORECAST_TIMEOUT_MS || 8000);
-// The model's own measured hold-out error, recorded when it was built in the console. It is
-// configuration rather than something we can read back: QuickML does not expose a model's
-// evaluation over HTTP, and a model whose error nobody wrote down cannot be compared to
+// The model's measured average precision, recorded when it was built in the console. It is
+// configuration rather than something readable back: QuickML does not expose a model's
+// evaluation over HTTP, and a model whose score nobody wrote down cannot be compared to
 // anything -- so an unset value means "do not serve it", not "assume it is good".
-const MODEL_MAPE = process.env.QUICKML_FORECAST_MAPE ? Number(process.env.QUICKML_FORECAST_MAPE) : null;
+const MODEL_AP = process.env.QUICKML_SPIKE_AP ? Number(process.env.QUICKML_SPIKE_AP) : null;
+// What the rule it would replace scores on the same folds. Measured, not assumed.
+const RULE_AP = Number(process.env.QUICKML_RULE_AP || 0.199);
 
 let lastError = null;
-let lastServed = 'baseline';
+let lastServed = 'rule';
 
 function configured() {
-  return Boolean(ENDPOINT) && Number.isFinite(MODEL_MAPE);
+  return Boolean(ENDPOINT) && Number.isFinite(MODEL_AP);
 }
 
 function status() {
+  const wins = configured() && MODEL_AP > RULE_AP;
   return {
+    task: 'spike classification — which district and crime type will run well above its own normal',
     configured: configured(),
     endpointSet: Boolean(ENDPOINT),
     deploymentIdSet: Boolean(DEPLOYMENT_ID),
-    declaredMape: MODEL_MAPE,
+    modelAveragePrecision: MODEL_AP,
+    ruleAveragePrecision: RULE_AP,
+    servedBy: wins ? 'model' : 'rule',
     lastServed,
     lastError,
-    // Said plainly, because "no ML model" reads as an omission unless the reason is given.
     note: configured()
-      ? 'A trained model is configured. The served forecast is whichever of model and baseline backtests better.'
-      : 'No trained model is deployed. The statistical forecast serves, and its measured hold-out error is reported with it.',
+      ? (wins
+        ? `A trained model is deployed and beats the z-score rule (${MODEL_AP} against ${RULE_AP}), so it ranks emerging risk.`
+        : `A trained model is deployed but does not beat the z-score rule (${MODEL_AP} against ${RULE_AP}), so the rule still ranks emerging risk.`)
+      : 'No trained model is deployed. Emerging risk is ranked by z-score against each series\' own history, and that rule scores '
+        + `${RULE_AP} average precision on a rolling hold-out.`,
+    // Said out loud because "we did not ship a regression model" reads as an omission unless
+    // the reason is given.
+    whyNotVolumeForecasting: 'Measured and rejected: monthly volume regression loses to a '
+      + 'three-month moving average at every grain and feature set tried, because the residual '
+      + 'is the arrival process rather than a pattern. The statistical forecaster in the '
+      + 'pipeline serves projections instead, with its own backtest error shown beside them.',
   };
 }
+
+// Column order is the contract with appsail/pipeline/training_set.py FEATURES. The two live in
+// different runtimes so the list cannot be imported; it is asserted against the training-set
+// metadata at call time instead, and a mismatch is reported rather than silently scored.
+const FEATURES = [
+  'district_id', 'crime_head_id', 'month_index', 'month_of_year',
+  'lag_1', 'lag_2', 'lag_3', 'lag_12',
+  'roll_3', 'roll_6', 'roll_12',
+  'district_lag_1', 'head_share',
+  'std_6', 'std_12',
+  'accel_3_12', 'accel_1_12',
+  'head_state_lag_1', 'head_state_roll_3',
+  'state_lag_1', 'state_roll_3', 'head_state_share',
+  'district_roll_3', 'district_accel',
+  'detected_share_lag_1', 'detected_roll_6',
+  'population_m', 'literacy_pct', 'urban_pct', 'pop_density_k',
+  'days_in_month',
+];
 
 function postJson(body, token) {
   return new Promise((resolve) => {
@@ -75,7 +114,7 @@ function postJson(body, token) {
       });
     });
     // A hanging model call inside a 30s function would burn the whole budget and return
-    // nothing. Time out well below it and fall back.
+    // nothing. Time out well below it and fall back to the rule.
     req.on('timeout', () => { lastError = 'timeout'; req.destroy(); resolve(null); });
     req.on('error', (e) => { lastError = `net: ${e.message}`; resolve(null); });
     req.write(payload);
@@ -84,80 +123,13 @@ function postJson(body, token) {
 }
 
 /**
- * Feature row for one district and crime head, built from that series' own recent history.
- *
- * The column names and order must match training_set.py's FEATURES exactly. They are repeated
- * here rather than imported because the two live in different runtimes (Python pipeline, Node
- * function) -- so the list is asserted against the training-set metadata at call time instead,
- * and a mismatch is reported rather than silently producing nonsense.
+ * Score candidate series for spike risk. Returns null on ANY failure, and every caller treats
+ * null as "use the z-score rule" -- an unreachable model must degrade the ranking, never fail
+ * the request.
  */
-const FEATURES = ['district_id', 'crime_head_id', 'month_index', 'month_of_year',
-  'lag_1', 'lag_2', 'lag_3', 'lag_12', 'roll_3', 'roll_6', 'roll_12',
-  'district_lag_1', 'head_share'];
-
-const monthIndex = (ym) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
-const mean = (xs) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 1000) / 1000 : 0);
-
-function featureRow({ districtId, crimeHeadId, targetMonth, history, districtLag1 }) {
-  const h = history;
-  const lag1 = h[h.length - 1] || 0;
-  return {
-    district_id: Number(districtId),
-    crime_head_id: Number(crimeHeadId),
-    month_index: monthIndex(targetMonth),
-    month_of_year: Number(targetMonth.slice(5, 7)),
-    lag_1: lag1,
-    lag_2: h[h.length - 2] || 0,
-    lag_3: h[h.length - 3] || 0,
-    lag_12: h[h.length - 12] || 0,
-    roll_3: mean(h.slice(-3)),
-    roll_6: mean(h.slice(-6)),
-    roll_12: mean(h.slice(-12)),
-    district_lag_1: districtLag1,
-    head_share: districtLag1 ? Math.round((lag1 / districtLag1) * 10000) / 10000 : 0,
-  };
-}
-
-/**
- * Decide what to serve.
- *
- * Takes the baseline forecast block as the pipeline computed it and returns it annotated with
- * which forecaster answered and what each scored. When no model is configured -- the current
- * state -- this is a cheap, honest passthrough that still makes the comparison visible.
- */
-function chooseServed(baseline) {
-  const baselineMape = baseline && baseline.accuracy ? baseline.accuracy.mape : null;
-  if (!configured()) {
-    lastServed = 'baseline';
-    return {
-      servedBy: 'baseline',
-      baselineMape,
-      modelMape: null,
-      reason: 'No trained model is deployed, so the statistical forecast serves.',
-    };
-  }
-  // Strictly better, not merely different. A model that ties the baseline adds a network hop,
-  // an external dependency and a thing to explain, for nothing.
-  const modelWins = Number.isFinite(baselineMape) && MODEL_MAPE < baselineMape;
-  lastServed = modelWins ? 'model' : 'baseline';
-  return {
-    servedBy: lastServed,
-    baselineMape,
-    modelMape: MODEL_MAPE,
-    reason: modelWins
-      ? `The trained model backtests at ${MODEL_MAPE}% against the baseline's ${baselineMape}%, so it serves.`
-      : `The trained model backtests at ${MODEL_MAPE}% against the baseline's ${baselineMape}%, so the baseline serves.`,
-  };
-}
-
-/**
- * Ask the model for one district-head series. Returns null on any failure, and every caller
- * treats null as "use the baseline" -- an unreachable model must degrade the forecast, never
- * fail the request.
- */
-async function predict(req, rows, token) {
+async function scoreSpikes(req, rows, token) {
   if (!configured() || !rows.length) return null;
-  const body = { data: rows.map((r) => FEATURES.map((f) => r[f])), columns: FEATURES };
+  const body = { data: rows.map((r) => FEATURES.map((f) => Number(r[f]) || 0)), columns: FEATURES };
   if (DEPLOYMENT_ID) body.deployment_id = DEPLOYMENT_ID;
   const out = await postJson(body, token);
   if (!out) return null;
@@ -166,7 +138,34 @@ async function predict(req, rows, token) {
     lastError = 'unexpected prediction shape';
     return null;
   }
-  return preds.map((p) => (typeof p === 'number' ? p : Number(p && (p.prediction ?? p.value ?? p[0]))));
+  lastServed = 'model';
+  return preds.map((p) => (typeof p === 'number' ? p
+    : Number(p && (p.probability ?? p.score ?? p.prediction ?? p[1] ?? p[0])) || 0));
 }
 
-module.exports = { FEATURES, featureRow, chooseServed, predict, configured, status };
+/**
+ * Which ranker answers, and what both scored. Attached to the forecast response whether or not
+ * a model is deployed: "the rule ranks because no model is deployed" is a statement worth
+ * making out loud, and it is the same field that will read "the model ranks" once one is.
+ */
+function chooseServed(baseline) {
+  const baselineMape = baseline && baseline.accuracy ? baseline.accuracy.mape : null;
+  const wins = configured() && MODEL_AP > RULE_AP;
+  lastServed = wins ? 'model' : 'rule';
+  return {
+    // Projections always come from the statistical forecaster -- see whyNotVolumeForecasting.
+    projectionsBy: 'statistical forecaster',
+    projectionBacktestMape: baselineMape,
+    // Emerging-risk RANKING is the part a model can win.
+    emergingRiskRankedBy: lastServed,
+    modelAveragePrecision: configured() ? MODEL_AP : null,
+    ruleAveragePrecision: RULE_AP,
+    reason: configured()
+      ? (wins
+        ? `The trained spike classifier scores ${MODEL_AP} average precision against the z-score rule's ${RULE_AP}, so it ranks emerging risk.`
+        : `The trained spike classifier scores ${MODEL_AP} against the rule's ${RULE_AP}, so the rule still ranks emerging risk.`)
+      : 'No trained model is deployed, so emerging risk is ranked by z-score against each series\' own history.',
+  };
+}
+
+module.exports = { FEATURES, chooseServed, scoreSpikes, configured, status };

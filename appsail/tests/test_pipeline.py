@@ -267,10 +267,51 @@ def test_training_set_has_no_protected_attributes_and_real_history():
 
     meta = json.load(open(os.path.join(DERIVED, "training_set_meta.json"), encoding="utf-8"))
     assert meta["rows"] > 1000, "too few rows to train anything"
-    # The fairness invariant, asserted on the actual header rather than on the docstring.
-    common.assert_no_protected(training_set.HEADER)
+    # The fairness invariant, asserted on the actual columns rather than on the docstring.
+    common.assert_no_protected(training_set.LABELS + training_set.FEATURES)
     assert not (common.PROTECTED_COLUMNS & set(meta["features"]))
     # The partial trailing month must be dropped, or the model learns that every year ends in
     # a collapse.
     assert meta["droppedPartialMonth"], "the partial extract month should have been dropped"
     assert meta["monthTo"] < meta["droppedPartialMonth"]
+
+
+def test_training_set_recommends_the_task_that_actually_won():
+    """Four ML tasks were measured; three lost. The metadata has to say which is which.
+
+    This is not decoration. Someone opening the QuickML console a month from now will train
+    whatever the file seems to offer, and target_count is right there in the same CSV -- so the
+    recommendation and the do-not-train have to travel with the data.
+    """
+    meta = json.load(open(os.path.join(DERIVED, "training_set_meta.json"), encoding="utf-8"))
+    rec = meta["recommended"]
+    assert rec["target"] == "target_spike"
+    assert rec["task"] == "binary classification"
+    assert "target_count" in rec["doNotTrain"]
+    assert "moving average" in rec["doNotTrain"]
+    # The measured floor travels with the data too, so nobody re-derives it the hard way.
+    assert meta["poissonFloorPct"] and meta["naiveMape"]
+    assert meta["naiveMape"] > meta["poissonFloorPct"], "headroom must be stated honestly"
+
+
+def test_spike_label_is_only_set_where_it_could_mean_something():
+    """A 40% rise on a base of two cases is one extra case, and is not a signal.
+
+    Every eligible row must clear the minimum base, and the eligibility flag has to agree with
+    the label -- an ineligible row carrying a positive label would train the model on noise.
+    """
+    import csv as _csv
+    import training_set
+
+    with open(os.path.join(DERIVED, "training_set.csv"), encoding="utf-8") as f:
+        rows = list(_csv.DictReader(f))
+    assert rows, "training set is empty"
+    eligible = [r for r in rows if r["spike_eligible"] == "1"]
+    assert len(eligible) > 500, "too few eligible rows to train a classifier"
+    for r in rows:
+        if r["spike_eligible"] == "1":
+            assert float(r["roll_3"]) >= training_set.SPIKE_MIN_BASE
+        else:
+            assert r["target_spike"] == "0", "an ineligible row must never carry a positive label"
+    rate = sum(int(r["target_spike"]) for r in eligible) / len(eligible)
+    assert 0.02 < rate < 0.45, f"spike rate {rate:.2%} is not a usable class balance"
