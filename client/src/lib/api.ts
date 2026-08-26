@@ -1,5 +1,8 @@
 // api.ts — typed fetch wrapper for the KADI API (envelope-aware, role header).
 const BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
+// Exported for the one caller that cannot go through api.get/post: the assistant fetches
+// audio/wav bytes from /tts, and those helpers parse JSON.
+export const API_BASE = BASE;
 
 // Two tiers. State: Analyst, DGP, Admin. District: SP, DSP, SI.
 export type Role = 'Analyst' | 'DGP' | 'Admin' | 'SP' | 'DSP' | 'SI' | 'SHO';

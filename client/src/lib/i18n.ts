@@ -33,6 +33,10 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   react: { en: 'React', kn: 'ಪ್ರತಿಕ್ರಿಯೆ' },
   forecast: { en: 'Forecast', kn: 'ಮುನ್ಸೂಚನೆ' },
   register: { en: 'Register', kn: 'ದಾಖಲಾತಿ' },
+  // One destination, two meanings. A station officer FILES a case there; everyone senior
+  // APPROVES one. The button is icon-only, so this is what the tooltip says.
+  registerCase: { en: 'Register a case', kn: 'ಪ್ರಕರಣ ದಾಖಲಿಸಿ' },
+  approvals: { en: 'Approvals', kn: 'ಅನುಮೋದನೆಗಳು' },
   assistant: { en: 'Assistant', kn: 'ಸಹಾಯಕ' },
   audit: { en: 'Audit', kn: 'ಲೆಕ್ಕಪರಿಶೋಧನೆ' },
   admin: { en: 'Admin', kn: 'ನಿರ್ವಹಣೆ' },

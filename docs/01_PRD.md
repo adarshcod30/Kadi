@@ -286,10 +286,19 @@ deployed build.
   or a URL. An FIR number rendered in Kannada numerals is a corrupted record, and an officer
   searching for `100010064202600888` must find it whatever language the chrome is in. The
   exclusions are deliberately over-broad: leaving a label in English costs nothing.
-- **Zia does not translate.** A live probe of the SDK on this project returns object detection,
-  OCR, barcode, face analysis, sentiment, keyword extraction and NER — nothing linguistic. So
-  translation runs on the QuickML LLM, batched, cached, and with identifiers masked out before
-  the model sees them and restored after.
+- **Zia translates, speaks and listens — through QuickML, not the SDK.** An earlier probe of
+  `catalyst.zia()` found object detection, OCR, barcode, face analysis, sentiment, keyword
+  extraction and NER and nothing linguistic, and concluded the platform had none. That was
+  right about the SDK and wrong about Catalyst: the three models ship as QuickML **Trained NLP
+  Models** on a different host path. All three are now wired:
+  - **Text Translation** (11 languages) is the primary translator. Its Kannada is markedly
+    better than the LLM's — "Which cases are slipping?" went from roughly *"what operation is
+    being left"* to *"ಯಾವ ಪ್ರಕರಣಗಳು ಜಾರಿಬೀಳುತ್ತಿವೆ"*. The LLM stays as the fallback.
+  - **Text-to-Audio** (en/hi/kn, three Kannada speakers) reads answers aloud, so read-aloud
+    works on machines with no Kannada system voice — which is most of them.
+  - **Audio-to-Text** (en/hi/kn) backs voice input where the browser's own recogniser is weak.
+  - Translations are batched, cached on the **masked** template, and identifiers are masked out
+    before the model sees them and restored after.
 - The cache is keyed on the **masked** text. Sixty worklist rows reading "Open 1283 days — 2.6x
   the peer median (501d)" are one template: one model call and fifty-nine cache hits instead of
   sixty calls. This is what makes translating a data-heavy page affordable at all.

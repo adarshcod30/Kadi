@@ -7,9 +7,9 @@ import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
   Globe, MapPin, ChevronDown, Check, LogOut, PanelLeftClose, PanelLeftOpen, Building2,
-  Zap, TrendingUp, FilePlus2,
+  Zap, TrendingUp, FilePlus2, Inbox,
 } from 'lucide-react';
-import { useMe, useAlerts, useLookups } from '../api/hooks';
+import { useMe, useAlerts, useLookups, useSubmissions } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
 import { setRole, getRole, signOut as clearSession, Role } from '../lib/api';
 import { SeverityDot } from './ui';
@@ -22,12 +22,9 @@ const NAV = [
   { to: '/offenders', icon: Users, key: 'offenders' },
   { to: '/health', icon: Activity, key: 'health' },
   { to: '/map', icon: Map, key: 'map' },
-  { to: '/react', icon: Zap, key: 'react' },
-  // The write path. Shown only to accounts that can file or decide a case, because a nav
-  // entry that leads to "nothing to do here" is worse than no entry at all.
-  { to: '/register', icon: FilePlus2, key: 'register', cap: 'write' },
-  { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
+  { to: '/react', icon: Zap, key: 'react' },
+  { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
   { to: '/about', icon: Info, key: 'about' },
@@ -52,10 +49,19 @@ export function Shell({ children }: { children: ReactNode }) {
     if (search.trim()) nav(`/cases?search=${encodeURIComponent(search.trim())}`);
   };
 
-  const visibleNav = NAV.filter((n) => {
-    if (n.cap === 'write') return Boolean(me?.capabilities.canSubmitCase || me?.capabilities.canApproveCases);
-    return !n.roles || (me && n.roles.includes(me.user.role));
-  });
+  const visibleNav = NAV.filter((n) => !n.roles || (me && n.roles.includes(me.user.role)));
+
+  // One destination, two meanings. A station officer files a case; an SP, the DGP or the
+  // Administrator decides one. The approver also gets a count, because a queue you have to
+  // open to discover is empty is a queue people stop opening.
+  const canSubmitCase = Boolean(me?.capabilities.canSubmitCase);
+  const canApproveCases = Boolean(me?.capabilities.canApproveCases);
+  const { data: pendingSubs } = useSubmissions('pending', canApproveCases);
+  const writePath = canSubmitCase
+    ? { icon: FilePlus2, label: t('registerCase'), pending: 0 }
+    : canApproveCases
+      ? { icon: Inbox, label: t('approvals'), pending: (pendingSubs?.items || []).length }
+      : null;
 
   return (
     <div className="h-full flex flex-col">
@@ -72,6 +78,26 @@ export function Shell({ children }: { children: ReactNode }) {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search')}
             className="bg-white/10 placeholder-white/50 text-white text-sm rounded-ctl pl-9 pr-3 py-1.5 w-64 focus:bg-white/20 outline-none" />
         </form>
+        {/* The write path lives in the top bar, not the sidebar, and it is icon-only.
+            It is one screen that means two different things: a station officer FILES a case
+            there, everyone senior APPROVES one. Calling it "Register" in the sidebar was wrong
+            for every role above a police station, and carrying two labels for one destination
+            in a list of nouns read as two features. An icon with a role-correct tooltip says
+            it once, and the badge does the rest. */}
+        {writePath && (
+          <NavLink to="/register"
+            className={({ isActive }) => `relative grid place-items-center w-9 h-9 rounded-ctl transition-colors ${
+              isActive ? 'bg-kadi-gold text-kadi-navy' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            title={writePath.label} aria-label={writePath.label}>
+            <writePath.icon size={17} />
+            {writePath.pending > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white
+                text-[10px] font-semibold grid place-items-center font-num" data-notranslate>
+                {writePath.pending > 99 ? '99+' : writePath.pending}
+              </span>
+            )}
+          </NavLink>
+        )}
         <NavLink to="/assistant"
           className={({ isActive }) => `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-ctl transition-colors ${
             isActive ? 'bg-kadi-gold text-kadi-navy' : 'bg-white/10 text-white hover:bg-white/20'}`}

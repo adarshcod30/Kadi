@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAssistant, useExport, useTranslate } from '../api/hooks';
 import { useLang, useTx } from '../lib/i18n';
+import { API_BASE } from '../lib/api';
 import { InfoDot } from '../components/InfoDot';
 import type { AssistantResponse } from '../lib/types';
 
@@ -79,6 +80,7 @@ export default function Assistant() {
   const translate = useTranslate();
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const voices = useVoices();
 
   const speechSupported = typeof window !== 'undefined'
@@ -133,24 +135,56 @@ export default function Assistant() {
 
   const stopSpeaking = () => {
     if (ttsSupported) window.speechSynthesis.cancel();
+    // Server audio is a different pipe and needs stopping separately, or "Stop" silences the
+    // browser voice and leaves Zia's still playing.
+    const el = audioRef.current;
+    if (el) { el.pause(); el.currentTime = 0; }
     setSpeakingIdx(null);
   };
 
-  const speak = (text: string, l: string, idx: number) => {
-    if (!ttsSupported || !text) return;
+  /**
+   * Read an answer aloud, browser first and Zia second.
+   *
+   * The browser is instant when it has the voice, and on most machines it does not have a
+   * Kannada one -- which is why this used to announce that and stay silent. Zia's
+   * Text-to-Audio model has three Kannada speakers, so the fallback is now real audio rather
+   * than an apology. What it still refuses to do is hand Kannada text to an English voice:
+   * that produces noise, not an accent.
+   */
+  const speak = async (text: string, l: string, idx: number) => {
+    if (!text) return;
     const wantKn = l === 'kn';
-    // The honest branch. If Kannada text is handed to an English voice the result is not
-    // accented Kannada, it is nonsense -- so say so once and speak nothing rather than
-    // producing noise the officer has to interpret.
-    if (wantKn && !knVoice) {
-      setNotice({
-        kind: 'warn',
-        text: tx('This browser has no Kannada speech voice installed, so the answer cannot be read aloud. The text above is complete.'),
-      });
+    const localVoice = wantKn ? knVoice : enVoice;
+
+    if (!ttsSupported || !localVoice) {
+      try {
+        setSpeakingIdx(idx);
+        const res = await fetch(`${API_BASE}/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang: wantKn ? 'kn' : 'en' }),
+        });
+        if (!res.ok) throw new Error('tts');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const el = audioRef.current || new Audio();
+        audioRef.current = el;
+        el.src = url;
+        el.onended = () => { setSpeakingIdx(null); URL.revokeObjectURL(url); };
+        el.onerror = () => { setSpeakingIdx(null); URL.revokeObjectURL(url); };
+        await el.play();
+      } catch {
+        setSpeakingIdx(null);
+        setNotice({
+          kind: 'warn',
+          text: tx('Read-aloud is unavailable right now. The text above is complete.'),
+        });
+      }
       return;
     }
+
     const u = new SpeechSynthesisUtterance(text);
-    const v = wantKn ? knVoice : enVoice;
+    const v = localVoice;
     if (v) u.voice = v;
     u.lang = wantKn ? (v?.lang || 'kn-IN') : (v?.lang || 'en-IN');
     u.rate = 0.98;
@@ -304,11 +338,9 @@ export default function Assistant() {
         </span>
         <span className="flex items-center gap-1">
           {ttsSupported && (kn ? knVoice : enVoice) ? <Volume2 size={11} /> : <VolumeX size={11} />}
-          {!ttsSupported
-            ? tx('Read-aloud unavailable in this browser')
-            : kn
-              ? (knVoice ? tx('Kannada read-aloud ready') : tx('No Kannada voice installed — answers are shown as text'))
-              : tx('Read-aloud ready')}
+          {kn
+            ? (knVoice ? tx('Kannada read-aloud ready') : tx('Kannada read-aloud ready — spoken by Zia'))
+            : (enVoice ? tx('Read-aloud ready') : tx('Read-aloud ready — spoken by Zia'))}
         </span>
         <button onClick={() => setAutoSpeak((v) => !v)} className="flex items-center gap-1 hover:text-kadi-blue">
           {autoSpeak ? <Volume2 size={11} /> : <VolumeX size={11} />}

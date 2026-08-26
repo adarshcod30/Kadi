@@ -16,6 +16,7 @@
 // round trip per label would make the language toggle unusable.
 const crypto = require('crypto');
 const quickml = require('./quickml');
+const zianlp = require('./zianlp');
 const cache = require('./cache');
 
 // Kannada runs roughly three times English in tokens, so a batch that looks small in
@@ -105,7 +106,11 @@ function unmask(text, kept) {
 // placeholders, and a cache with no version is a cache you cannot correct -- every later
 // request served the corrupt value back and looked like the bug had not been fixed. Bump this
 // whenever the masking or the prompt changes in a way that invalidates what is stored.
-const CACHE_VERSION = 'v2';
+// v3: Zia's Text Translation replaced the LLM as the primary engine, and everything cached
+// under v2 is an LLM translation of noticeably lower quality -- "Which cases are slipping?"
+// had been stored as roughly "what operation is being left". Serving those back would make
+// the better engine look like it changed nothing.
+const CACHE_VERSION = 'v3';
 const keyFor = (maskedText, to) => {
   let h = 5381;
   const s = `${to}:${maskedText}`;
@@ -250,14 +255,33 @@ async function translateMany(req, texts, to = 'kn') {
       group.push(pending[start]);
       start += 1;
     }
-    // translateBatch masks again, which is a no-op on already-masked text: the placeholders
-    // contain no digits or capitals for PROTECT to catch.
-    const done = await translateBatchSplit(req, group, to);
+    // ZIA FIRST, LLM SECOND.
+    //
+    // Zia's Text Translation is a purpose-built model: it does not editorialise, it keeps the
+    // placeholders, and its Kannada reads like a person wrote it rather than like English with
+    // Kannada words. The LLM was only ever here because an earlier probe of the Zia SDK found
+    // no translate method -- true of the SDK, wrong about the platform, which ships it as a
+    // QuickML trained NLP model instead.
+    //
+    // It takes one string per call, so the group goes out in parallel. Anything Zia declines
+    // or mangles falls through to the LLM batch, which is why that path is still here.
+    const viaZia = await Promise.all(group.map(async (t) => {
+      const out = await zianlp.translate(req, t, 'en', to).catch(() => null);
+      // Same placeholder contract as the LLM path. A figure that quietly vanishes is worse
+      // than a sentence left in English, whichever model dropped it.
+      return out && slots(out) === slots(t) ? out : null;
+    }));
+    const stillMissing = group.map((t, i) => (viaZia[i] ? null : t)).filter(Boolean);
+    let viaLlm = [];
+    if (stillMissing.length) viaLlm = await translateBatchSplit(req, stillMissing, to) || [];
+    let k = 0;
+    const done = group.map((t, i) => (viaZia[i] || (viaZia[i] === null ? viaLlm[k++] : null) || null));
+    if (viaZia.some(Boolean)) engine = 'zia';
     for (let j = 0; j < group.length; j += 1) {
       const t = group[j];
       const out = done && done[j];
       if (out) {
-        engine = 'llm';
+        if (engine !== 'zia') engine = 'llm';
         memo.set(byTemplate.get(t).key, out);
         await cache.put(req, byTemplate.get(t).key, out).catch(() => {});
       }

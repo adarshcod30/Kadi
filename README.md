@@ -180,9 +180,10 @@ flowchart LR
 | **Assistant** | Bilingual grounded Q&A · voice input and read-aloud · per-answer translation · provenance labels · briefing export · falls through to RAG over a 12-document knowledge base |
 | **About** | Full platform, dataset and fairness documentation |
 
-> **The whole interface is bilingual**, not just the answers. 605 strings are pre-translated
+> **The whole interface is bilingual**, not just the answers. 609 strings are pre-translated
 > and committed; the translator refuses to touch FIR numbers, figures, dates and identifiers,
-> so `100010064202600888` reads the same in either language.
+> so `100010064202600888` reads the same in either language. Translation, read-aloud and voice
+> input all run on Zia's trained NLP models.
 
 > **Sign in** at the live URL, either with a provisioned `@ksp.gov.in` account
 > (`docs/ACCESS_CREDENTIALS.md`) or through the demo role chooser. Three tiers — state,

@@ -21,6 +21,7 @@ const reactq = require('./services/react');
 const submissions = require('./services/submissions');
 const mlforecast = require('./services/mlforecast');
 const translate = require('./services/translate');
+const zianlp = require('./services/zianlp');
 const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
@@ -231,6 +232,41 @@ function buildApp() {
     }
     return translate.translateMany(req, list, to);
   }));
+
+  // Zia's trained NLP models, probed live so what they actually return is on record rather
+  // than inferred from a console screenshot.
+  r.get('/diag/zia-nlp', handle(async (req) => ({ ...zianlp.status(), probe: await zianlp.probe(req) })));
+
+  // Read an answer aloud, server-side.
+  //
+  // The browser's speechSynthesis has no Kannada voice on most machines -- which is why the
+  // assistant had to announce that and stay silent. Zia's Text-to-Audio model has three
+  // Kannada speakers, so this makes read-aloud work everywhere rather than only where the
+  // operating system happened to ship a voice.
+  //
+  // Returns audio/wav bytes, or 503 with a reason the interface can show. It never falls back
+  // to an English voice reading Kannada text: that is noise, not an accent.
+  r.post('/tts', async (req, res) => {
+    try {
+      const { text, lang = 'en', speaker, speed, pitch, emotion } = req.body || {};
+      if (!text || String(text).trim().length < 2) {
+        return res.status(400).json({ ok: false, error: { code: 'no_text', message: 'Nothing to speak.' } });
+      }
+      const out = await zianlp.speak(req, String(text), { lang, speaker, speed, pitch, emotion });
+      if (!out) {
+        return res.status(503).json({
+          ok: false,
+          error: { code: 'tts_unavailable', message: 'Read-aloud is unavailable right now.', detail: zianlp.status().lastError },
+        });
+      }
+      res.setHeader('Content-Type', out.mime);
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Audio-Speaker', out.speaker || '');
+      return res.end(out.audio);
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: { code: 'tts_failed', message: e.message } });
+    }
+  });
 
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));
