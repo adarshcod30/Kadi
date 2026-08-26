@@ -86,3 +86,9 @@ h1, h2, h3 { font-family: Ubuntu, 'Open Sans', system-ui, sans-serif; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Login hero: hotspot breathing. Scale + opacity only, so it stays on the compositor. */
+@keyframes kadi-hot {
+  0%, 100% { transform: scale(0.72); opacity: 0.30; }
+  50%      { transform: scale(1.32); opacity: 0.78; }
+}

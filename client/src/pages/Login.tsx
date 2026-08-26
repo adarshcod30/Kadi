@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Globe, MapPin, Building2, Loader2, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { setRole, setToken, signOut, Role, api } from '../lib/api';
+import { LoginHero } from '../components/LoginHero';
 
 const DOMAIN = 'ksp.gov.in';
 
@@ -72,80 +73,115 @@ export default function Login() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-kadi-navy text-white">
+    <div className="min-h-screen relative overflow-hidden bg-[#071a28] text-white">
+      {/* Depth, in three layers: a cool base, a warm bloom behind the map so the state reads
+          as lit from within, and a fine grid that gives the dark ground a surface. */}
       <div className="absolute inset-0" style={{
         background:
-          'radial-gradient(1000px 560px at 8% -8%, rgba(26,111,196,0.32), transparent 60%),'
-          + 'radial-gradient(820px 480px at 92% 106%, rgba(47,168,160,0.18), transparent 58%),'
-          + 'linear-gradient(150deg, #0d3149 0%, #0B2437 55%, #08202f 100%)',
+          'radial-gradient(900px 620px at 34% 42%, rgba(26,111,196,0.28), transparent 62%),'
+          + 'radial-gradient(700px 460px at 88% 8%, rgba(232,180,74,0.10), transparent 60%),'
+          + 'radial-gradient(800px 520px at 6% 96%, rgba(47,168,160,0.14), transparent 62%),'
+          + 'linear-gradient(160deg, #0b2942 0%, #082032 52%, #061722 100%)',
       }} />
-      {/* The seal, moved up and left so it reads as the crest behind the page rather than a
-          shape falling off the corner, and the node field pulled right back — it was competing
-          with the form instead of sitting behind it. */}
-      <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
-        className="pointer-events-none absolute -left-16 -top-16 w-[420px] opacity-[0.06] select-none" />
-      <NetworkBackdrop />
+      <div className="absolute inset-0 opacity-[0.045]" style={{
+        backgroundImage: 'linear-gradient(#7CC4F5 1px, transparent 1px), linear-gradient(90deg, #7CC4F5 1px, transparent 1px)',
+        backgroundSize: '54px 54px',
+        maskImage: 'radial-gradient(ellipse 85% 70% at 50% 45%, black, transparent)',
+        WebkitMaskImage: 'radial-gradient(ellipse 85% 70% at 50% 45%, black, transparent)',
+      }} />
 
-      <div className="relative z-10 min-h-screen grid lg:grid-cols-[1fr_460px]">
-        {/* Left: identity and the numbers, nothing else */}
-        <div className="flex flex-col justify-center px-8 lg:px-14 py-12">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-            <div className="flex items-center gap-4">
+      <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.25fr_440px]">
+        {/* ---- Left: the state, the name, the numbers ---- */}
+        <div className="relative flex flex-col justify-center px-8 lg:px-14 py-12 overflow-hidden">
+          {/* The map sits behind the wordmark rather than beside it, so the two read as one
+              composition instead of two panels sharing a column. */}
+          <div className="pointer-events-none absolute right-[-4%] top-1/2 -translate-y-1/2 w-[46%] max-w-[380px] hidden lg:block opacity-[0.85]">
+            <LoginHero />
+          </div>
+
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}
+            className="relative">
+            <div className="flex items-center gap-3.5">
               <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka"
-                className="h-16 w-16 rounded-full bg-white/95 p-1 shrink-0" />
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.24em] text-kadi-gold/90">Karnataka State Police</div>
-                <h1 className="text-6xl lg:text-7xl font-bold tracking-tight leading-none mt-1">KADI</h1>
-                <div className="text-[12.5px] uppercase tracking-[0.18em] text-white/45 mt-1.5">
-                  Crime Analytics &amp; Intelligence
-                </div>
+                className="h-14 w-14 rounded-full bg-white/95 p-1 shrink-0 shadow-lg" />
+              <div className="h-10 w-px bg-white/15" />
+              <div className="text-[10.5px] uppercase tracking-[0.26em] text-kadi-gold/85 leading-relaxed">
+                Karnataka<br />State Police
               </div>
             </div>
+
+            <h1 className="mt-6 text-[5.5rem] lg:text-[7rem] font-bold tracking-[-0.04em] leading-[0.85]"
+              style={{ textShadow: '0 4px 40px rgba(0,0,0,0.45)' }}>
+              KADI
+            </h1>
+            <div className="mt-2 flex items-center gap-3">
+              <span className="h-px w-10 bg-kadi-gold/70" />
+              <span className="text-[12px] uppercase tracking-[0.2em] text-white/55">
+                Crime Analytics &amp; Intelligence
+              </span>
+            </div>
+            <p className="mt-5 text-[15px] text-white/65 max-w-[26rem] leading-relaxed">
+              Every FIR in Karnataka held as one connected graph — so a serial offender working
+              across three districts stops looking like three unrelated cases.
+            </p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.12 }}
-            className="mt-10 grid grid-cols-2 gap-2.5 max-w-lg">
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.14 }}
+            className="relative mt-9 grid grid-cols-2 gap-x-8 gap-y-5 max-w-[24rem]">
             {[
               { v: figures?.cases, label: 'FIRs in one graph' },
               { v: figures?.offenders, label: 'Repeat offenders resolved' },
               { v: figures?.networks, label: 'Active offender networks' },
               { v: figures?.recovery, label: 'Ground-truth recovery', suffix: '%' },
             ].map((k) => (
-              <div key={k.label} className="rounded-card border border-white/10 bg-white/[0.05] px-4 py-3">
-                <div className="text-2xl font-semibold font-num text-kadi-gold tabular-nums">
-                  {figures ? <Counter to={k.v || 0} suffix={k.suffix} /> : <span className="opacity-30">—</span>}
+              <div key={k.label} className="border-l-2 border-kadi-gold/45 pl-3.5">
+                <div className="text-[26px] font-semibold font-num text-kadi-gold tabular-nums leading-none">
+                  {figures ? <Counter to={k.v || 0} suffix={k.suffix} /> : <span className="opacity-25">—</span>}
                 </div>
-                <div className="text-[12px] text-white/70 mt-0.5 leading-tight">{k.label}</div>
+                <div className="text-[11.5px] text-white/55 mt-1.5 leading-tight">{k.label}</div>
               </div>
             ))}
           </motion.div>
+
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            className="relative mt-9 text-[11px] text-white/30 max-w-[26rem] leading-relaxed">
+            Evidence and behaviour only — never caste, religion or occupation.
+            Synthetic corpus, schema-faithful to the KSP FIR system.
+          </motion.div>
         </div>
 
-        {/* Right: the door */}
-        <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, delay: 0.08 }}
-          className="bg-white/[0.07] backdrop-blur-md border-l border-white/10 flex flex-col justify-center px-7 py-10">
+        {/* ---- Right: the door ---- */}
+        <motion.div initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
+          className="relative flex flex-col justify-center px-7 py-10 border-l border-white/[0.08]"
+          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.03))', backdropFilter: 'blur(14px)' }}>
+          {/* A gold hairline down the seam: the KSP rule that runs under the app's header,
+              carried onto the entry screen so the two feel like one product. */}
+          <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-kadi-gold/45 to-transparent" />
+
           {mode === 'signin'
             ? <SignInCard onSignup={() => setMode('signup')} onDone={() => nav('/')} />
             : <SignUpCard onBack={() => setMode('signin')} />}
 
           <div className="mt-7 pt-5 border-t border-white/10">
-            <div className="text-[10.5px] uppercase tracking-[0.16em] text-white/40 mb-2.5">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-white/35 mb-2.5">
               Or explore without an account
             </div>
             <div className="grid grid-cols-3 gap-2">
               {DEMO_TIERS.map((t) => (
                 <button key={t.key}
                   onClick={() => { setToken(null); setRole(t.role); nav('/'); }}
-                  className="group rounded-ctl border border-white/12 bg-white/[0.04] hover:bg-white/[0.10] hover:border-white/25 px-2.5 py-2.5 text-left transition-all">
-                  <t.icon size={15} style={{ color: t.accent }} />
-                  <div className="text-[12.5px] font-medium mt-1.5">{t.label}</div>
-                  <div className="text-[10.5px] text-white/45 leading-tight">{t.scope}</div>
+                  className="group relative rounded-ctl border border-white/10 bg-white/[0.035] hover:bg-white/[0.10] hover:border-white/25 px-2.5 py-3 text-left transition-all overflow-hidden">
+                  <span className="absolute inset-x-0 bottom-0 h-[2px] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"
+                    style={{ background: t.accent }} />
+                  <t.icon size={16} style={{ color: t.accent }} />
+                  <div className="text-[12.5px] font-medium mt-2">{t.label}</div>
+                  <div className="text-[10px] text-white/40 leading-tight mt-0.5">{t.scope}</div>
                 </button>
               ))}
             </div>
-            <p className="text-[10.5px] text-white/35 mt-2.5 leading-relaxed">
-              Demo access. The district tier may switch between all 31 districts; a real
-              account is pinned to its own.
+            <p className="text-[10px] text-white/30 mt-2.5 leading-relaxed">
+              The demo district tier switches between all 31 districts. A real account is
+              pinned to its own.
             </p>
           </div>
         </motion.div>
@@ -302,34 +338,3 @@ function SignUpCard({ onBack }: { onBack: () => void }) {
   );
 }
 
-// Kept, but pulled well back. At the earlier weight it read as a foreground pattern and the
-// sign-in form had to compete with it.
-function NetworkBackdrop() {
-  const [seed] = useState(() => {
-    const nodes = Array.from({ length: 22 }, (_, i) => ({
-      id: i, x: Math.random() * 100, y: Math.random() * 100, d: 7 + Math.random() * 9,
-    }));
-    const edges: { a: typeof nodes[0]; b: typeof nodes[0] }[] = [];
-    for (const n of nodes) {
-      const near = nodes.filter((m) => m.id !== n.id)
-        .sort((p, q) => ((p.x - n.x) ** 2 + (p.y - n.y) ** 2) - ((q.x - n.x) ** 2 + (q.y - n.y) ** 2))[0];
-      if (near && n.id < near.id) edges.push({ a: n, b: near });
-    }
-    return { nodes, edges };
-  });
-  return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100"
-      preserveAspectRatio="none" aria-hidden="true">
-      <g stroke="#7CC4F5" strokeWidth="0.08" opacity="0.14">
-        {seed.edges.map((e, i) => <line key={i} x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />)}
-      </g>
-      <g fill="#7CC4F5">
-        {seed.nodes.map((n) => (
-          <circle key={n.id} cx={n.x} cy={n.y} r="0.16" opacity="0.2">
-            <animate attributeName="opacity" values="0.08;0.3;0.08" dur={`${n.d}s`} repeatCount="indefinite" />
-          </circle>
-        ))}
-      </g>
-    </svg>
-  );
-}
