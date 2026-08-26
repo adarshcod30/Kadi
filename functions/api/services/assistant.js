@@ -198,6 +198,35 @@ function query(user, text, lang) {
 async function queryEnhanced(user, text, lang, req) {
   const base = query(user, text, lang);
   if (!quickml.configured()) return { ...base, llm: 'disabled' };
+
+  // Questions the case database cannot answer go to the knowledge base.
+  //
+  // The two halves are complementary, not competing. The deterministic engine answers
+  // questions of FACT exactly -- how many cyber cases in Udupi, who is linked to FIR 11597 --
+  // and it must keep doing so, because a retrieved sentence can go stale where a live query
+  // cannot. What it has no way to answer is what a thing MEANS: how the risk score is built,
+  // why a busy station is not automatically red, what a health flag asks you to do. None of
+  // that is in a column, and those are exactly the documents in the knowledge base.
+  //
+  // So RAG is consulted only when intent came back 'unknown' -- the engine saying "this is not
+  // a question about the records". Consulting it earlier would risk answering a countable
+  // question from prose.
+  if (base.intent === 'unknown') {
+    const rag = await quickml.ragAnswer(req, { question: text, lang: base.lang });
+    if (rag && rag.answer) {
+      return {
+        ...base,
+        answer: rag.answer,
+        // Still grounded, in documents rather than rows -- and labelled so the difference is
+        // visible instead of implied.
+        grounded: true,
+        source: 'knowledge_base',
+        documentsSearched: rag.documents,
+        llm: 'rag',
+        deterministicAnswer: base.answer,
+      };
+    }
+  }
   const facts = [
     base.answer,
     ...(base.citations || []).slice(0, 8).map((c) => `- ${c.type} ${c.label} (id ${c.id})`),

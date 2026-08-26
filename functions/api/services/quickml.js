@@ -9,7 +9,6 @@
 // Configuration (all optional; absent = disabled, and the caller falls back):
 //   QUICKML_LLM_ENDPOINT      full URL of the deployed GLM-4.7 endpoint
 //   QUICKML_LLM_DEPLOYMENT_ID deployment id, sent when the endpoint expects it
-//   QUICKML_RAG_KB_ID         knowledge-base / document id for RAG answers
 //   QUICKML_CONNECTION_NAME   Catalyst Connection holding scope quickml.deployment.read
 //
 // STATUS: wired but not yet live. What is confirmed working, and what is not:
@@ -41,14 +40,164 @@ try {
 const ENDPOINT = process.env.QUICKML_LLM_ENDPOINT
   || 'https://api.catalyst.zoho.in/quickml/v1/project/55468000000013048/glm/chat';
 const DEPLOYMENT_ID = process.env.QUICKML_LLM_DEPLOYMENT_ID || '';
-const RAG_KB_ID = process.env.QUICKML_RAG_KB_ID || '';
 // RAG has its own endpoint. The previous code posted the RAG body to the LLM-serving URL,
 // which ignores knowledge_base_id entirely -- so even with a KB configured it would have
 // answered from the model's own weights and looked like RAG was working.
 // Confirmed against the console: POST .../quickml/v1/project/{id}/rag/answer,
 // OAuth scope QuickML.rag.READ.
+// The console's own API Details panel is the authority here, and it disagreed with what was
+// coded in three ways at once -- host, auth prefix and body shape:
+//
+//   POST https://console.catalyst.zoho.in/quickml/v1/project/{id}/rag/answer
+//   Authorization: Zoho-oauthtoken <token>          (not Bearer, which the LLM endpoint uses)
+//   { "query": "<message>", "documents": ["<id>"] } (not the chat-completions shape)
+//
+// RAG is a different product surface from LLM serving, so it does not inherit that endpoint's
+// conventions. Both are kept separately rather than sharing constants.
 const RAG_ENDPOINT = process.env.QUICKML_RAG_ENDPOINT
-  || `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}/rag/answer`;
+  || `https://console.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}/rag/answer`;
+const RAG_AUTH_PREFIX = process.env.QUICKML_RAG_AUTH_PREFIX || 'Zoho-oauthtoken';
+
+// The knowledge base is addressed by document id, and the ids are assigned at upload. Rather
+// than pin them in config -- which would silently stop retrieving from a document the moment
+// one was re-uploaded -- they are read from the API and cached for the container's life.
+let ragDocIds = null;
+let ragDocsFetchedAt = 0;
+const RAG_DOCS_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * List what the knowledge base currently holds.
+ *
+ * Listing lives on the api. host, which answers it; answering lives on the console. host, per
+ * the console's own API Details panel. They are genuinely different endpoints on this product.
+ */
+async function listDocuments(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const u = new URL(`https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}/rag/documents`);
+  const out = await new Promise((resolve) => {
+    const rq = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'GET',
+      headers: { Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG, Accept: 'application/json' },
+      timeout: 15000,
+    }, (res) => {
+      let b = '';
+      res.on('data', (c) => { b += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body: b }));
+    });
+    rq.on('error', (e) => resolve({ status: 0, body: String(e.message) }));
+    rq.on('timeout', () => { rq.destroy(); resolve({ status: 0, body: 'timeout' }); });
+    rq.end();
+  });
+  try {
+    const j = JSON.parse(out.body);
+    const documents = j.documents || [];
+    // Ingestion into the vector store is ASYNCHRONOUS and this is the only place it is
+    // visible. A document sitting at "pushing_to_rag" is uploaded but not yet retrievable, so
+    // /rag/answer returns "not enough information" with retrieved_nodes: [] and never invokes
+    // the model. Without this readout that looks like a broken payload rather than a document
+    // that has not finished indexing -- two very different problems.
+    const byStatus = {};
+    for (const d of documents) byStatus[d.status || 'unknown'] = (byStatus[d.status || 'unknown'] || 0) + 1;
+    const ready = documents.filter((d) => /completed|success|active|synced/i.test(String(d.status)));
+    return {
+      ok: out.status === 200,
+      status: out.status,
+      documents,
+      indexing: {
+        total: documents.length,
+        retrievable: ready.length,
+        byStatus,
+        failed: documents.filter((d) => /fail/i.test(String(d.status))).map((d) => d.documentName),
+        note: ready.length === 0 && documents.length
+          ? 'Uploaded but still being pushed into the vector store. Retrieval stays empty until this completes.'
+          : null,
+      },
+    };
+  } catch {
+    return { ok: false, status: out.status, raw: out.body.slice(0, 300) };
+  }
+}
+
+/**
+ * Push the bundled documents into the knowledge base.
+ *
+ * BLOCKED ON SCOPE, and kept rather than deleted. The multipart contract is right -- the
+ * endpoint stopped complaining about `documentName` once the body was a form -- but every POST
+ * answers 401 INVALID_OAUTHSCOPE while the GET above answers 200 from the same credential. The
+ * token Catalyst injects into a deployed function carries QuickML.rag.READ and no write scope,
+ * the same shape as the Data Store DDL wall. Uploading is a console action until that changes;
+ * this exists so that when it does, the knowledge base refreshes from the same command that
+ * regenerates the documents rather than being maintained by hand until it silently disagrees.
+ */
+async function syncKnowledgeBase(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const dir = path.join(__dirname, '..', 'data', 'kb');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.txt')); } catch {
+    return { ok: false, reason: 'no bundled knowledge-base documents found' };
+  }
+  const results = [];
+  for (const f of files) {
+    const content = fs.readFileSync(path.join(dir, f), 'utf8');
+    const boundary = `----kadi${crypto.randomBytes(12).toString('hex')}`;
+    const body = Buffer.from([
+      `--${boundary}\r\nContent-Disposition: form-data; name="documentName"\r\n\r\n${f.replace(/\.txt$/, '')}\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${f}"\r\n`
+        + `Content-Type: text/plain\r\n\r\n${content}\r\n`,
+      `--${boundary}--\r\n`,
+    ].join(''), 'utf8');
+    const u = new URL(`https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}/rag/documents`);
+    // eslint-disable-next-line no-await-in-loop
+    const r = await new Promise((resolve) => {
+      const rq = https.request({
+        hostname: u.hostname, path: u.pathname, method: 'POST',
+        headers: {
+          Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length,
+        },
+        timeout: 25000,
+      }, (res) => {
+        let b = '';
+        res.on('data', (c) => { b += c; });
+        res.on('end', () => resolve({ name: f, status: res.statusCode, body: b.slice(0, 220) }));
+      });
+      rq.on('error', (e) => resolve({ name: f, status: 0, body: String(e.message) }));
+      rq.on('timeout', () => { rq.destroy(); resolve({ name: f, status: 0, body: 'timeout' }); });
+      rq.write(body); rq.end();
+    });
+    results.push(r);
+  }
+  const uploaded = results.filter((r) => r.status >= 200 && r.status < 300);
+  const scopeBlocked = results.some((r) => r.status === 401 && /OAUTHSCOPE/i.test(r.body));
+  return {
+    ok: uploaded.length > 0,
+    uploaded: uploaded.length,
+    attempted: results.length,
+    blocked: scopeBlocked ? 'QuickML rag write scope' : null,
+    remedy: scopeBlocked
+      ? 'The injected function credential holds QuickML.rag.READ only. Upload in the QuickML '
+        + 'console (RAG > Knowledge Base), or grant a write scope and re-run this.'
+      : null,
+    results: results.map((r) => ({ name: r.name, status: r.status, body: r.body.slice(0, 140) })),
+  };
+}
+
+async function ragDocuments(req) {
+  if (ragDocIds && Date.now() - ragDocsFetchedAt < RAG_DOCS_TTL_MS) return ragDocIds;
+  const out = await listDocuments(req);
+  if (out && out.ok && Array.isArray(out.documents) && out.documents.length) {
+    // Exclude documents that failed to index. Passing an id the retriever cannot serve adds
+    // nothing and muddies the diagnosis when an answer comes back empty.
+    ragDocIds = out.documents
+      .filter((d) => !/fail/i.test(String(d.status)))
+      .map((d) => String(d.documentId || d.id))
+      .filter(Boolean);
+    ragDocsFetchedAt = Date.now();
+  }
+  return ragDocIds;
+}
 const CONNECTION = process.env.QUICKML_CONNECTION_NAME || 'kadi_quickml';
 const TIMEOUT_MS = Number(process.env.QUICKML_TIMEOUT_MS || 12000);
 // Model id and org header are what the console's own sample request uses.
@@ -84,7 +233,7 @@ function status() {
     configured: configured(),
     endpointSet: Boolean(ENDPOINT),
     deploymentIdSet: Boolean(DEPLOYMENT_ID),
-    ragKbSet: Boolean(RAG_KB_ID),
+    ragDocumentsCached: ragDocIds ? ragDocIds.length : 0,
     ragEndpoint: RAG_ENDPOINT,
     connectionSet: Boolean(CONNECTION),
     sdkLoaded: Boolean(catalyst),
@@ -229,151 +378,64 @@ async function phrase(req, { question, facts, lang }) {
  * Separate from `phrase`: this one is allowed to answer from the documents rather than
  * from the case database, and says so to the caller so the UI can label the source.
  */
+// Returns the endpoint's reply verbatim. "Not enough information" from a RAG service can mean
+// the payload was wrong, the documents are still being embedded, or retrieval genuinely missed
+// -- and those have different fixes, so look at the wire rather than guess.
+async function ragProbe(req, question) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const documents = await ragDocuments(req);
+  const variants = [
+    { label: 'documents=ids', body: { query: question, documents } },
+    { label: 'documents=ids,top_k', body: { query: question, documents, top_k: 5 } },
+    { label: 'no-documents', body: { query: question } },
+  ];
+  const out = [];
+  for (const v of variants) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await postJson(RAG_ENDPOINT, v.body, {
+        Authorization: `${RAG_AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG,
+      });
+      out.push({ variant: v.label, reply: JSON.stringify(res).slice(0, 420) });
+    } catch (e) {
+      out.push({ variant: v.label, error: String(e && e.message ? e.message : e).slice(0, 220) });
+    }
+  }
+  return { ok: true, documentCount: (documents || []).length, sample: (documents || []).slice(0, 3), variants: out };
+}
+
 async function ragAnswer(req, { question, lang }) {
-  if (!configured() || !RAG_KB_ID) return null;
+  if (!configured()) return null;
   try {
     const token = await accessToken(req);
-    const headers = token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {};
-    const body = {
-      model: MODEL,
-      chat_template_kwargs: { enable_thinking: false },
-      knowledge_base_id: RAG_KB_ID,
-      documents: [RAG_KB_ID],
-      messages: [
-        { role: 'system', content: `${SYSTEM_PROMPT}\nAnswer from the attached documents.` },
-        { role: 'user', content: `QUESTION (${lang}): ${question}` },
-      ],
-      temperature: 0.1,
-      max_tokens: 400,
-      stream: false,
-    };
-    const out = await postJson(RAG_ENDPOINT, body, headers);
+    if (!token) return null;
+    const documents = await ragDocuments(req);
+    if (!documents || !documents.length) {
+      lastError = 'rag: knowledge base is empty';
+      return null;
+    }
+    // The language hint rides in the query rather than a system prompt -- this endpoint takes
+    // a bare question, not a message list, so there is nowhere else to put it.
+    const query = lang && String(lang).startsWith('kn')
+      ? `${question}\n\n(Answer in Kannada.)`
+      : String(question);
+
+    const out = await postJson(RAG_ENDPOINT, { query, documents }, {
+      Authorization: `${RAG_AUTH_PREFIX} ${token}`,
+      'CATALYST-ORG': ORG,
+    });
     const text = extractText(out);
     if (text && text.trim()) {
       lastError = null;
-      return { answer: text.trim(), source: 'knowledge_base', kbId: RAG_KB_ID };
+      return { answer: text.trim(), source: 'knowledge_base', documents: documents.length };
     }
+    lastError = `rag: no answer in reply ${JSON.stringify(out).slice(0, 180)}`;
     return null;
   } catch (e) {
     lastError = `rag: ${e && e.message ? e.message : e}`;
     return null;
   }
-}
-
-/**
- * List what the knowledge base currently holds.
- */
-async function listDocuments(req) {
-  const token = await accessToken(req);
-  if (!token) return { ok: false, stage: 'token', tokenState };
-  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}`;
-  const out = await new Promise((resolve) => {
-    const u = new URL(`${base}/rag/documents`);
-    const rq = https.request({
-      hostname: u.hostname, path: u.pathname, method: 'GET',
-      headers: { Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG, Accept: 'application/json' },
-      timeout: 15000,
-    }, (res) => {
-      let b = '';
-      res.on('data', (c) => { b += c; });
-      res.on('end', () => resolve({ status: res.statusCode, body: b }));
-    });
-    rq.on('error', (e) => resolve({ status: 0, body: String(e.message) }));
-    rq.on('timeout', () => { rq.destroy(); resolve({ status: 0, body: 'timeout' }); });
-    rq.end();
-  });
-  try {
-    const j = JSON.parse(out.body);
-    return { ok: out.status === 200, status: out.status, documents: j.documents || [] };
-  } catch {
-    return { ok: false, status: out.status, raw: out.body.slice(0, 300) };
-  }
-}
-
-/**
- * Upload one document to the knowledge base.
- *
- * multipart/form-data, hand-built. The endpoint rejected every JSON shape with
- * LESS_THAN_MIN_OCCURANCE naming `documentName`, which is the signature of a form parameter
- * rather than a JSON field -- so the body is assembled here rather than pulling in a
- * form-data dependency for one call inside a function that must stay small.
- */
-function uploadDocument(req, token, { name, content }) {
-  const boundary = `----kadi${crypto.randomBytes(12).toString('hex')}`;
-  const parts = [
-    `--${boundary}\r\nContent-Disposition: form-data; name="documentName"\r\n\r\n${name}\r\n`,
-    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\n`
-      + `Content-Type: text/markdown\r\n\r\n${content}\r\n`,
-    `--${boundary}--\r\n`,
-  ];
-  const body = Buffer.from(parts.join(''), 'utf8');
-  const u = new URL(`https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}/rag/documents`);
-  return new Promise((resolve) => {
-    const rq = https.request({
-      hostname: u.hostname, path: u.pathname, method: 'POST',
-      headers: {
-        Authorization: `${AUTH_PREFIX} ${token}`,
-        'CATALYST-ORG': ORG,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': body.length,
-      },
-      timeout: 25000,
-    }, (res) => {
-      let b = '';
-      res.on('data', (c) => { b += c; });
-      res.on('end', () => resolve({ name, status: res.statusCode, body: b.slice(0, 300) }));
-    });
-    rq.on('error', (e) => resolve({ name, status: 0, body: String(e.message) }));
-    rq.on('timeout', () => { rq.destroy(); resolve({ name, status: 0, body: 'timeout' }); });
-    rq.write(body); rq.end();
-  });
-}
-
-/**
- * Push every bundled knowledge-base document.
- *
- * STATUS: blocked on scope, and worth recording rather than deleting.
- *
- * The multipart contract is right -- the endpoint stopped complaining about `documentName`
- * once the body was built as a form. What it returns instead is 401 INVALID_OAUTHSCOPE on
- * every POST, while GET /rag/documents answers 200 from the same credential. So the token
- * Catalyst injects into a deployed function carries QuickML.rag.READ and no write scope.
- *
- * This is the same shape as the Data Store DDL wall: the path is correct, the credential is
- * not privileged for it. Uploading is therefore a console action until a write scope is
- * granted, and this route stays so that the moment it is, the KB can be refreshed by the same
- * command that regenerates the documents rather than maintained by hand until it silently
- * disagrees with the product.
- */
-async function syncKnowledgeBase(req) {
-  const token = await accessToken(req);
-  if (!token) return { ok: false, stage: 'token', tokenState };
-  const dir = path.join(__dirname, '..', 'data', 'kb');
-  let files = [];
-  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')); } catch {
-    return { ok: false, reason: 'no bundled knowledge-base documents found' };
-  }
-  const results = [];
-  for (const f of files) {
-    const content = fs.readFileSync(path.join(dir, f), 'utf8');
-    // eslint-disable-next-line no-await-in-loop
-    results.push(await uploadDocument(req, token, { name: f, content }));
-  }
-  const uploaded = results.filter((r) => r.status >= 200 && r.status < 300);
-  const scopeBlocked = results.some((r) => r.status === 401 && /OAUTHSCOPE/i.test(r.body));
-  return {
-    ok: uploaded.length > 0,
-    uploaded: uploaded.length,
-    attempted: results.length,
-    // Say which wall this is. A bare 401 reads as "broken"; naming the scope says the request
-    // was correct and the credential was not, which is a different thing to go and fix.
-    blocked: scopeBlocked ? 'QuickML rag write scope' : null,
-    remedy: scopeBlocked
-      ? 'The injected function credential holds QuickML.rag.READ only. Upload the documents in '
-        + 'the QuickML console (RAG > Documents), or grant a write scope and re-run this.'
-      : null,
-    results: results.map((r) => ({ name: r.name, status: r.status, body: r.body.slice(0, 160) })),
-  };
 }
 
 // Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant// Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant
@@ -424,4 +486,4 @@ async function complete(req, { system, user, maxTokens = 220, temperature = 0.35
 }
 
 module.exports = {
-  listDocuments, syncKnowledgeBase, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };
+  listDocuments, syncKnowledgeBase, ragProbe, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };

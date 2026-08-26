@@ -742,6 +742,8 @@ function buildApp() {
   // Knowledge base. Listing is open to the state tier; pushing is an Admin/DGP action because
   // it replaces what the assistant retrieves from.
   r.get('/ai/kb', handle(async (req) => quickml.listDocuments(req)));
+  // Raw RAG round-trip, so a "no answer" can be told apart from a wrong payload.
+  r.get('/ai/rag-probe', handle(async (req) => quickml.ragProbe(req, String(req.query.q || 'What does a pulsing red zone mean?'))));
   r.post('/admin/sync-knowledge-base', handle(async (req) => {
     rbac.requireRole(req.user, ['Admin', 'DGP']);
     return quickml.syncKnowledgeBase(req);
