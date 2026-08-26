@@ -31,7 +31,7 @@ limitation you will find in older notes and in some Zoho documentation.
 | **Web Client Hosting** | The React SPA at `/app` |
 | **Serverless Functions** | `api` (36 endpoints) + `refreshanalytics` (the nightly Job) |
 | **AppSail** | `kadi-appsail` — Python analytics, ~135 ms per call |
-| **Data Store** | 11 tables, 40,829 FIRs, live ZCQL |
+| **Data Store** | 11 tables, 59,985 FIRs, live ZCQL |
 | **Stratus** | Bulk-import objects |
 | **Job Scheduling + Cron** | Nightly recompute, 02:00 IST, last run SUCCESS |
 | **Connections** | `kadi_quickml` OAuth, scope `deployment.READ` |
@@ -90,7 +90,7 @@ refused, not hidden. Only the identity check is outstanding. Fix: read the Catal
 
 **2 · CaseMaster in Data Store is a snapshot, and the API reads the bundle.**
 
-Data Store holds **40,836** CaseMaster rows against the current corpus's **40,829**, with
+Data Store holds **40,836** CaseMaster rows against the current corpus's **59,985**, with
 different offenders behind them -- it was never re-imported after the corpus was regenerated.
 The deployed application does not read it, so the staleness is contained to
 `/datastore/cases`, but the row-count claim should be stated as a snapshot.
@@ -250,12 +250,12 @@ API and carried into the deck and this README.
 
 | Metric | Value |
 |---|---|
-| FIRs analysed | 40,829 |
-| Accused records → resolved identities | 36,582 → 35,662 identities · 441 repeat |
+| FIRs analysed | 59,985 |
+| Accused records → resolved identities | 54,337 → 52,928 identities · 578 repeat |
 | Active networks / cross-district | 127 / 197 |
-| Cases flagged by investigation health | 18,901 |
+| Cases flagged by investigation health | 26,168 |
 | Ground-truth recovery | 100% overall · identity ER 83.2% |
-| Forecast MAPE | 3.9% — 3-month hold-out backtest |
+| Forecast MAPE | 7.8% — 3-month hold-out backtest |
 | Correlations (n=31) | urbanisation +0.88 · literacy +0.546 · density +0.871 |
 | Pipeline runtime / peak memory | 24.6 s / 738 MB (was 1,770 MB) |
 | AppSail analytics latency | ~135 ms |

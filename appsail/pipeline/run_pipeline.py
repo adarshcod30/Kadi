@@ -39,6 +39,7 @@ import evaluate
 import national
 import socio
 import forecast
+import training_set
 
 TODAY = date(2026, 7, 13)
 
@@ -293,6 +294,13 @@ def run(data_dir: str):
     step("crime forecasting")
     forecast_ctx = forecast.compute(tables, unit_district, TODAY)
 
+    # The CSV a QuickML model trains on. Written every run so it tracks the corpus, including
+    # any case approved through the write path -- but retraining stays a deliberate console
+    # action. Silent automatic retraining on a police system is a liability; someone should
+    # read the backtest before a new model serves.
+    step("ML training set")
+    training_meta = training_set.compute(tables, unit_district, TODAY, data_dir)
+
     # ---------------- write artifacts ----------------
     step("writing derived artifacts")
     common.write_json(data_dir, "offenders", offenders)
@@ -315,6 +323,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "national", national_ctx)
     common.write_json(data_dir, "socio", socio_ctx)
     common.write_json(data_dir, "forecast", forecast_ctx)
+    common.write_json(data_dir, "training_set_meta", training_meta)
 
     step("ground-truth evaluation")
     gt_path = os.path.join(data_dir, "_ground_truth.json")

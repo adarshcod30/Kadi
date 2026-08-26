@@ -41,7 +41,7 @@ detection timelines with no supervisory signal. And the FIR schema contains cast
 and occupation — so any predictive system built on it risks discriminating, which is the
 standard and fair criticism of predictive policing in India.
 
-**The solution.** Fold 40,829 FIRs into one graph where every edge is provable evidence, then
+**The solution.** Fold 59,985 FIRs into one graph where every edge is provable evidence, then
 build analytics on top that explain rather than merely count — and exclude protected
 attributes by construction, enforced by a test rather than a policy.
 
@@ -164,13 +164,13 @@ so the analytics exercise the same shapes they would in production.
 
 | Table | Rows |
 |---|---:|
-| CaseMaster (FIRs) | **40,829** |
-| Victim | 50,656 |
-| Accused | **36,582** → 300 resolved identities |
-| ComplainantDetails | ~40,000 |
-| ArrestSurrender | ~30,000 |
-| ActSectionAssociation | ~90,000 |
-| ChargesheetDetails | ~28,000 |
+| CaseMaster (FIRs) | **59,985** |
+| Victim | 74,799 |
+| Accused | **54,337** → 300 planted, 578 resolved |
+| ComplainantDetails | 59,985 |
+| ArrestSurrender | 17,346 |
+| ActSectionAssociation | 87,868 |
+| ChargesheetDetails | 32,942 |
 | Districts / stations | 31 / 298 |
 
 Span: Jan 2023 → Jul 2026, 43 months. Seed `2026`, regenerates byte-for-byte.
@@ -211,7 +211,7 @@ There are **two** stores, and only one is on the read path.
 
 | Store | Contents | On the read path? |
 |---|---|---|
-| **Data Store** (Catalyst) | CaseMaster 40,829 · DistrictInsight 31 · **Accused 0 · OffenderIdentity 0** | ❌ no |
+| **Data Store** (Catalyst) | CaseMaster 59,985 · DistrictInsight 31 · **Accused 0 · OffenderIdentity 0** | ❌ no |
 | **Bundle** (`functions/api/data/`) | everything the UI reads | ✅ yes |
 
 Verified by ZCQL on 2026-08-20:
@@ -223,7 +223,7 @@ SELECT COUNT(ROWID) FROM Accused           → 0
 SELECT COUNT(ROWID) FROM OffenderIdentity  → 0
 ```
 
-**So two things are true at once:** the claim "40,829 FIRs are in Data Store" is *correct*,
+**So two things are true at once:** the claim "59,985 FIRs are in Data Store" is *correct*,
 and the deployed application does not read them. §8 and §10 explain why.
 
 ---
@@ -237,7 +237,7 @@ Stage order, taken from the `step()` calls in the source:
 | # | Stage | Module | What it does |
 |---|---|---|---|
 | 1 | loading source tables | `common.py` | reads the 29 CSVs |
-| 2 | **entity resolution** | `entity_resolution.py` (258 ln) | blocking → rapidfuzz → union-find. 36,582 → 35,662 identities · 441 repeat |
+| 2 | **entity resolution** | `entity_resolution.py` (258 ln) | blocking → rapidfuzz → union-find. 54,337 → 52,928 identities · 578 repeat |
 | 3 | MO similarity | `mo_similarity.py` (73 ln) | TF-IDF + NearestNeighbors cosine |
 | 4 | graph build + community | `graph_build.py` (174) · `community.py` (28) | typed edges + Louvain → 127 networks |
 | 5 | offender risk | `risk_score.py` (130) | transparent additive score with factors |
@@ -411,7 +411,9 @@ the state identifies nobody; neither does a narrative shared by 140 FIRs.
 | `shared_section` signals | 137,596 | 338 |
 
 **Headline figures are untouched** — 127 networks, 197 cross-district, 441 offenders, 18,901
-flagged, ground-truth recovery 100%. Those run on shared-offender relationships, so what was
+flagged, ground-truth recovery 100%. (Measured on the 40,829-FIR corpus of the time; the
+current corpus reports different absolutes, and the point stands on the invariance, not the
+values.) Those run on shared-offender relationships, so what was
 removed was noise, not intelligence. That invariance is the evidence the gate is surgical.
 
 ### Two display defects found in the same investigation
@@ -571,7 +573,7 @@ half-translated page (Kannada headings, English body) is worse than none.
 | **Web Client Hosting** | React SPA at `/app` | same origin as API → no CORS |
 | **Serverless Functions** | `api` (33 routes) + `refreshanalytics` (Job) | 512 MB |
 | **AppSail** | `kadi-appsail`, Python | ~135 ms; **stdlib-only** |
-| **Data Store** | 11 tables, 40,829 FIRs | live ZCQL — but see below |
+| **Data Store** | 11 tables, 59,985 FIRs | live ZCQL — but see below |
 | **Stratus** | bulk-import objects | |
 | **Job Scheduling + Cron** | nightly 02:00 IST | last run SUCCESS |
 | **Connections** | `kadi_quickml` OAuth | `deployment.READ` |
@@ -838,5 +840,5 @@ Three specifically worth volunteering before anyone asks:
    hallucinate an FIR number. In police work that trade is worth making.
 
 Saying these first is what separates an analyst's work from a student project. And you can
-afford to say them, because the things that *do* work — 100% ground-truth recovery, 4.3% MAPE
+afford to say them, because the things that *do* work — 100% ground-truth recovery, 7.8% MAPE
 on a hold-out backtest, a fairness guarantee enforced by a failing test — are all measured.

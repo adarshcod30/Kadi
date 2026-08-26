@@ -17,7 +17,7 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   intelligence: { en: 'Intelligence', kn: 'ಗುಪ್ತಚರ' },
   react: { en: 'React', kn: 'ಪ್ರತಿಕ್ರಿಯೆ' },
   forecast: { en: 'Forecast', kn: 'ಮುನ್ಸೂಚನೆ' },
-  register: { en: 'Register a case', kn: 'ಪ್ರಕರಣ ದಾಖಲಿಸಿ' },
+  register: { en: 'Register', kn: 'ದಾಖಲಾತಿ' },
   assistant: { en: 'Assistant', kn: 'ಸಹಾಯಕ' },
   audit: { en: 'Audit', kn: 'ಲೆಕ್ಕಪರಿಶೋಧನೆ' },
   admin: { en: 'Admin', kn: 'ನಿರ್ವಹಣೆ' },

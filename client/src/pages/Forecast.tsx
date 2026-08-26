@@ -30,7 +30,7 @@ export default function Forecast() {
 
   const m = data.momentum;
   const dir = DIR[(m?.direction || 'flat') as keyof typeof DIR];
-  const bt = fc?.backtest;
+  const bt = fc?.accuracy;
 
   return (
     <div className="space-y-4">
@@ -153,7 +153,12 @@ export default function Forecast() {
             Case-to-case links are on the Graph, and they carry evidence.
           </InfoDot>
         </span>}>
-          {!data.patterns?.items?.length ? <Empty title="No co-occurrence above chance" /> : (
+          {!data.patterns?.items?.length ? (
+            <Empty title="No co-occurrence above chance"
+              hint={data.patterns?.districts === 1
+                ? 'Co-occurrence is measured across district-months. Within a single district the common crime types appear in nearly every month, so chance is already near one and little can rise above it. This reads at state scope.'
+                : 'No pair of crime types appears together materially more often than if they were unrelated.'} />
+          ) : (
             <div className="p-3 space-y-2">
               {data.patterns.items.slice(0, 6).map((p: any) => (
                 <div key={p.key} className="border border-line rounded-ctl px-3 py-2">
@@ -228,8 +233,42 @@ export default function Forecast() {
             backtest {bt.mape}% MAPE over {bt.holdoutMonths} months
           </span>
         )}>
-          <div className="p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+          {/* A district officer's OWN projection first and on its own. Sorting every district by
+              change and showing the top nine put nine other districts under a heading that says
+              "your scope" -- true of the numbers, misleading about whose they are. */}
+          {fc.scope === 'district' && fc.focus && (
+            <div className="p-3 pb-0">
+              <div className="rounded-ctl border border-kadi-teal/30 bg-teal-50/40 px-3.5 py-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13.5px] font-semibold text-kadi-navy">{fc.focus.districtName}</span>
+                  <span className={`text-[12.5px] font-num ${fc.focus.direction === 'rising' ? 'text-danger' : 'text-success'}`}>
+                    {fc.focus.changePct > 0 ? '+' : ''}{fc.focus.changePct}%
+                  </span>
+                  <span className="ml-auto text-[11.5px] text-ink-muted">
+                    {fc.focus.rankByChange} of {fc.focus.ofDistricts} by change
+                  </span>
+                </div>
+                {(fc.focus.forecast || [])[0] && (
+                  <div className="text-[12.5px] text-ink-muted mt-1 font-num">
+                    {fc.focus.forecast[0].month}: <b className="text-ink">{Math.round(fc.focus.forecast[0].predicted)}</b>
+                    <span className="text-ink-subtle"> ({Math.round(fc.focus.forecast[0].lower)}–{Math.round(fc.focus.forecast[0].upper)})</span>
+                    <span className="text-ink-subtle"> · {fc.focus.vsStateChangePct > 0 ? '+' : ''}{fc.focus.vsStateChangePct} points against the state trend</span>
+                  </div>
+                )}
+              </div>
+              <div className="label mt-3 mb-1">
+                Other districts, for comparison
+                <InfoDot label="Why other districts appear here" className="ml-1.5">
+                  Forecasts are aggregate monthly counts, not case-level records, so comparing
+                  yours against the rest is not a scope breach — it is the only way to know
+                  whether a rise is yours or everyone's. No case detail crosses the boundary.
+                </InfoDot>
+              </div>
+            </div>
+          )}
+          <div className="p-3 pt-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {[...fc.districts]
+              .filter((d: any) => fc.scope !== 'district' || String(d.districtId) !== String(fc.focus?.districtId))
               .sort((a: any, b: any) => (b.changePct || 0) - (a.changePct || 0))
               .slice(0, 9)
               .map((d: any) => {

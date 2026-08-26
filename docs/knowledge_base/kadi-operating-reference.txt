@@ -124,7 +124,7 @@ Station-level outliers compare false-case rates against the station's peer group
 Three-month projections use a linear trend plus month-of-year seasonality.
 
 Accuracy is a hold-out backtest: the last three months are hidden from the model,
-predicted, and scored against what actually happened. Current error is 4.3% MAPE.
+predicted, and scored against what actually happened. Current error is 7.8% MAPE.
 
 A projected move smaller than the model's own error is inside the noise and should not be
 acted on as if it were a finding.

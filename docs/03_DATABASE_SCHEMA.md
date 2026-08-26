@@ -14,7 +14,7 @@ Three parts:
 > have built a demo instead of a system. Catalyst auto-adds `ROWID`, `CREATEDTIME`,
 > `MODIFIEDTIME` and `CREATORID` to every table — never redefine those.
 
-**Live right now:** 11 tables in Data Store, 40,829 FIRs, queryable with ZCQL. The generator
+**Live right now:** 11 tables in Data Store, 59,985 FIRs, queryable with ZCQL. The generator
 emits 29 tables in total; you imported the subset the API actually reads.
 
 ---

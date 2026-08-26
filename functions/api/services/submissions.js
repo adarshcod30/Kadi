@@ -437,6 +437,19 @@ async function requestUpdate(req, user, body = {}) {
   const reason = trim(body.reason, 1000);
   if (reason.length < 5) return { ok: false, error: 'Give the grounds for the change.', status: 400 };
 
+  // One pending request of a kind per case. Submissions have guarded against a duplicate FIR
+  // number since they shipped; updates did not, and two identical arrest requests sat in the
+  // queue at once -- which puts an approver in the position of approving the same fact twice
+  // and makes the second decision meaningless.
+  const existing = await datastore.query(req,
+    `SELECT ROWID FROM ${UPDATE_TABLE} WHERE caseMasterId = '${esc(caseMasterId)}' `
+      + `AND updateType = '${esc(type)}' AND updateStatus = 'pending'`, UPDATE_TABLE);
+  if (existing && existing.length) {
+    // Phrased without an article: "A arrest recorded request" is what naive interpolation
+    // produced, and every label would need its own a/an to fix it that way.
+    return { ok: false, error: `There is already a pending "${UPDATE_TYPES[type].label}" request on this case.`, status: 409 };
+  }
+
   const key = mintKey();
   const row = {
     updateKey: key,

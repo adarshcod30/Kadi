@@ -547,3 +547,34 @@ test('read model: approved cases union into the register but not into the derive
   // And a user with no live rows sees exactly what the bundle holds.
   assert.strictEqual(q.filterCases(sp, {}).rows.length, before);
 });
+
+test('forecasting: a live case in a new month must not move the corpus clock', () => {
+  const q = require('../api/services/queries');
+  const fc = require('../api/services/forecasting');
+  const user = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  const rows = q.scopeBaseline(user);
+
+  // The write path broke this the day it shipped. Momentum and emerging risk both took "the
+  // last complete month" to be months[length - 2] -- the last month minus one, assuming
+  // exactly one trailing month is partial because the extract was pulled mid-month. One case
+  // registered today opens a new month, the partial month slides one position, and both
+  // analyses silently read a fortnight as a full month: the state reported -24% falling and
+  // emerging risk returned nothing at all, on a corpus that had not changed.
+  const live = {
+    ...rows[0], caseMasterId: 'LIVE-x', crimeRegisteredDate: '2026-08-26',
+    crimeSubHeadId: '203', districtId: '1',
+  };
+  const withLive = rows.concat([live, { ...live, caseMasterId: 'LIVE-y' }]);
+
+  const before = fc.momentum(rows);
+  const after = fc.momentum(withLive);
+  assert.strictEqual(after.changePct, before.changePct, 'two live cases must not move the trend');
+  assert.strictEqual(after.series[after.series.length - 1].month,
+    before.series[before.series.length - 1].month, 'the last complete month must not move');
+
+  const erBefore = fc.emergingRisk(rows);
+  const erAfter = fc.emergingRisk(withLive);
+  assert.strictEqual(erAfter.asOfMonth, erBefore.asOfMonth);
+  assert.ok(erAfter.total > 0, 'emerging risk must not collapse to zero');
+  assert.strictEqual(erAfter.total, erBefore.total);
+});

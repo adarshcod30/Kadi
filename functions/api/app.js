@@ -19,6 +19,7 @@ const intel = require('./services/intelligence');
 const fc = require('./services/forecasting');
 const reactq = require('./services/react');
 const submissions = require('./services/submissions');
+const mlforecast = require('./services/mlforecast');
 const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
@@ -709,7 +710,11 @@ function buildApp() {
     return { ...o, insight: text, insightSource: source };
   }));
   r.get('/analytics/forecast', handle(async (req) => {
-    const f = q.forecast(req.user);
+    // Which forecaster answered, and what both scored. Attached whether or not a model is
+    // deployed: "the baseline serves because no model is deployed" is a statement worth making
+    // out loud, and it is the same field that will read "the model serves" once one is.
+    const base = q.forecast(req.user);
+    const f = { ...base, serving: mlforecast.chooseServed(base) };
     if (String(req.query.explain) !== 'true') return f;
     const districtView = f.scope === 'district';
     const facts = districtView ? {
@@ -943,6 +948,30 @@ function buildApp() {
     note: 'Rows are written through to the AuditLog Data Store table. The buffer answers reads.',
   })));
 
+  // ---- the ML training set -----------------------------------------------------------
+  // QuickML has no REST surface for datasets, pipelines or models, so building one is a
+  // console workflow. These two endpoints are the automated half: what is in the current
+  // training set, and the file itself to upload.
+  r.get('/ml/training-set', handle(async () => {
+    const meta = q.trainingSetMeta();
+    return {
+      ...meta,
+      available: Boolean(meta && meta.rows),
+      download: '/server/api/ml/training-set.csv',
+      serving: mlforecast.status(),
+    };
+  }));
+
+  r.get('/ml/training-set.csv', (req, res) => {
+    const p = require('path').join(q.dataDir(), 'derived', 'training_set.csv');
+    if (!require('fs').existsSync(p)) {
+      return res.status(404).json({ ok: false, error: { code: 'not_found', message: 'Run the pipeline to build the training set.' } });
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="kadi_training_set.csv"');
+    require('fs').createReadStream(p).pipe(res);
+  });
+
   r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
   // Knowledge base. Listing is open to the state tier; pushing is an Admin/DGP action because
   // it replaces what the assistant retrieves from.
@@ -955,6 +984,7 @@ function buildApp() {
   }));
 
   r.get('/ai/status', handle(async () => ({
+    forecastModel: mlforecast.status(),
     quickml: quickml.status(),
     zia: zia.status(),
     smartbrowz: smartbrowz.status(),

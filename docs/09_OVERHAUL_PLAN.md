@@ -22,7 +22,7 @@ ourselves honestly:
 | **Repeat offender tracking + MO across jurisdictions** | ⚠️ partial | Only 300 of 36,289 identities; weakly surfaced |
 | **Association detection** | ⚠️ weak | Co-accused edges exist but are barely used |
 | **Socio-economic correlation** | ✅ done | Kodagu finding |
-| **Predictive risk scoring / forecast** | ✅ done | 3-month, MAPE 4.3% |
+| **Predictive risk scoring / forecast** | ✅ done | 3-month, MAPE 7.8% |
 | **Anomaly detection** | ⚠️ weak | Computed, hardly visible |
 | **AI/ML-driven intelligence, hidden correlations** | 🔴 **the big one** | No LLM anywhere on the read path |
 | **"Storytelling", not static charts** | 🔴 missing | Charts have no narrative layer |
@@ -174,7 +174,7 @@ mix.
 
 ### W6 · Scope Cases and Offenders properly
 
-- **Cases** — state: all 40,829. District: that district's cases **plus cases linked into
+- **Cases** — state: all 59,985. District: that district's cases **plus cases linked into
   them** (silo-breaking is the whole point, so linked-in cases must remain visible).
 - **Offenders** — state: all. District: offenders with a case in that district.
 
@@ -186,7 +186,7 @@ mix.
 
 The track names both explicitly. Both are currently underpowered.
 
-**The honest problem:** entity resolution merges 36,582 accused records into 36,289 identities
+**The honest problem:** entity resolution merges 54,337 accused records into 36,289 identities
 — only **601 merges**. Of those, 300 appear in 2+ cases. That is thin, and it is because the
 generator only plants name variants for its seven patterns.
 

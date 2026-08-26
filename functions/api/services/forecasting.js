@@ -25,6 +25,36 @@ function shiftDays(isoDate, n) {
 const monthOf = (d) => String(d || '').slice(0, 7);
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
 
+
+// Which trailing months are COMPLETE.
+//
+// Both the trend read and the emerging-risk baseline need "the last month we actually have all
+// of", and both originally took that to be `months[length - 2]` -- the last month minus one,
+// on the assumption that exactly one trailing month is partial because the extract was pulled
+// mid-month.
+//
+// The write path broke that assumption the day it shipped. A single case registered today adds
+// a new month holding one row, so the "partial" month slid one position and the analyses
+// silently read a fortnight of July as a complete month: momentum reported -24% falling and
+// emerging risk returned nothing at all, on a corpus that had not changed.
+//
+// So detect a partial month instead of assuming where it is. A trailing month counting less
+// than PARTIAL_GUARD of the trailing median is cut, repeatedly -- which handles one stray live
+// case, several, and the ordinary mid-month extract identically.
+const PARTIAL_GUARD = 0.55;
+
+function completeMonths(byMonth) {
+  const months = [...byMonth.keys()].sort();
+  while (months.length > 6) {
+    const tail = byMonth.get(months[months.length - 1]) || 0;
+    const prior = months.slice(-7, -1).map((m) => byMonth.get(m) || 0).sort((a, b) => a - b);
+    const median = prior[Math.floor(prior.length / 2)] || 0;
+    if (median && tail < PARTIAL_GUARD * median) months.pop();
+    else break;
+  }
+  return months;
+}
+
 function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0; }
 function stdev(xs) {
   if (xs.length < 2) return 0;
@@ -44,10 +74,12 @@ function stdev(xs) {
 function emergingRisk(rows, { limit = 12 } = {}) {
   // Bucket by district × sub-head × month.
   const series = new Map();
+  const monthTotals = new Map();
   let maxMonth = '';
   for (const c of rows) {
     const m = monthOf(c.crimeRegisteredDate);
     if (!m) continue;
+    monthTotals.set(m, (monthTotals.get(m) || 0) + 1);
     if (m > maxMonth) maxMonth = m;
     const key = `${c.districtId}|${c.crimeSubHeadId}`;
     let e = series.get(key);
@@ -58,14 +90,11 @@ function emergingRisk(rows, { limit = 12 } = {}) {
     e.months.set(m, (e.months.get(m) || 0) + 1);
   }
   if (!maxMonth) return { asOfMonth: null, items: [] };
-  // Compare against the last COMPLETE month, not the last month with any row in it. The corpus
-  // runs to the end of June while registration dates reach mid-July, so the final bucket holds
-  // a fortnight and every series reads as collapsing. Momentum already drops it; emerging risk
-  // silently returned nothing at all until it did the same.
-  const allMonths = new Set();
-  for (const e of series.values()) for (const m of e.months.keys()) allMonths.add(m);
-  const ordered = [...allMonths].sort();
-  const current = ordered.length > 1 ? ordered[ordered.length - 2] : ordered[0];
+  // Compare against the last COMPLETE month, not the last month with any row in it -- a
+  // fortnight of data makes every series read as collapsing.
+  const ordered = completeMonths(monthTotals);
+  if (!ordered.length) return { asOfMonth: null, items: [], total: 0 };
+  const current = ordered[ordered.length - 1];
 
   const out = [];
   for (const e of series.values()) {
@@ -120,7 +149,7 @@ function patterns(rows, { limit = 10, minSupport = 12 } = {}) {
     labels.set(String(c.crimeSubHeadId), c.crimeSubHead);
   }
   const N = buckets.size;
-  if (N < 12) return { buckets: N, items: [] };
+  if (N < 12) return { buckets: N, items: [], total: 0, districts: 0 };
 
   for (const set of buckets.values()) for (const s of set) counts.set(s, (counts.get(s) || 0) + 1);
 
@@ -157,7 +186,14 @@ function patterns(rows, { limit = 10, minSupport = 12 } = {}) {
     });
   }
   items.sort((a, b) => b.lift - a.lift);
-  return { buckets: N, total: items.length, items: items.slice(0, limit) };
+  // How many districts the buckets span, because it changes what an empty result MEANS. Lift
+  // is measured against how often two types co-occur by chance; inside a single district both
+  // common types appear in nearly every month, so chance is already near one and almost
+  // nothing can rise above it. That is a property of the scope, not an absence of pattern, and
+  // an empty panel that does not say so reads as "we found nothing" rather than "this reads at
+  // state level".
+  const districts = new Set([...buckets.keys()].map((k) => k.split('|')[0])).size;
+  return { buckets: N, districts, total: items.length, items: items.slice(0, limit) };
 }
 
 /**
@@ -170,10 +206,14 @@ function momentum(rows) {
     const m = monthOf(c.crimeRegisteredDate);
     if (m) byMonth.set(m, (byMonth.get(m) || 0) + 1);
   }
+  if (byMonth.size < 6) return null;
+  // Drop trailing PARTIAL months -- however many there are. Taking "the last one" on faith read
+  // a fortnight of the extract month as a complete month the moment a live case opened a new
+  // one, and reported the state as falling 24% on a corpus that had not changed.
+  const complete = new Set(completeMonths(byMonth));
   const months = [...byMonth.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  if (months.length < 6) return null;
-  // Drop the final month: it is usually partial, and a partial month always reads as a crash.
-  const usable = months.slice(0, -1);
+  const usable = months.filter(([m]) => complete.has(m));
+  if (usable.length < 6) return null;
   const last3 = usable.slice(-3).map(([, v]) => v);
   const prev3 = usable.slice(-6, -3).map(([, v]) => v);
   const a = mean(last3);
@@ -185,7 +225,7 @@ function momentum(rows) {
     priorAvg: Math.round(b),
     changePct,
     direction: changePct > 5 ? 'rising' : changePct < -5 ? 'falling' : 'flat',
-    note: 'The most recent month is excluded — it is usually partial, and a partial month always reads as a fall.',
+    note: 'Trailing partial months are excluded — a month with only a fortnight in it always reads as a fall.',
   };
 }
 

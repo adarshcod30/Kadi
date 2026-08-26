@@ -636,6 +636,13 @@ module.exports = {
   // Expose the loaded store so the ZCQL mapper can reuse lookups rather than re-querying
   // a few hundred rows that never change between pipeline runs.
   db: () => load(),
+  dataDir: () => load().dataDir,
+  // What the current training set holds, for the console upload step. Written by the pipeline
+  // alongside the CSV so the two can never disagree about row count or date range.
+  trainingSetMeta: () => {
+    const db = load();
+    return db.trainingSetMeta || { rows: 0, reason: 'The pipeline has not built a training set yet.' };
+  },
 
   // Units a user may read, or null for state tier (no WHERE clause needed).
   scopeUnitIds: (user) => {

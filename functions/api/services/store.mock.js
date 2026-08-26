@@ -182,6 +182,7 @@ function load() {
   const national = readJson('national', { states: [] });
   const socio = readJson('socio', { districts: [], correlations: [], composition: [] });
   const forecast = readJson('forecast', { districts: [], state: null, accuracy: null });
+  const trainingSetMeta = readJson('training_set_meta', null);
   const linkSummary = readJson('link_summary', {});
   // Cache-busting fingerprint: written by build_bundle.py, changes whenever the corpus is
   // regenerated. Threaded into /stats' cache key so a redeploy after a data update can
@@ -202,7 +203,7 @@ function load() {
     offenders, offendersById, adjacency, offenderOfCase,
     clusters, clustersById,
     hotspots, caseAnomalies, alerts, stats, zones, occasions, evalReport, districtStats, national,
-    socio, forecast,
+    socio, forecast, trainingSetMeta,
     healthList, healthByCase, linkedCount, stations,
   };
   console.log(`[store.mock] loaded ${cases.size} cases, ${offenders.length} offenders in ${DB.loadedMs}ms`);

@@ -222,3 +222,55 @@ def test_steady_area_is_more_sensitive_than_a_volatile_one():
         "a station steady at 4 for a year must alert at 8"
     assert build(volatile, 8)["z"] < build(steady, 8)["z"], \
         "the same rise must score lower where that swing is routine"
+
+
+# ---------------------------------------------------------------------------
+# Forecasting: level shifts, and the training set the ML model is built from
+# ---------------------------------------------------------------------------
+def test_level_shift_is_detected_and_fitted_from():
+    """A straight line drawn across a structural break under-forecasts forever.
+
+    This corpus contains one: registrations step from ~1,300 a month to ~2,300 in Jan 2026 and
+    stay there. Fitting across it scored 24.4% MAPE while predicting ~1,780 against ~2,340
+    actual -- every month, in the same direction. A consistent one-directional miss is the
+    wrong model, not noise.
+    """
+    import forecast
+
+    flat = [100] * 12
+    assert forecast._last_level_shift(flat) == 0, "no break in a flat series"
+
+    stepped = [100] * 12 + [250] * 8
+    at = forecast._last_level_shift(stepped)
+    assert at == 12, f"break should be found at the step, got {at}"
+
+    # A steep but continuous ramp is NOT a level shift, and must not be treated as one --
+    # extrapolating a real trend is the whole job.
+    ramp = [100 + 8 * i for i in range(20)]
+    assert forecast._last_level_shift(ramp) == 0, "a steady ramp is a trend, not a break"
+
+
+def test_forecast_backtest_beats_the_pre_shift_baseline():
+    """The committed artifact must carry a measured error, and a credible one."""
+    fc = json.load(open(os.path.join(DERIVED, "forecast.json"), encoding="utf-8"))
+    acc = fc.get("accuracy")
+    assert acc, "a forecast without a backtest is a guess with a chart"
+    assert acc["mape"] < 15, f"MAPE regressed to {acc['mape']}%"
+    # Every projection carries an interval. A point estimate alone overstates what is known.
+    for d in fc["districts"][:5]:
+        for row in d["forecast"]:
+            assert row["lower"] <= row["predicted"] <= row["upper"]
+
+
+def test_training_set_has_no_protected_attributes_and_real_history():
+    import training_set
+
+    meta = json.load(open(os.path.join(DERIVED, "training_set_meta.json"), encoding="utf-8"))
+    assert meta["rows"] > 1000, "too few rows to train anything"
+    # The fairness invariant, asserted on the actual header rather than on the docstring.
+    common.assert_no_protected(training_set.HEADER)
+    assert not (common.PROTECTED_COLUMNS & set(meta["features"]))
+    # The partial trailing month must be dropped, or the model learns that every year ends in
+    # a collapse.
+    assert meta["droppedPartialMonth"], "the partial extract month should have been dropped"
+    assert meta["monthTo"] < meta["droppedPartialMonth"]

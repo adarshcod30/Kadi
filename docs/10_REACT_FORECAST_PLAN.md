@@ -5,6 +5,25 @@ generated and waiting on one wiring step.
 
 ---
 
+> **Status — all six phases shipped.** What follows is the plan as approved. Where execution
+> diverged from it, the divergence is noted inline. Three things are worth reading before the
+> rest, because they changed numbers the plan quotes:
+>
+> 1. **The forecast baseline was wrong, not merely imprecise.** The plan says 4.3% MAPE. The
+>    real backtest was **24.4%**, and the errors were all in the same direction — ~1,780
+>    predicted against ~2,340 actual, every month. The cause was a structural break: the corpus
+>    steps from ~1,300 registrations a month to ~2,300 in Jan 2026 and stays there, and a
+>    least-squares line drawn across a break splits the difference and then under-forecasts
+>    forever. Adding level-shift detection took it to **7.8%**. A consistent one-directional
+>    miss is the wrong model, not noise.
+> 2. **QuickML's row-insert response cannot be trusted for identity.** It answers with a ROWID
+>    that is not the ROWID the row ends up with. Submissions mint their own key.
+> 3. **The write path broke the corpus clock on day one.** Momentum and emerging risk both took
+>    "the last complete month" to be `months[length - 2]`. One case registered today opens a new
+>    month, the partial month slides, and both silently read a fortnight as a full month —
+>    the state reported -24% falling on a corpus that had not changed. Both now detect a partial
+>    month rather than assume its position, with a regression test.
+
 ## 0. What I checked before proposing anything
 
 Two findings change the shape of this plan, so they come first.
@@ -143,7 +162,8 @@ Given §0.2, the honest model is **not** a case-outcome classifier. It is a
 ### Why this one
 
 - The signal is real: time series carries trend, seasonality and level shifts.
-- It is already measurable — the current statistical forecast backtests to 4.3% MAPE, so a
+- It is already measurable — the statistical forecast backtests to 7.8% MAPE (24.4% before
+  level-shift detection was added), so a
   QuickML model has a number to beat rather than a vacuum to fill.
 - It needs no outcome labels, so it improves as data grows rather than waiting on closures.
 - It is what the brief asks for.
