@@ -385,10 +385,17 @@ async function ragProbe(req, question) {
   const token = await accessToken(req);
   if (!token) return { ok: false, stage: 'token', tokenState };
   const documents = await ragDocuments(req);
+  const one = (documents || [])[0];
+  // The console renders the placeholder as "<array-of-document-ids>" -- quoted, like the
+  // "<message>" placeholder next to it, which is a string. So the quoting is notation rather
+  // than type, but it is cheap to settle by sending every plausible reading and reading the
+  // errors: a type mismatch answers differently from a retriever that simply found nothing.
   const variants = [
-    { label: 'documents=ids', body: { query: question, documents } },
-    { label: 'documents=ids,top_k', body: { query: question, documents, top_k: 5 } },
-    { label: 'no-documents', body: { query: question } },
+    { label: 'array', body: { query: question, documents } },
+    { label: 'json-string', body: { query: question, documents: JSON.stringify(documents) } },
+    { label: 'csv-string', body: { query: question, documents: (documents || []).join(',') } },
+    { label: 'single-id-string', body: { query: question, documents: one } },
+    { label: 'single-id-array', body: { query: question, documents: [one] } },
   ];
   const out = [];
   for (const v of variants) {
@@ -397,12 +404,17 @@ async function ragProbe(req, question) {
       const res = await postJson(RAG_ENDPOINT, v.body, {
         Authorization: `${RAG_AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG,
       });
-      out.push({ variant: v.label, reply: JSON.stringify(res).slice(0, 420) });
+      out.push({
+        variant: v.label,
+        nodes: Array.isArray(res && res.retrieved_nodes) ? res.retrieved_nodes.length : null,
+        tokens: res && res.usage ? res.usage.total_tokens : null,
+        answer: String((res && res.response) || '').slice(0, 150),
+      });
     } catch (e) {
-      out.push({ variant: v.label, error: String(e && e.message ? e.message : e).slice(0, 220) });
+      out.push({ variant: v.label, error: String(e && e.message ? e.message : e).slice(0, 200) });
     }
   }
-  return { ok: true, documentCount: (documents || []).length, sample: (documents || []).slice(0, 3), variants: out };
+  return { ok: true, documentCount: (documents || []).length, variants: out };
 }
 
 async function ragAnswer(req, { question, lang }) {
