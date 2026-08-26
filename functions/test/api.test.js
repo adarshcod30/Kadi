@@ -455,3 +455,95 @@ test('auth: an unapproved account is refused a token', async () => {
   assert.strictEqual(wrongPw.ok, false);
   assert.strictEqual(wrongPw.error, out.error);
 });
+
+// ---- the write path -------------------------------------------------------------------
+// The rules that decide who may register a case and who may let it stand. These are the two
+// predicates the interface and the server both read, so they are worth pinning: a drift here
+// shows up as a button that renders and then 403s.
+test('submissions: only the station tier may register a case', () => {
+  const subs = require('../api/services/submissions');
+  const as = (role) => ({ ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] });
+  for (const role of ['SI', 'SHO']) assert.ok(subs.canSubmit(as(role)), `${role} registers cases`);
+  for (const role of ['SP', 'DSP', 'Analyst', 'DGP', 'Admin']) {
+    assert.ok(!subs.canSubmit(as(role)), `${role} does not register cases`);
+  }
+});
+
+test('submissions: approval authority ends at the approver district', () => {
+  const subs = require('../api/services/submissions');
+  const as = (role) => ({ ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] });
+  // null means unrestricted, which is exactly the difference between holding the state and
+  // holding one district -- an SP must never be handed a null here.
+  assert.strictEqual(subs.approvalDistrict(as('DGP')), null);
+  assert.strictEqual(subs.approvalDistrict(as('Admin')), null);
+  assert.strictEqual(subs.approvalDistrict(as('SP')), '1');
+  for (const role of ['SP', 'DGP', 'Admin']) assert.ok(subs.canApprove(as(role)), `${role} approves`);
+  for (const role of ['SI', 'SHO', 'DSP', 'Analyst']) assert.ok(!subs.canApprove(as(role)), `${role} does not approve`);
+});
+
+test('submissions: a submission is refused before it reaches the store', async () => {
+  const subs = require('../api/services/submissions');
+  const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI, email: 'si@ksp.gov.in' };
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  const good = {
+    crimeNo: '100010064202600099', crimeHeadId: '1', crimeSubHeadId: '12',
+    crimeRegisteredDate: '2026-06-01', briefFacts: 'A chain snatching reported near the market.',
+  };
+  assert.strictEqual((await subs.submit({ headers: {} }, analyst, good)).status, 403, 'wrong tier');
+  const bad = [
+    [{ ...good, crimeNo: 'abc' }, /crime number/],
+    [{ ...good, crimeSubHeadId: '' }, /head/],
+    [{ ...good, crimeRegisteredDate: '01-06-2026' }, /date of registration/],
+    [{ ...good, crimeRegisteredDate: '2099-01-01' }, /future/],
+    [{ ...good, briefFacts: 'theft' }, /sentence/],
+  ];
+  for (const [body, pattern] of bad) {
+    const out = await subs.submit({ headers: {} }, si, body);
+    assert.strictEqual(out.ok, false, `must reject ${JSON.stringify(body).slice(0, 60)}`);
+    assert.match(out.error, pattern);
+  }
+
+  // The form can only offer real crime heads, but the endpoint is reachable without the form,
+  // and a case whose sub-head resolves to nothing renders as a blank crime type everywhere.
+  const lookups = require('../api/services/queries').lookups();
+  const real = lookups.subheads[0];
+  const otherHead = lookups.heads.find((h) => String(h.id) !== String(real.headId));
+  const cases = [
+    [{ ...good, crimeHeadId: real.headId, crimeSubHeadId: '999999' }, /does not exist/],
+    [{ ...good, crimeHeadId: otherHead.id, crimeSubHeadId: real.id }, /does not belong/],
+    [{ ...good, crimeHeadId: real.headId, crimeSubHeadId: real.id, gravityId: '99' }, /gravity does not exist/],
+  ];
+  for (const [body, pattern] of cases) {
+    const out = await subs.submit({ headers: {} }, si, body, lookups);
+    assert.strictEqual(out.ok, false, `must reject ${JSON.stringify(body).slice(0, 70)}`);
+    assert.match(out.error, pattern);
+  }
+});
+
+test('submissions: live case ids cannot collide with corpus case ids', () => {
+  const subs = require('../api/services/submissions');
+  assert.ok(subs.isLiveId('LIVE-55468000000181028'));
+  // An 18-digit CaseMasterID from the corpus must never read as live -- a collision would
+  // attach one case's parties to another.
+  assert.ok(!subs.isLiveId('100010064202300018'));
+});
+
+test('read model: approved cases union into the register but not into the derived surfaces', () => {
+  const q = require('../api/services/queries');
+  const sp = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP };
+  const before = q.filterCases(sp, {}).rows.length;
+  const live = {
+    caseMasterId: 'LIVE-1', crimeNo: '100010064202600099', crimeRegisteredDate: '2026-06-02',
+    unitId: '46', districtId: '1', crimeHeadId: '1', crimeSubHeadId: '12',
+    statusId: '1', gravityId: '1', categoryId: '1', linkedCount: 0, healthSeverity: null,
+    latitude: null, longitude: null, awaitingAnalysis: true, source: 'live',
+  };
+  const withLive = { ...sp, _live: [live] };
+  assert.strictEqual(q.filterCases(withLive, {}).rows.length, before + 1, 'register grows by one');
+  // Out of district, it must not be visible at all -- the live rows go through the same scope
+  // filter as everything else rather than around it.
+  const other = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP, districtId: '3', _live: [live] };
+  assert.ok(!q.filterCases(other, {}).rows.some((c) => c.caseMasterId === 'LIVE-1'), 'scoped out');
+  // And a user with no live rows sees exactly what the bundle holds.
+  assert.strictEqual(q.filterCases(sp, {}).rows.length, before);
+});

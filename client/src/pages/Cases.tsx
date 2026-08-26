@@ -227,7 +227,10 @@ export default function Cases() {
                     {linkedIn.map((c: any) => (
                       <tr key={c.caseMasterId} onClick={() => nav(`/graph?case=${c.caseMasterId}`)}
                         className="border-b border-line/60 hover:bg-kadi-blue50/50 cursor-pointer">
-                        <td className="px-4 py-2"><Mono>{c.crimeNo}</Mono></td>
+                        <td className="px-4 py-2">
+                          <Mono>{c.crimeNo}</Mono>
+                          {c.awaitingAnalysis && <span className="ml-1.5 text-[10px] text-amber-700 uppercase">new</span>}
+                        </td>
                         <td className="px-4 py-2 text-ink">{c.crimeSubHead}</td>
                         <td className="px-4 py-2 text-ink-muted">{c.districtName}</td>
                         <td className="px-4 py-2 text-ink-muted">{c.unitName}</td>
@@ -261,7 +264,19 @@ export default function Cases() {
             <tbody className="divide-y divide-line">
               {data.items.map((c) => (
                 <tr key={c.caseMasterId} onClick={() => nav(`/cases/${c.caseMasterId}`)} className="hover:bg-kadi-blue50 cursor-pointer">
-                  <td className="px-4 py-2.5"><Mono>{c.crimeNo}</Mono></td>
+                  <td className="px-4 py-2.5">
+                    <Mono>{c.crimeNo}</Mono>
+                    {/* A case approved since the last pipeline run is in the register and
+                        genuinely unanalysed. Without this marker the em-dash in the Links
+                        column reads as "no connections found" rather than "nothing has
+                        looked yet", which inverts the claim the whole product rests on. */}
+                    {c.awaitingAnalysis && (
+                      <div className="text-[10.5px] font-medium text-amber-700 uppercase tracking-wide mt-0.5"
+                        title="Registered and visible. Linkage, entity resolution and health are computed by the overnight pipeline.">
+                        new · awaiting analysis
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5">{c.crimeSubHead}<div className="text-xs text-ink-muted">{c.crimeHead}</div></td>
                   <td className="px-4 py-2.5">{c.unitName}<div className="text-xs text-ink-muted">{c.districtName}</div></td>
                   <td className="px-4 py-2.5">{c.ioName || '—'}{c.ioRank && <div className="text-xs text-ink-muted">{c.ioRank}</div>}</td>

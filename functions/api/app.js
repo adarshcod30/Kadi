@@ -16,6 +16,9 @@ const datastore = require('./services/datastore');
 const auth = require('./services/auth');
 const insight = require('./services/insight');
 const intel = require('./services/intelligence');
+const fc = require('./services/forecasting');
+const reactq = require('./services/react');
+const submissions = require('./services/submissions');
 const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
@@ -38,6 +41,23 @@ function buildApp() {
     await auth.loadSecret(req).catch(() => {});
     req.user = rbac.userFromRequest(req);
     req.clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local';
+    next();
+  });
+
+  // Cases approved since the last pipeline run, unioned into the register.
+  //
+  // Only on the paths that read the register. Every route paying a Data Store round trip for
+  // what is usually an empty list would be a real cost on a cold container, and the derived
+  // surfaces -- graph, health, offenders, hotspots -- must NOT see these rows anyway: they are
+  // pipeline output, and a case nothing has analysed does not belong in a hotspot cluster.
+  //
+  // Failure is swallowed. A Data Store outage degrades the register to the bundle, which is
+  // the same contract every other adapter here keeps.
+  const LIVE_PATHS = /^\/(cases|case-updates|stats|geo\/points|analytics\/(worklist|outlook))/;
+  app.use(async (req, _res, next) => {
+    if (LIVE_PATHS.test(req.path)) {
+      req.user._live = await submissions.liveCases(req, q.db()).catch(() => []);
+    }
     next();
   });
 
@@ -105,6 +125,94 @@ function buildApp() {
   }));
 
   r.get('/auth/status', handle(async (req) => auth.status(req)));
+
+  // ---- the write path ----------------------------------------------------------------
+  // A case enters the system from the station that registered it and stands only once a
+  // supervisor says so. Scope on the way in comes from the ACCOUNT, never the form -- see
+  // services/submissions.js for why that is the whole security boundary of the feature.
+  const fail = (out) => {
+    const e = new Error(out.error);
+    e.status = out.status || 400;
+    e.code = 'submission_rejected';
+    throw e;
+  };
+
+  r.post('/submissions', handle(async (req) => {
+    // Lookups passed in so the service can reject a crime head or sub-head that does not
+    // exist without taking a dependency on the corpus loader itself.
+    const out = await submissions.submit(req, req.user, req.body || {}, q.lookups());
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'submit_case', targetType: 'submission',
+      targetId: out.id, queryText: out.crimeNo, ip: req.clientIp, req });
+    return out;
+  }));
+
+  r.get('/submissions', handle(async (req) => {
+    const out = await submissions.list(req, req.user, {
+      status: req.query.status || '', limit: req.query.limit || 100,
+    });
+    return {
+      ...out,
+      // The interface has to know which side of the gate this user stands on before it can
+      // render anything sensible, and asking it to infer that from the role name is how the
+      // two drift apart.
+      canSubmit: submissions.canSubmit(req.user),
+      canApprove: submissions.canApprove(req.user),
+      approvalScope: submissions.canApprove(req.user)
+        ? (submissions.approvalDistrict(req.user) === null ? 'state' : 'district') : null,
+    };
+  }));
+
+  r.get('/submissions/:id', handle(async (req) => {
+    const out = await submissions.getOne(req, req.user, req.params.id);
+    if (!out) throw forbidden('That submission is not in your scope.');
+    return out;
+  }));
+
+  r.post('/submissions/:id/decide', handle(async (req) => {
+    const { decision, note } = req.body || {};
+    const out = await submissions.decide(req, req.user, req.params.id, decision, note);
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: `case_${out.status}`, targetType: 'submission',
+      targetId: req.params.id, queryText: out.crimeNo, ip: req.clientIp, req });
+    return out;
+  }));
+
+  // ---- lifecycle updates ---------------------------------------------------------------
+  // The same gate for a change to a case that already exists. Each request carries before and
+  // after, so the trail records WHAT changed rather than merely that something did.
+  r.post('/case-updates', handle(async (req) => {
+    // The case's district and station are read from the register, not taken from the body --
+    // otherwise a request could be filed against a case in someone else's district and land in
+    // the wrong approver's queue.
+    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''));
+    const out = await submissions.requestUpdate(req, req.user, {
+      ...(req.body || {}),
+      crimeNo: target.crimeNo,
+      districtId: target.districtId,
+      unitId: target.unitId,
+    });
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'request_case_update', targetType: 'case',
+      targetId: target.caseMasterId, queryText: (req.body || {}).updateType, ip: req.clientIp, req });
+    return out;
+  }));
+
+  r.get('/case-updates', handle(async (req) => {
+    const out = await submissions.listUpdates(req, req.user, {
+      status: req.query.status || '', caseMasterId: req.query.case || '', limit: req.query.limit || 100,
+    });
+    return { ...out, canApprove: submissions.canApprove(req.user), types: submissions.UPDATE_TYPES };
+  }));
+
+  r.post('/case-updates/:id/decide', handle(async (req) => {
+    const { decision, note } = req.body || {};
+    const out = await submissions.decideUpdate(req, req.user, req.params.id, decision, note);
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: `case_update_${out.status}`, targetType: 'case',
+      targetId: out.caseMasterId, queryText: out.updateType, ip: req.clientIp, req });
+    return out;
+  }));
 
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));
@@ -358,7 +466,25 @@ function buildApp() {
 
   r.get('/cases/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
-    return q.getCase(req.user, req.params.id);
+    const c = q.getCase(req.user, req.params.id);
+    // A live case has no rows in the bundled child tables -- its parties were filed with the
+    // submission and its history is the approved lifecycle changes since. Fetch both here
+    // rather than in queries.js, which is synchronous by design.
+    if (submissions.isLiveId(req.params.id)) {
+      const [parties, updates] = await Promise.all([
+        submissions.livePartiesFor(req, req.params.id),
+        submissions.approvedUpdatesFor(req, req.params.id),
+      ]);
+      return {
+        ...c,
+        parties: parties || c.parties,
+        updates,
+        awaitingAnalysis: true,
+        analysisNote: 'Registered and visible. Linkage, entity resolution and investigation '
+          + 'health are computed by the overnight pipeline, so this case has not been analysed yet.',
+      };
+    }
+    return c;
   }));
 
   // Entities pulled out of the FIR's own narrative by Zia. Separate from /cases/:id so the
@@ -484,6 +610,85 @@ function buildApp() {
   r.get('/geo/national', handle(async () => q.national()));
 
   // analytics (role-gated)
+  // ---- react surface -------------------------------------------------------------------
+  // The merged worklist. Inputs are gathered here, already scoped by the query layer, and
+  // ranked in react.js -- so the ranking stays a pure function over data someone else filtered
+  // and cannot widen a scope by accident.
+  r.get('/analytics/worklist', handle(async (req) => {
+    const db = q.db();
+    const health = q.filterHealth(req.user, {});
+    const offenders = q.listOffenders(req.user, { page: 1, pageSize: 200 }).items || [];
+    const stations = (q.stations(req.user, { sort: 'zone' }).items) || [];
+    const tier = req.user.roleMeta.tier;
+    // Inbound links are a district-and-below concern: at state scope nothing is "outside".
+    let linkedIn = [];
+    if (tier !== 'state' || req.user.drilledFromState) {
+      const cmd = tier === 'station' ? q.stationCommand(req.user) : q.districtCommand(req.user);
+      linkedIn = cmd.linkedOutSample || cmd.linkedInFromOtherDistricts || [];
+    }
+    let asOf = null;
+    for (const c of db.caseList) {
+      if (c.crimeRegisteredDate && (!asOf || c.crimeRegisteredDate > asOf)) asOf = c.crimeRegisteredDate;
+    }
+
+    const out = reactq.worklist({ health, casesById: db.cases, offenders, stations, linkedIn, asOf },
+      { limit: Math.min(60, Number(req.query.limit) || 40) });
+    out.scope = rbac.capabilities(req.user).effectiveScope;
+    if (String(req.query.explain) === 'false' || !out.total) return out;
+
+    const findings = [`1. ${out.total} items need attention, ${out.highCount} of them urgent.`];
+    out.items.slice(0, 3).forEach((i, idx) => {
+      findings.push(`${idx + 2}. ${i.title} — ${i.why} Recommended: ${i.action}`);
+    });
+    const { text, source } = await insight.generate(req, 'the action queue for this officer today',
+      { findings, recordsInView: String(out.total) },
+      { maxTokens: 190, system: insight.SIGNALS_SYSTEM });
+    return { ...out, insight: text, insightSource: source };
+  }));
+
+  // ---- forecast surface ---------------------------------------------------------------
+  // One call for the whole Forecast tab. Four analyses over the same scoped rows, computed
+  // once rather than four times across four requests -- and, more importantly, they cannot
+  // disagree with each other about what the scope was.
+  r.get('/analytics/outlook', handle(async (req) => {
+    const { rows } = q.filterCases(req.user, req.query);
+    const spots = q.hotspots(req.user, {});
+    const out = {
+      scope: rbac.capabilities(req.user).effectiveScope,
+      casesAnalysed: rows.length,
+      momentum: fc.momentum(rows),
+      emergingRisk: fc.emergingRisk(rows),
+      patterns: fc.patterns(rows),
+      shiftProfile: fc.shiftProfile(rows),
+      emergingHotspots: (spots.hotspots || []).filter((h) => h.emergingFlag).length,
+    };
+    if (String(req.query.explain) === 'false' || !rows.length) return out;
+
+    // Narrated through the hardened signals prompt, for the same reason the intelligence bands
+    // are: handed a loose fact bag the model welds independent figures into one claim.
+    const er = out.emergingRisk.items || [];
+    const pt = out.patterns.items || [];
+    const findings = [];
+    if (out.momentum) {
+      findings.push(`1. Registrations across this scope are ${out.momentum.direction} — a ${out.momentum.changePct}% change, from an average of ${out.momentum.priorAvg.toLocaleString('en-IN')} a month to ${out.momentum.recentAvg.toLocaleString('en-IN')}.`);
+    }
+    if (er.length) {
+      findings.push(`${findings.length + 1}. ${out.emergingRisk.total} district and crime-type combinations are rising against their own history. The sharpest is ${er[0].subHead} in ${er[0].districtName}: ${er[0].current} last month against a baseline of ${er[0].baseline}, which is ${er[0].z} standard deviations above its own normal.`);
+    }
+    if (pt.length) {
+      findings.push(`${findings.length + 1}. ${pt[0].a} and ${pt[0].b} co-occur ${Math.round((pt[0].lift - 1) * 100)}% more often than chance across district-months. This is a co-occurrence between crime TYPES, not a link between specific cases.`);
+    }
+    if (out.shiftProfile) {
+      const b = out.shiftProfile.blocks[0];
+      findings.push(`${findings.length + 1}. The busiest three-hour window is ${b.from} to ${b.to}, carrying ${b.sharePct}% of incidents against ${out.shiftProfile.evenShare}% if the day were flat.`);
+    }
+    if (!findings.length) return out;
+    const { text, source } = await insight.generate(req, 'the forward outlook for this scope',
+      { findings, recordsInView: rows.length.toLocaleString('en-IN') },
+      { maxTokens: 220, system: insight.SIGNALS_SYSTEM });
+    return { ...out, insight: text, insightSource: source };
+  }));
+
   r.get('/analytics/vulnerability', handle(async (req) => q.vulnerability(req.user)));
   // Sociological + predictive intelligence (problem statement pillar 3). Both are
   // state-wide, area-level aggregates — no person-level rows, so no RBAC scoping.

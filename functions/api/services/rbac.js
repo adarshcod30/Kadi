@@ -176,6 +176,12 @@ function capabilities(user) {
     canAdmin: user.role === 'Admin',
     // Sign-up requests are decided by the two posts that hold the whole state.
     canApproveAccounts: user.role === 'DGP' || user.role === 'Admin',
+    // The write path, mirroring the chain of command rather than inventing a new one: the
+    // station registers a case, a supervisor lets it stand. Kept here so the interface and
+    // the server read the same rule -- when the two hold their own copies they drift, and the
+    // one that drifts is always the one that renders a button the server then refuses.
+    canSubmitCase: stationTier,
+    canApproveCases: user.role === 'DGP' || user.role === 'Admin' || user.role === 'SP',
     // True only for a token-backed session. The interface uses it to say which way you came
     // in, because "demo" and "signed in as SP Mysuru" must never look the same.
     authenticated: Boolean(user.authenticated),

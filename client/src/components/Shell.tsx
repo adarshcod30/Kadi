@@ -7,6 +7,7 @@ import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
   Globe, MapPin, ChevronDown, Check, LogOut, PanelLeftClose, PanelLeftOpen, Building2,
+  Zap, TrendingUp, FilePlus2,
 } from 'lucide-react';
 import { useMe, useAlerts, useLookups } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
@@ -21,6 +22,11 @@ const NAV = [
   { to: '/offenders', icon: Users, key: 'offenders' },
   { to: '/health', icon: Activity, key: 'health' },
   { to: '/map', icon: Map, key: 'map' },
+  { to: '/react', icon: Zap, key: 'react' },
+  // The write path. Shown only to accounts that can file or decide a case, because a nav
+  // entry that leads to "nothing to do here" is worse than no entry at all.
+  { to: '/register', icon: FilePlus2, key: 'register', cap: 'write' },
+  { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/intelligence', icon: Brain, key: 'intelligence' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
@@ -46,7 +52,10 @@ export function Shell({ children }: { children: ReactNode }) {
     if (search.trim()) nav(`/cases?search=${encodeURIComponent(search.trim())}`);
   };
 
-  const visibleNav = NAV.filter((n) => !n.roles || (me && n.roles.includes(me.user.role)));
+  const visibleNav = NAV.filter((n) => {
+    if (n.cap === 'write') return Boolean(me?.capabilities.canSubmitCase || me?.capabilities.canApproveCases);
+    return !n.roles || (me && n.roles.includes(me.user.role));
+  });
 
   return (
     <div className="h-full flex flex-col">

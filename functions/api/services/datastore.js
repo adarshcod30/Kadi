@@ -274,6 +274,11 @@ function enrich(rows, db) {
 
 // Generic row insert over the same raw-HTTPS path that ZCQL uses. Returns false rather than
 // throwing: a failed audit write must never turn a successful read into a 500.
+//
+// It returns only success, not the created rows, and that is deliberate: the endpoint's
+// response carries a ROWID that is NOT the ROWID the row ends up with (verified -- an insert
+// answered ...178070 for a row that queried back as ...178073). Anything that needs to
+// reference what it just wrote must mint its own key, as submissions.js does.
 function insertRows(req, table, rows) {
   return new Promise((resolve) => {
     const h = (req && req.headers) || {};

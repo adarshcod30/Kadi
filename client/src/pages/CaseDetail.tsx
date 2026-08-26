@@ -1,7 +1,14 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react';
-import { useCase, useCaseEntities } from '../api/hooks';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles, Clock, Hourglass, Check,
+} from 'lucide-react';
+import {
+  useCase, useCaseEntities, useMe, useCaseUpdates, useRequestUpdate,
+} from '../api/hooks';
 import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } from '../components/ui';
+import { Select } from '../components/Select';
 import { InfoDot } from '../components/InfoDot';
 
 
@@ -96,9 +103,26 @@ export default function CaseDetail() {
         </div>
       </div>
 
+      {/* The one caveat that must never be silent. A case approved since the last pipeline run
+          is in the register and genuinely unanalysed -- reading "0 linked cases" as a finding
+          would invert the whole claim the product rests on. */}
+      {(c as any).awaitingAnalysis && (
+        <div className="rounded-card border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-2.5">
+          <Hourglass size={16} className="text-amber-700 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold text-amber-900">Registered, awaiting overnight analysis</div>
+            <p className="text-[12.5px] text-amber-900/85 leading-relaxed mt-0.5">
+              {(c as any).analysisNote
+                || 'Linkage, entity resolution and investigation health are computed by the overnight pipeline over the whole corpus. Nothing has looked at this case yet, so an empty link list here means "not yet analysed", not "unconnected".'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <Section title="Brief facts (MO)"><p className="p-4 text-sm leading-relaxed">{c.briefFacts}</p></Section>
+          <CaseLifecycle caseId={String(c.caseMasterId)} crimeNo={c.crimeNo} statusName={c.status} />
           <NarrativeEntities id={String(c.caseMasterId)} />
 
           <Section title="Parties">
@@ -195,5 +219,112 @@ function PartyList({ title, items }: { title: string; items: string[] }) {
       <div className="label mb-1">{title}</div>
       {items.length ? <ul className="text-sm space-y-0.5">{items.map((x, i) => <li key={i}>{x}</li>)}</ul> : <div className="text-sm text-ink-muted">—</div>}
     </div>
+  );
+}
+
+// ---- lifecycle -------------------------------------------------------------------------------
+// What has happened to this case since it was registered, and how to record the next thing.
+//
+// A change goes through the same gate a new case does. That is the point: an arrest or a closure
+// recorded by whoever happened to be at the terminal, with no supervisor and no record of the
+// prior state, is exactly the practice the approval chain exists to replace.
+function CaseLifecycle({ caseId, crimeNo, statusName }: { caseId: string; crimeNo: string; statusName: string }) {
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const { data } = useCaseUpdates({ case: caseId });
+  const request = useRequestUpdate();
+  const [type, setType] = useState('arrest');
+  const [after, setAfter] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const tier = me?.capabilities.tier;
+  const canRequest = tier === 'station' || me?.user.role === 'DSP';
+  const items = data?.items || [];
+  const approved = items.filter((u) => u.status === 'approved');
+  const pending = items.filter((u) => u.status === 'pending');
+  if (!canRequest && !items.length) return null;
+
+  const go = async () => {
+    setError(''); setSent(false);
+    try {
+      await request.mutateAsync({
+        caseMasterId: caseId, crimeNo, updateType: type, afterValue: after, reason,
+        // The prior state, captured from what is on screen. Sending it with the request is
+        // what makes the trail readable later -- "closed" alone does not say closed from what.
+        beforeValue: type === 'closure' || type === 'status' ? statusName : '',
+      });
+      setSent(true); setAfter(''); setReason('');
+      qc.invalidateQueries({ queryKey: ['case-updates'] });
+    } catch (e: any) {
+      setError(e?.message || 'Could not record the request.');
+    }
+  };
+
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <Clock size={15} className="text-kadi-teal" /> Case lifecycle
+      <InfoDot label="How a case changes">
+        <b className="block mb-1 text-kadi-navy">The same gate as a new case</b>
+        An arrest, a chargesheet or a closure is a request, approved by an SP for their own
+        district or by the DGP or Administrator anywhere.
+        <b className="block mt-1.5 text-kadi-navy">Before and after, not just after</b>
+        Each request records the prior state alongside the new one, so the trail says what
+        changed. A log that only records that something changed is not an audit trail.
+      </InfoDot>
+    </span>}>
+      <div className="p-4 space-y-3">
+        {approved.length > 0 && (
+          <ol className="space-y-2">
+            {approved.map((u) => (
+              <li key={u.id} className="flex items-start gap-2.5 text-[12.5px]">
+                <Check size={14} className="text-success shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <span className="font-medium text-ink">{u.updateLabel}</span>
+                  <span className="text-ink-muted"> · {u.afterValue}</span>
+                  <div className="text-[11.5px] text-ink-subtle">
+                    Requested by {u.requestedBy} ({u.requesterRole}), approved by {u.reviewedBy} on {String(u.reviewedAt || '').slice(0, 10)}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+        {pending.map((u) => (
+          <div key={u.id} className="flex items-start gap-2.5 text-[12.5px] text-ink-muted">
+            <Hourglass size={14} className="text-warning shrink-0 mt-0.5" />
+            <span><b className="text-ink">{u.updateLabel}</b> · {u.afterValue} — awaiting approval</span>
+          </div>
+        ))}
+        {!approved.length && !pending.length && (
+          <p className="text-[12.5px] text-ink-subtle">Nothing recorded on this case since registration.</p>
+        )}
+
+        {canRequest && (
+          <div className="pt-2 border-t border-line space-y-2">
+            {sent && <div className="text-[12.5px] text-success">Sent for approval.</div>}
+            {error && <div className="text-[12.5px] text-danger">{error}</div>}
+            <div className="flex flex-wrap gap-2">
+              <Select value={type} onChange={setType} className="min-w-[160px]"
+                options={[
+                  { value: 'arrest', label: 'Arrest recorded' },
+                  { value: 'chargesheet', label: 'Chargesheet filed' },
+                  { value: 'closure', label: 'Case closure' },
+                  { value: 'status', label: 'Status change' },
+                  { value: 'party', label: 'Party added' },
+                ]} />
+              <input className="input flex-1 min-w-[180px]" value={after} onChange={(e) => setAfter(e.target.value)}
+                placeholder="What changed" />
+              <input className="input flex-1 min-w-[180px]" value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="Grounds for the change" />
+              <button onClick={go} disabled={request.isPending} className="btn-primary disabled:opacity-50">
+                {request.isPending ? 'Sending…' : 'Send for approval'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }

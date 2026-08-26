@@ -36,13 +36,27 @@ function scoped(user, list) {
   return list.filter((c) => rbac.caseInScope(user, c));
 }
 
+// The register this officer is actually reading: the bundled corpus plus any case approved
+// since the last pipeline run. Live rows are attached to the user by the route layer (see
+// app.js `withLive`), so this stays synchronous and the fallback is simply "no live rows".
+//
+// Deliberately NOT applied to the derived surfaces -- linkage, health, hotspots, offenders --
+// because those are pipeline output. A case nothing has analysed does not belong in a hotspot
+// cluster or a health summary; it belongs in the register, flagged as awaiting analysis.
+// corpusAsOf is excluded for a sharper reason: one case registered today would move the corpus
+// clock forward and empty every "last 90 days" window in the product.
+function universe(user) {
+  const db = load();
+  const live = (user && user._live) || [];
+  return live.length ? live.concat(db.caseList) : db.caseList;
+}
+
 // ---------------- cases ----------------
 // Filtering and sorting live apart from pagination so the intelligence layer can analyse the
 // WHOLE filtered set. Reading a page and calling it the picture is how a "38% concentrated in
 // three stations" finding becomes 38% of twenty-five rows.
 function filterCases(user, q = {}) {
-  const db = load();
-  let rows = scoped(user, db.caseList);
+  let rows = scoped(user, universe(user));
   const { search, head, subhead, district, unit, status, gravity, category,
     dateFrom, dateTo, flagged, clusterId, severity, io, linked, sort = 'date_desc' } = q;
 
@@ -87,7 +101,7 @@ function filterCases(user, q = {}) {
 
 // The officer's whole scope, unfiltered -- the denominator every "above the expected rate"
 // finding is measured against.
-function scopeBaseline(user) { return scoped(user, load().caseList); }
+function scopeBaseline(user) { return scoped(user, universe(user)); }
 
 function listCases(user, q = {}) {
   const { rows, sort } = filterCases(user, q);
@@ -108,7 +122,10 @@ function listCases(user, q = {}) {
 
 function getCase(user, id) {
   const db = load();
-  const c = db.cases.get(String(id));
+  // An approved-but-unanalysed case exists only in the live rows, so look there before
+  // declaring it missing -- otherwise the register lists a case whose detail page 404s.
+  const c = db.cases.get(String(id))
+    || ((user && user._live) || []).find((r) => String(r.caseMasterId) === String(id));
   if (!c) throw notFound(`Case ${id} not found`);
   // detail visible if in scope OR linked into an in-scope investigation (silo-breaking is the point)
   const kid = String(id);
@@ -471,7 +488,7 @@ function geoPoints(user, q = {}) {
   //
   // The station tier is the exception. Its entire purpose is to show how little one register
   // holds, so handing it a state-wide dot map would contradict the view it demonstrates.
-  let rows = db.caseList.filter((c) => c.latitude && c.longitude);
+  let rows = universe(user).filter((c) => c.latitude && c.longitude);
   if (user && user.roleMeta && user.roleMeta.tier === 'station') {
     rows = rows.filter((c) => String(c.unitId) === String(user.unitId));
   }
@@ -608,7 +625,7 @@ function vulnerability(user) {
 }
 
 module.exports = {
-  FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline,
+  FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
   filterHealth, getCase, graphForCase, getCluster,
   listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
@@ -628,7 +645,10 @@ module.exports = {
     if (user.drillUnitId) return [user.drillUnitId];
     const db = load();
     const did = String(user.districtId);
-    return Object.entries(db.lookups.unitDistrict)
+    // unitDistrict is a Map, and Object.entries on a Map returns [] -- which silently gave
+    // every district and station user an empty unit scope, so the ?source=datastore path
+    // answered "0 cases" rather than theirs.
+    return [...db.lookups.unitDistrict.entries()]
       .filter(([, d]) => String(d) === did).map(([u]) => u);
   },
 
@@ -636,7 +656,7 @@ module.exports = {
     const db = load();
     if (!user || (user.roleMeta.tier === 'state' && !user.drilledFromState)) return { ...db.stats, scope: 'state' };
 
-    const rows = scoped(user, db.caseList);
+    const rows = scoped(user, universe(user));
     const ids = new Set(rows.map((c) => String(c.caseMasterId)));
     const status = { open: 0, chargeSheeted: 0, closed: 0, undetected: 0 };
     const heads = new Map();

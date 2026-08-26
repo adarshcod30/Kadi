@@ -177,3 +177,90 @@ export const useDecideRequest = () =>
     mutationFn: (v: { id: string; decision: 'approve' | 'reject' }) =>
       api.post<{ ok: boolean; status: string }>(`/auth/requests/${v.id}/decide`, { decision: v.decision }),
   });
+
+// Forecast and React surfaces. Both scope-aware, so they carry role() in the key.
+export const useOutlook = (params: Record<string, unknown> = {}) =>
+  useQuery({
+    queryKey: ['outlook', role(), params],
+    queryFn: () => api.get<any>(`/analytics/outlook${qs(params)}`),
+    staleTime: 5 * 60 * 1000,
+  });
+export const useWorklist = (params: Record<string, unknown> = {}) =>
+  useQuery({
+    queryKey: ['worklist', role(), params],
+    queryFn: () => api.get<any>(`/analytics/worklist${qs(params)}`),
+    staleTime: 2 * 60 * 1000,
+  });
+
+// ---- the write path ---------------------------------------------------------------------
+// Submissions and lifecycle updates. Every mutation invalidates the register as well as the
+// queue, because approving a case changes what /cases returns -- and a queue that empties
+// while the register behind it still shows yesterday's rows is how people stop trusting both.
+export type Submission = {
+  id: string; crimeNo: string; caseNo: string | null;
+  unitId: string; districtId: string;
+  crimeHeadId: string; crimeSubHeadId: string;
+  gravityId: string | null; categoryId: string | null;
+  crimeRegisteredDate: string; incidentFromDate: string | null;
+  latitude: string | null; longitude: string | null;
+  briefFacts: string; actsSections: string; ioName: string;
+  submittedBy: string; submitterRole: string; submittedAt: string;
+  status: 'pending' | 'approved' | 'rejected' | 'returned';
+  reviewedBy: string | null; reviewedAt: string | null; reviewNote: string | null;
+  caseMasterId: string | null;
+  parties?: { id: string; partyRole: string; fullName: string; age: string | null; gender: string | null; address: string; contact: string }[];
+  canDecide?: boolean;
+};
+export type SubmissionList = {
+  items: Submission[]; visible: boolean; available?: boolean; reason?: string;
+  canSubmit: boolean; canApprove: boolean; approvalScope: 'state' | 'district' | null;
+};
+
+export const useSubmissions = (status = '', enabled = true) =>
+  useQuery({
+    queryKey: ['submissions', role(), status],
+    queryFn: () => api.get<SubmissionList>(`/submissions${qs({ status })}`),
+    enabled,
+    staleTime: 30 * 1000,
+  });
+export const useSubmission = (id?: string) =>
+  useQuery({
+    queryKey: ['submission', role(), id],
+    queryFn: () => api.get<Submission>(`/submissions/${id}`),
+    enabled: !!id,
+  });
+export const useSubmitCase = () =>
+  useMutation({ mutationFn: (body: Record<string, unknown>) => api.post<{ ok: boolean; id: string; crimeNo: string }>('/submissions', body) });
+export const useDecideSubmission = () =>
+  useMutation({
+    mutationFn: (v: { id: string; decision: 'approve' | 'reject' | 'return'; note?: string }) =>
+      api.post<{ ok: boolean; status: string; caseMasterId: string | null }>(
+        `/submissions/${v.id}/decide`, { decision: v.decision, note: v.note || '' }),
+  });
+
+export type CaseUpdateRow = {
+  id: string; caseMasterId: string; crimeNo: string | null;
+  districtId: string; unitId: string;
+  updateType: string; updateLabel: string; field: string;
+  beforeValue: string; afterValue: string; reason: string;
+  requestedBy: string; requesterRole: string; requestedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy: string | null; reviewedAt: string | null; reviewNote: string | null;
+};
+export const useCaseUpdates = (params: { status?: string; case?: string } = {}, enabled = true) =>
+  useQuery({
+    queryKey: ['case-updates', role(), params],
+    queryFn: () => api.get<{
+      items: CaseUpdateRow[]; visible: boolean; available?: boolean; reason?: string;
+      canApprove: boolean; types: Record<string, { label: string; field: string }>;
+    }>(`/case-updates${qs(params)}`),
+    enabled,
+    staleTime: 30 * 1000,
+  });
+export const useRequestUpdate = () =>
+  useMutation({ mutationFn: (body: Record<string, unknown>) => api.post<{ ok: boolean; id: string }>('/case-updates', body) });
+export const useDecideUpdate = () =>
+  useMutation({
+    mutationFn: (v: { id: string; decision: 'approve' | 'reject'; note?: string }) =>
+      api.post<{ ok: boolean; status: string }>(`/case-updates/${v.id}/decide`, { decision: v.decision, note: v.note || '' }),
+  });
