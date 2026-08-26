@@ -43,6 +43,25 @@ h1, h2, h3 { font-family: Ubuntu, 'Open Sans', system-ui, sans-serif; }
 /* Skeleton shimmer */
 .skeleton { @apply bg-surface-3 rounded animate-pulse; }
 
+/* Page enter, in CSS rather than JavaScript.
+   This was a framer-motion initial/animate pair, and on the map route it reliably stopped at
+   its `initial` state -- inline opacity:0, computed ~0.4, frozen there indefinitely. The map
+   page starves the animation loop on mount (eight sources, twelve layers, nine thousand
+   points), and a JS-driven tween that misses its scheduling never recovers. A 45%-opacity
+   satellite tile over a white page reads as a blank grey box, which is why this looked like a
+   broken basemap for days when nothing was wrong with the map at all.
+   A CSS animation is driven by the compositor, runs to completion regardless of what the main
+   thread is doing, and leaves the element at its final state. A page cannot be left invisible
+   by it. */
+@keyframes kadi-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: kadi-page-in 0.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+}
+
 /* Graph canvas container */
 .graph-canvas { background: linear-gradient(180deg,#FBFCFE 0%, #F5F7FA 100%); }
 

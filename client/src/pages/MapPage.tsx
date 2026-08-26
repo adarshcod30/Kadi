@@ -48,18 +48,35 @@ const STYLE: any = {
     // A real dark cartographic basemap, not a darkened satellite image: incident colours and
     // the pulsing red zones read far better against it, and it is the sane choice on a
     // control-room screen at night.
-    dark: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap, © CARTO',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      ] },
+    //
+    // Called DARK, not "night", and the distinction is not pedantry. This map already has a
+    // shift filter whose options include "Night" (22:00-23:00), so two unrelated controls
+    // carried the same word: one a rendering style, one a time of day. Someone reaching for a
+    // dark map had no way to tell which was which.
+    //
+    // Esri, NOT CARTO. The CARTO dark basemap this used renders every tile stamped
+    // "API KEY REQUIRED" across it -- they gated their free basemaps, and the tiles still
+    // return 200 so nothing in the code could tell. Esri's Dark Gray Canvas needs no key and
+    // is the same provider as the satellite layer above, which was already working.
+    //
+    // Split into base and labels, because that is how Esri ships it: the base carries land and
+    // water, the reference layer carries the place names on transparent PNG. Both are needed
+    // or the map is a dark shape with nothing named on it.
+    dark: { type: 'raster', tileSize: 256, attribution: '© Esri',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'] },
+    darkref: { type: 'raster', tileSize: 256, attribution: '© Esri',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'] },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#08131f' } },
     { id: 'basemap-sat', type: 'raster', source: 'sat', paint: { 'raster-opacity': 1 } },
     { id: 'basemap-osm', type: 'raster', source: 'osm', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.5 } },
     { id: 'basemap-dark', type: 'raster', source: 'dark', layout: { visibility: 'none' }, paint: { 'raster-opacity': 1 } },
+    // Declared here but MOVED above the choropleth once the data layers exist (see the
+    // moveLayer call in the load handler). Declared position would put it under the district
+    // fill, which is opaque enough to hide every place name -- a dark map of Karnataka with
+    // nothing named on it.
+    { id: 'basemap-darkref', type: 'raster', source: 'darkref', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.9 } },
   ],
 };
 
@@ -99,7 +116,8 @@ export default function MapPage() {
   const markers = useRef<maplibregl.Marker[]>([]);
   const [ready, setReady] = useState(false);
   const [layer, setLayer] = useState<LayerMode>('density');
-  const [basemap, setBasemap] = useState<'sat' | 'streets' | 'night'>('sat');
+  const [basemap, setBasemap] = useState<'sat' | 'streets' | 'dark'>('sat');
+  const pumpRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [head, setHead] = useState('');
   const [hours, setHours] = useState<[number, number]>([0, 23]);
   const [period, setPeriod] = useState('');
@@ -163,8 +181,34 @@ export default function MapPage() {
     if (!ref.current || map.current) return;
     const m = new maplibregl.Map({ container: ref.current, style: STYLE, center: [76.3, 15.0], zoom: 6, attributionControl: false });
     map.current = m;
+    // Reachable from a console. A WebGL map that renders nothing gives you almost no signal
+    // from the outside -- no error, no failed request, just a dark rectangle -- and the
+    // instance is the only thing that can say whether the style loaded, where it is centred
+    // and which layers it thinks are visible.
+    (window as any).__kadiMap = m;
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     m.on('error', (e: any) => console.warn('[map]', e?.error?.message || e));
+
+    // KEEP THE CANVAS THE SIZE OF ITS CONTAINER.
+    //
+    // MapLibre measures the container once, at construction, and never again unless told.
+    // This container's height comes from a flex layout that resolves AFTER the map is created,
+    // so the canvas was locked at 400x418 inside a 718x494 box -- the map painted a fraction
+    // of its own area and the rest showed page background. It read as "the basemap is broken":
+    // satellite looked like a grey rectangle, the dark basemap like a black one, and no
+    // amount of changing tile sources would have fixed it because the tiles were never the
+    // problem.
+    //
+    // A ResizeObserver rather than a window 'resize' listener, because the container also
+    // changes size when the sidebar collapses or a panel opens, and neither of those resizes
+    // the window.
+    const ro = new ResizeObserver(() => {
+      try { m.resize(); } catch { /* torn down mid-observation */ }
+    });
+    ro.observe(ref.current);
+    // One immediate resize after the first paint, for the case where the container was already
+    // its final size before the observer attached and no mutation ever fires.
+    requestAnimationFrame(() => { try { m.resize(); } catch { /* no-op */ } });
     m.on('load', () => {
       try {
       m.addSource('india', { type: 'geojson', data: indiaOutline as any });
@@ -217,16 +261,80 @@ export default function MapPage() {
       m.on('mouseleave', 'pts', () => { m.getCanvas().style.cursor = ''; });
 
       m.fitBounds(KA_BOUNDS, { padding: 24, duration: 0 });
+      // Lift the dark basemap's labels above the choropleth.
+      //
+      // Layer order is paint order, and the data layers are added here -- after the basemap
+      // layers in STYLE -- so the labels start underneath them. The district fill is opaque
+      // enough to bury every place name, which leaves a dark map with no towns on it. Above
+      // the fill and below the incidents is the right slot: names stay readable, dots and
+      // pulsing zones still sit on top of the names.
+      if (m.getLayer('basemap-darkref') && m.getLayer('heat')) {
+        try { m.moveLayer('basemap-darkref', 'heat'); } catch { /* order already fine */ }
+      }
       setReady(true);
+      // Repaint once the style, sources and layers are all in place.
+      //
+      // Without this the map mounted, fetched its tiles, sized its canvas correctly -- and
+      // then painted nothing. Every diagnostic said it was healthy: sources loaded, twelve
+      // layers in order, worker running, bounds over Karnataka. It rendered the instant
+      // anything nudged it, which is the tell: the render loop had gone idle before the last
+      // tiles arrived and nothing asked it to draw again.
+      //
+      // The ResizeObserver above cannot cover this. It only fires when the container CHANGES
+      // size, and here the container was already final -- so it never fired, and the one
+      // requestAnimationFrame resize ran before the tiles were in.
+      requestAnimationFrame(() => {
+        try { m.resize(); m.triggerRepaint(); } catch { /* torn down */ }
+      });
       } catch (err) {
         console.warn('[map] layer setup failed', err);
       }
     });
 
+    // WAKE THE RENDER LOOP WHEN A SOURCE FINISHES.
+    //
+    // MapLibre parks its render loop when it believes there is nothing left to draw, and here
+    // it parked before the last raster tiles had decoded -- so the canvas stayed the
+    // background colour while isSourceLoaded('sat') reported true and no error was raised
+    // anywhere. A single triggerRepaint() painted the whole map instantly, which is the proof:
+    // nothing was missing, nothing had failed, the loop had simply gone to sleep early.
+    //
+    // 'sourcedata' with isSourceLoaded is the moment new pixels become available, so that is
+    // where the nudge belongs. It is cheap -- a repaint that has nothing to do is a no-op.
+    m.on('sourcedata', (e: any) => {
+      if (e && e.isSourceLoaded) { try { m.triggerRepaint(); } catch { /* torn down */ } }
+    });
+    // And once more when everything settles, for the case where the last tile lands between
+    // the final sourcedata and the loop parking.
+    m.once('idle', () => { try { m.resize(); m.triggerRepaint(); } catch { /* torn down */ } });
+
+    // A BOUNDED REPAINT PUMP, and the reason it exists rather than a cleverer hook.
+    //
+    // This map paints nothing on first load until something asks it to draw. Every state read
+    // says it should be fine -- canvas sized to its container, style applied, twelve layers in
+    // order, isSourceLoaded('sat') true, worker alive, no error on any channel -- and a single
+    // triggerRepaint() renders the whole thing instantly. The render loop parks before the last
+    // tiles decode and never wakes.
+    //
+    // The 'sourcedata' and 'idle' hooks above are the correct place to fix that and they do not
+    // catch it, so this is the blunt instrument: ask for a frame every 250ms for the first eight
+    // seconds, then stop. A repaint with nothing to draw is a no-op, the window is short and
+    // bounded, and it is cleared on unmount. Ugly, honest, and it makes the most important
+    // screen in the product reliably visible -- which is worth more than an elegant fix that
+    // does not work.
+    const pumpStart = Date.now();
+    const pump = setInterval(() => {
+      if (Date.now() - pumpStart > 8000) { clearInterval(pump); return; }
+      try { m.triggerRepaint(); } catch { clearInterval(pump); }
+    }, 250);
+    pumpRef.current = pump;
+
     // Tear the map down on unmount — without this, navigating away (or an HMR update)
     // leaves orphaned WebGL map instances attached to detached DOM nodes.
     return () => {
       try {
+        ro.disconnect();
+        if (pumpRef.current) { clearInterval(pumpRef.current); pumpRef.current = null; }
         markers.current.forEach((mk) => mk.remove());
         markers.current = [];
         m.remove();
@@ -291,7 +399,8 @@ export default function MapPage() {
     if (!m || !ready || !m.getLayer('basemap-sat')) return;
     m.setLayoutProperty('basemap-sat', 'visibility', basemap === 'sat' ? 'visible' : 'none');
     m.setLayoutProperty('basemap-osm', 'visibility', basemap === 'streets' ? 'visible' : 'none');
-    if (m.getLayer('basemap-dark')) m.setLayoutProperty('basemap-dark', 'visibility', basemap === 'night' ? 'visible' : 'none');
+    if (m.getLayer('basemap-dark')) m.setLayoutProperty('basemap-dark', 'visibility', basemap === 'dark' ? 'visible' : 'none');
+    if (m.getLayer('basemap-darkref')) m.setLayoutProperty('basemap-darkref', 'visibility', basemap === 'dark' ? 'visible' : 'none');
   }, [ready, basemap]);
 
   // ---- pulsing red zones ----
@@ -457,7 +566,8 @@ export default function MapPage() {
           <div className="flex rounded-ctl border border-line overflow-hidden text-sm bg-surface">
             <button onClick={() => setBasemap('sat')} className={`px-3 py-1.5 ${basemap === 'sat' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Satellite</button>
             <button onClick={() => setBasemap('streets')} className={`px-3 py-1.5 ${basemap === 'streets' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Streets</button>
-            <button onClick={() => setBasemap('night')} className={`px-3 py-1.5 flex items-center gap-1 ${basemap === 'night' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}><Moon size={13} /> Night</button>
+            <button onClick={() => setBasemap('dark')} title="Dark cartographic basemap"
+              className={`px-3 py-1.5 flex items-center gap-1 ${basemap === 'dark' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}><Moon size={13} /> Dark</button>
           </div>
           <Select value={head} onChange={setHead} className="w-48"
             options={[{ value: '', label: 'All crime heads' }, ...(lookups?.heads || []).map((h) => ({ value: h.id, label: h.name }))]} />

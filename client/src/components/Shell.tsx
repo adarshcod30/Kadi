@@ -2,7 +2,6 @@
 // persistent fairness banner. Light, government-grade layout (docs/04 §3).
 import { ReactNode, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
@@ -166,13 +165,14 @@ export function Shell({ children }: { children: ReactNode }) {
         {/* Main */}
         <main className="flex-1 min-w-0 overflow-auto">
           <FairnessBanner />
-          <AnimatePresence mode="wait">
-            <motion.div key={location.pathname.split('/')[1] || 'home'}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }} className="p-5 max-w-[1500px] mx-auto">
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {/* Keyed on the route so each page replays the enter animation. The animation
+              itself is CSS (see .page-enter) rather than framer-motion: a JS tween on this
+              wrapper stalled at opacity 0 on the map route and left the whole page invisible,
+              and no decorative fade is worth that. */}
+          <div key={location.pathname.split('/')[1] || 'home'}
+            className="page-enter p-5 max-w-[1500px] mx-auto">
+            {children}
+          </div>
         </main>
       </div>
     </div>
