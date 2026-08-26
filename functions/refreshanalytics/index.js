@@ -107,11 +107,18 @@ module.exports = async (jobRequest, context) => {
       console.log(`[refresh] largest rank shift: ${topShift.DistrictName} `
         + `#${topShift.RankByCount} by count -> #${topShift.RankByRate} per capita`);
     }
-    // NOTE: publishing these rows into Data Store from here is blocked - the credential
-    // Catalyst injects into a deployed function has no write scope on the data services
-    // (the same wall the Cache adapter hits; see docs/08_CATALYST_LIVE.md). Until that
-    // scope is granted the tables are loaded out-of-band via bulk write, and this job
-    // runs as the nightly integrity check over the analytics the pipeline produced.
+    // Why this job validates but does not write.
+    //
+    // The original note here said writes were blocked by missing scope. That stopped being
+    // true once the raw-HTTPS header path landed -- AuditLog, AppUser and AppConfig all write
+    // from a deployed function now. The real constraint is different and structural: the Data
+    // Store credential arrives as request HEADERS (x-zc-admin-cred-token), and a cron
+    // invocation has no HTTP request to carry them. A job cannot authenticate.
+    //
+    // So publishing lives on POST /admin/sync-forecast and /admin/sync-districts, which run
+    // behind a request that does hold the credential, and this job keeps the role it can
+    // actually perform: a nightly integrity check that fails loudly if the pipeline produced
+    // rows the tables would reject.
     console.log(`[refresh] ok in ${Date.now() - t0}ms`);
     context.closeWithSuccess();
   } catch (e) {

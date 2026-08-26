@@ -28,11 +28,44 @@ const DOMAIN = 'ksp.gov.in';
 const TOKEN_TTL_HOURS = 12;
 const TABLE = 'AppUser';
 
-// The signing secret. An env var in the deployed project; a per-process random value if it is
-// missing, which fails closed rather than open -- tokens simply stop verifying after a
-// restart instead of every deployment sharing a guessable key baked into the source.
-const SECRET = process.env.KADI_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
-const SECRET_FROM_ENV = Boolean(process.env.KADI_AUTH_SECRET);
+// ---- the signing secret ------------------------------------------------------------------
+//
+// It lives in the AppConfig Data Store table, not in the repository and not in the deployed
+// function's env block. Both of those were considered and rejected:
+//
+//   env var        catalyst-config.json is how a function declares env vars, and that file is
+//                  committed. A signing secret in a public repo is worse than the credential
+//                  list -- those are mock passwords for a synthetic corpus, whereas the secret
+//                  mints a valid DGP token with no password at all.
+//   per-process    what this replaces. Every cold start generated a new key, so tokens stopped
+//                  verifying and officers were silently logged out mid-session.
+//
+// Read once per container and cached. If Data Store is unreachable the process falls back to a
+// random key, which fails CLOSED: tokens issued by that container simply will not verify
+// elsewhere, rather than every deployment sharing a guessable key.
+const SECRET_KEY = 'auth.signingSecret';
+const FALLBACK_SECRET = crypto.randomBytes(32).toString('hex');
+let cachedSecret = null;
+let secretSource = 'not-loaded';
+
+async function loadSecret(req) {
+  if (cachedSecret) return cachedSecret;
+  const rows = await datastore.query(req,
+    `SELECT configValue FROM AppConfig WHERE configKey = '${SECRET_KEY}'`, 'AppConfig');
+  if (rows && rows.length && rows[0].configValue) {
+    cachedSecret = rows[0].configValue;
+    secretSource = 'datastore';
+  } else {
+    cachedSecret = FALLBACK_SECRET;
+    secretSource = 'ephemeral-fallback';
+  }
+  return cachedSecret;
+}
+
+// Synchronous accessor for the signing helpers. Everything that signs or verifies runs behind
+// a route that has already awaited loadSecret(), so by the time this is reached the value is
+// in hand; the fallback keeps it total rather than throwing.
+const SECRET = () => cachedSecret || FALLBACK_SECRET;
 
 // ---------- provisioned accounts ----------
 // Bundled with the function, so the 36 seeded logins work the moment it deploys and do not
@@ -76,7 +109,7 @@ function verifyPassword(plain, stored) {
 // ---------- tokens ----------
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const unb64 = (s) => JSON.parse(Buffer.from(s, 'base64url').toString('utf8'));
-const sign = (data) => crypto.createHmac('sha256', SECRET).update(data).digest('base64url');
+const sign = (data) => crypto.createHmac('sha256', SECRET()).update(data).digest('base64url');
 
 function issueToken(user) {
   const payload = {
@@ -138,6 +171,7 @@ async function findAccount(req, email) {
 
 // ---------- operations ----------
 async function login(req, email, plain) {
+  await loadSecret(req);
   const acct = await findAccount(req, email);
   // One message for "no such account" and "wrong password". Distinguishing them turns the
   // login form into a directory of who holds an account.
@@ -225,18 +259,21 @@ async function decide(req, rowid, approve, deciderEmail) {
   return { ok: true, status };
 }
 
-function status() {
+async function status(req) {
+  await loadSecret(req);
   return {
     provisionedAccounts: provisioned().size,
     domain: DOMAIN,
     tokenTtlHours: TOKEN_TTL_HOURS,
-    // Surfaced because a per-process secret means tokens die on every cold start, which looks
-    // like random logouts. Better to be able to read it than to diagnose it from behaviour.
-    secretFromEnv: SECRET_FROM_ENV,
+    // Surfaced because an ephemeral secret means tokens die on every cold start, which
+    // presents as random logouts. Better to read it than to diagnose it from behaviour.
+    // The secret itself is never returned.
+    secretSource,
+    secretPersistent: secretSource === 'datastore',
   };
 }
 
 module.exports = {
   DOMAIN, login, signup, listRequests, decide, verifyToken, issueToken,
-  hashPassword, verifyPassword, provisioned, status,
+  hashPassword, verifyPassword, provisioned, status, loadSecret,
 };

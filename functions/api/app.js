@@ -29,7 +29,13 @@ function buildApp() {
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
-  app.use((req, _res, next) => {
+  app.use(async (req, _res, next) => {
+    // The signing secret must be in hand before anything verifies a token, and verifyToken is
+    // synchronous by design (rbac calls it while building the user). One Data Store read per
+    // container covers it -- loadSecret caches, so this is a no-op on every request after the
+    // first. Failure is swallowed: an unreachable Data Store must not turn every request into
+    // a 500, and the fallback secret fails closed on its own.
+    await auth.loadSecret(req).catch(() => {});
     req.user = rbac.userFromRequest(req);
     req.clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local';
     next();
@@ -98,7 +104,7 @@ function buildApp() {
     return out;
   }));
 
-  r.get('/auth/status', handle(async () => auth.status()));
+  r.get('/auth/status', handle(async (req) => auth.status(req)));
 
   r.get('/lookups', handle(async () => q.lookups()));
   r.get('/stations', handle(async (req) => q.stations(req.user, req.query)));
@@ -677,6 +683,53 @@ function buildApp() {
       } else results.updated += 1;
     }
     return results;
+  }));
+
+  // Publish the three-month district forecast into Data Store.
+  //
+  // CrimeForecast sat empty while DistrictInsight held 31 rows, because the nightly job that
+  // was meant to fill both cannot: a cron invocation carries no HTTP request, and the Data
+  // Store credential arrives as request HEADERS. The job therefore validates the rows and
+  // logs, with a comment saying writes are blocked by missing scope -- which stopped being
+  // true once the raw-HTTPS header path landed. Writes work; they just need a request.
+  //
+  // So publishing lives here, on a route that has one. Insert-only and idempotent by
+  // truncate-then-write: the forecast is a full replacement each pipeline run, not a delta,
+  // and 93 rows is small enough that rewriting beats reconciling.
+  r.post('/admin/sync-forecast', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin', 'DGP']);
+    const fc = q.db().forecast || { districts: [] };
+    const rows = [];
+    for (const d of (fc.districts || [])) {
+      for (const pt of (d.forecast || [])) {
+        rows.push({
+          DistrictID: String(d.districtId),
+          DistrictName: d.districtName || '',
+          ForecastMonth: pt.month,
+          Predicted: pt.predicted,
+          LowerBound: pt.lower,
+          UpperBound: pt.upper,
+          RecentAvg: d.recentAvg,
+          ChangePct: d.changePct,
+          Direction: d.direction,
+        });
+      }
+    }
+    if (!rows.length) return { written: 0, reason: 'the pipeline produced no forecast rows' };
+
+    await datastore.query(req, 'DELETE FROM CrimeForecast');
+    // Batched: one insert of 93 rows risks a payload limit, and a partial failure is easier
+    // to reason about in chunks than in one opaque call.
+    let written = 0;
+    const failures = [];
+    for (let i = 0; i < rows.length; i += 25) {
+      const batch = rows.slice(i, i + 25);
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await datastore.insertRows(req, 'CrimeForecast', batch);
+      if (ok) written += batch.length;
+      else if (failures.length < 3) failures.push({ from: i, err: datastore.diag().httpError });
+    }
+    return { written, attempted: rows.length, failures };
   }));
 
   r.get('/audit/health', handle(async () => ({
