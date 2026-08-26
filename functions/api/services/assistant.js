@@ -212,6 +212,33 @@ async function queryEnhanced(user, text, lang, req) {
   // a question about the records". Consulting it earlier would risk answering a countable
   // question from prose.
   if (base.intent === 'unknown') {
+    // A Kannada question the engine did not recognise gets one more chance in English before
+    // it falls through to the knowledge base.
+    //
+    // The intent patterns are written against English phrasing, so a question asked in Kannada
+    // -- or a Kannada suggestion the interface itself offered -- misses every one of them and
+    // lands in RAG, which answers "no information is provided" to a question the records could
+    // have answered exactly. Translating the QUESTION costs one model call and recovers the
+    // deterministic answer; the ANSWER still comes back in Kannada, because base.lang decides
+    // that and is taken from the original.
+    if (base.lang === 'kn') {
+      // eslint-disable-next-line global-require
+      const translate = require('./translate');
+      const en = await translate.translateOne(req, text, 'en').catch(() => null);
+      if (en && en.translated && en.text && en.text !== text) {
+        const retry = query(user, en.text, 'kn');
+        if (retry.intent !== 'unknown') {
+          return {
+            ...retry,
+            lang: 'kn',
+            llm: 'intent-via-translation',
+            // Surfaced rather than hidden: the reader should be able to see that the question
+            // was re-read in English, in case the translation changed what was asked.
+            interpretedAs: en.text,
+          };
+        }
+      }
+    }
     const rag = await quickml.ragAnswer(req, { question: text, lang: base.lang });
     if (rag && rag.answer) {
       return {

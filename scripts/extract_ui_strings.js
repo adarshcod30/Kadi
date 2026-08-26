@@ -67,6 +67,11 @@ for (const f of files) {
   for (const m of code.matchAll(/>([^<>{}\n][^<>{}]*)</g)) add(m[1], f);
   // String-valued props that reach the user
   for (const m of code.matchAll(/\b(placeholder|title|label|hint|aria-label|alt)\s*=\s*"([^"]{2,200})"/g)) add(m[2], f);
+  // tx('...') calls. These are inside JSX braces so the text-node pattern above cannot see
+  // them, and they are the MOST certain user-facing strings in the file -- someone marked
+  // them for translation by hand.
+  for (const m of code.matchAll(/\btx\(\s*'((?:[^'\\]|\\.)*)'/g)) add(m[1].replace(/\\'/g, "'"), f);
+  for (const m of code.matchAll(/\btx\(\s*"((?:[^"\\]|\\.)*)"/g)) add(m[1], f);
   // Quoted strings assigned to obviously user-facing names
   for (const m of code.matchAll(/\b(label|title|hint|text|heading|caption|message|reason|note|placeholder)\s*:\s*'([^']{2,200})'/g)) add(m[2], f);
 }

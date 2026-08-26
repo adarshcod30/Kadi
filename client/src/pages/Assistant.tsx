@@ -105,14 +105,21 @@ export default function Assistant() {
   const inFlight = useRef(false);
   const lastSent = useRef<{ text: string; at: number }>({ text: '', at: 0 });
 
-  const send = async (text: string) => {
+  /**
+   * `display` exists because the two are genuinely different for a suggestion chip: the
+   * question goes to the engine in English so its intent patterns match, but the officer
+   * clicked a Kannada chip and their own message should read back in Kannada. Showing them
+   * English for a button they pressed in Kannada is the same half-done feeling this page was
+   * rebuilt to remove.
+   */
+  const send = async (text: string, display?: string) => {
     const q = text.trim();
     if (!q || inFlight.current) return;
     if (q === lastSent.current.text && Date.now() - lastSent.current.at < 1500) return;
     inFlight.current = true;
     lastSent.current = { text: q, at: Date.now() };
     setInput(''); setInterim(''); setNotice(null);
-    setMsgs((m) => [...m, { role: 'user', content: q }]);
+    setMsgs((m) => [...m, { role: 'user', content: (display || q).trim() }]);
     try {
       const res = await ask.mutateAsync({ text: q, lang });
       setMsgs((m) => [...m, { role: 'assistant', content: res.answer, res }]);
@@ -329,7 +336,12 @@ export default function Assistant() {
             <p className="mb-3">{tx('Ask about cases, offenders, slipping investigations, per-capita crime rates, forecasts or hotspots. Try:')}</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => send(kn ? tx(s) : s)}
+                // Send the ENGLISH source, show the Kannada. The intent engine matches on
+                // English phrasing, and posting it a machine translation of its own suggestion
+                // means it fails to recognise a question it wrote -- which is how "Which cases
+                // are slipping?" came back as "no information is provided". The answer still
+                // arrives in Kannada, because `lang` controls that, not the question.
+                <button key={s} onClick={() => send(s, tx(s))}
                   className={`chip bg-kadi-blue50 text-kadi-blue hover:bg-kadi-blue hover:text-white ${kn ? 'kn' : ''}`}>
                   {tx(s)}
                 </button>
@@ -342,10 +354,15 @@ export default function Assistant() {
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[82%] rounded-card px-3.5 py-2.5 text-sm ${
               m.role === 'user' ? 'bg-kadi-navy text-white' : 'bg-surface-3 text-ink'} ${kn ? 'kn' : ''}`}>
-              <div className="whitespace-pre-wrap">{m.content}</div>
+              {/* data-notranslate on both: the answer already arrived in the language that was
+                  asked for, and the alternate is deliberately in the OTHER one. Without this
+                  the page translator dutifully turned the English translation back into
+                  Kannada, so "Show in English" produced a second Kannada sentence. */}
+              <div className="whitespace-pre-wrap" data-notranslate>{m.content}</div>
 
               {m.alt && (
-                <div className={`mt-2 pt-2 border-t border-line/70 text-[13px] text-ink-muted ${m.altLang === 'kn' ? 'kn' : ''}`}>
+                <div data-notranslate
+                  className={`mt-2 pt-2 border-t border-line/70 text-[13px] text-ink-muted ${m.altLang === 'kn' ? 'kn' : ''}`}>
                   {m.alt}
                 </div>
               )}
