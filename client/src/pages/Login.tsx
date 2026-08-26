@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Globe, MapPin, Building2, Loader2, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Globe, MapPin, Building2, Loader2, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { setRole, setToken, signOut, Role, api } from '../lib/api';
 import { LoginHero } from '../components/LoginHero';
 
@@ -95,7 +95,7 @@ export default function Login() {
         <div className="relative flex flex-col justify-center px-8 lg:px-14 py-12 overflow-hidden">
           {/* The map sits behind the wordmark rather than beside it, so the two read as one
               composition instead of two panels sharing a column. */}
-          <div className="pointer-events-none absolute right-[-4%] top-1/2 -translate-y-1/2 w-[46%] max-w-[380px] hidden lg:block opacity-[0.85]">
+          <div className="pointer-events-none absolute right-[-3%] top-1/2 -translate-y-1/2 w-[42%] max-w-[360px] hidden xl:block opacity-80">
             <LoginHero />
           </div>
 
@@ -152,17 +152,25 @@ export default function Login() {
 
         {/* ---- Right: the door ---- */}
         <motion.div initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-          className="relative flex flex-col justify-center px-7 py-10 border-l border-white/[0.08]"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.03))', backdropFilter: 'blur(14px)' }}>
+          className="relative flex flex-col justify-center px-7 py-10 border-l border-white/[0.08] overflow-hidden"
+          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', backdropFilter: 'blur(14px)' }}>
           {/* A gold hairline down the seam: the KSP rule that runs under the app's header,
               carried onto the entry screen so the two feel like one product. */}
           <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-kadi-gold/45 to-transparent" />
+          {/* The crest behind the form. Large, faint and bled off the bottom-right so it
+              anchors the column without ever sitting behind a line of text. */}
+          <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
+            className="pointer-events-none absolute -right-24 -bottom-20 w-[400px] opacity-[0.05] select-none" />
+          <div className="pointer-events-none absolute inset-x-0 -top-24 h-56"
+            style={{ background: 'radial-gradient(60% 100% at 50% 100%, rgba(232,180,74,0.10), transparent 70%)' }} />
 
-          {mode === 'signin'
-            ? <SignInCard onSignup={() => setMode('signup')} onDone={() => nav('/')} />
-            : <SignUpCard onBack={() => setMode('signin')} />}
+          <div className="relative">
+            {mode === 'signin'
+              ? <SignInCard onSignup={() => setMode('signup')} onDone={() => nav('/')} />
+              : <SignUpCard onBack={() => setMode('signin')} />}
+          </div>
 
-          <div className="mt-7 pt-5 border-t border-white/10">
+          <div className="relative mt-7 pt-5 border-t border-white/10">
             <div className="text-[10px] uppercase tracking-[0.18em] text-white/35 mb-2.5">
               Or explore without an account
             </div>
@@ -170,12 +178,21 @@ export default function Login() {
               {DEMO_TIERS.map((t) => (
                 <button key={t.key}
                   onClick={() => { setToken(null); setRole(t.role); nav('/'); }}
-                  className="group relative rounded-ctl border border-white/10 bg-white/[0.035] hover:bg-white/[0.10] hover:border-white/25 px-2.5 py-3 text-left transition-all overflow-hidden">
-                  <span className="absolute inset-x-0 bottom-0 h-[2px] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"
-                    style={{ background: t.accent }} />
-                  <t.icon size={16} style={{ color: t.accent }} />
-                  <div className="text-[12.5px] font-medium mt-2">{t.label}</div>
-                  <div className="text-[10px] text-white/40 leading-tight mt-0.5">{t.scope}</div>
+                  className="group relative rounded-xl px-2.5 py-3 text-left overflow-hidden transition-all duration-200 hover:-translate-y-px"
+                  style={{
+                    background: 'rgba(0,0,0,0.18)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.25)',
+                  }}>
+                  {/* The tier colour arrives on the top edge, where it reads as a label on the
+                      card rather than an underline on the text. */}
+                  <span className="absolute inset-x-0 top-0 h-[2px] opacity-40 group-hover:opacity-100 transition-opacity"
+                    style={{ background: `linear-gradient(90deg, transparent, ${t.accent}, transparent)` }} />
+                  <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: `radial-gradient(120% 90% at 50% 0%, ${t.accent}22, transparent 70%)` }} />
+                  <t.icon size={16} style={{ color: t.accent }} className="relative" />
+                  <div className="relative text-[12.5px] font-medium mt-2">{t.label}</div>
+                  <div className="relative text-[10px] text-white/40 leading-tight mt-0.5">{t.scope}</div>
                 </button>
               ))}
             </div>
@@ -190,13 +207,32 @@ export default function Login() {
   );
 }
 
+// Inputs that sit IN the surface rather than on it.
+//
+// The flat grey rectangle with a 1px border is what made this read as a decade-old form. A
+// recessed well — darker than its surround, with a soft inner shadow — plus a gold focus ring
+// that grows rather than switches, is the difference between a control and a box.
 function Field({ icon: Icon, ...props }: any) {
+  const [focused, setFocused] = useState(false);
   return (
-    <div className="relative">
-      {Icon && <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none" />}
+    <div className="relative group">
+      {Icon && (
+        <Icon size={15}
+          className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${
+            focused ? 'text-kadi-gold' : 'text-white/30'}`} />
+      )}
       <input {...props}
-        className={`w-full bg-white/[0.07] border border-white/15 rounded-ctl ${Icon ? 'pl-9' : 'pl-3'} pr-3 py-2.5
-          text-[13.5px] text-white placeholder-white/35 outline-none focus:border-kadi-gold/60 focus:bg-white/[0.10] transition-colors`} />
+        onFocus={(e: any) => { setFocused(true); props.onFocus?.(e); }}
+        onBlur={(e: any) => { setFocused(false); props.onBlur?.(e); }}
+        className={`w-full rounded-xl ${Icon ? 'pl-10' : 'pl-3.5'} pr-3.5 py-3 text-[13.5px] text-white
+          placeholder-white/30 outline-none transition-all duration-200`}
+        style={{
+          background: focused ? 'rgba(0,0,0,0.30)' : 'rgba(0,0,0,0.22)',
+          border: `1px solid ${focused ? 'rgba(232,180,74,0.55)' : 'rgba(255,255,255,0.09)'}`,
+          boxShadow: focused
+            ? 'inset 0 1px 3px rgba(0,0,0,0.35), 0 0 0 3px rgba(232,180,74,0.13)'
+            : 'inset 0 1px 3px rgba(0,0,0,0.30)',
+        }} />
     </div>
   );
 }
@@ -237,10 +273,13 @@ function SignInCard({ onSignup, onDone }: { onSignup: () => void; onDone: () => 
   };
 
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <div>
-        <h2 className="text-xl font-semibold">Sign in</h2>
-        <p className="text-[12.5px] text-white/50 mt-0.5">Use your official @{DOMAIN} address.</p>
+    <form onSubmit={submit} className="space-y-3.5">
+      <div className="pb-1">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-kadi-gold/75">
+          <ShieldCheck size={13} /> Secure access
+        </div>
+        <h2 className="text-[26px] font-semibold tracking-tight mt-2 leading-none">Sign in</h2>
+        <p className="text-[12.5px] text-white/45 mt-1.5">Use your official @{DOMAIN} address.</p>
       </div>
       {error && <Notice kind="error">{error}</Notice>}
       <Field icon={Mail} type="email" required autoComplete="username" placeholder={`officer@${DOMAIN}`}
@@ -248,12 +287,18 @@ function SignInCard({ onSignup, onDone }: { onSignup: () => void; onDone: () => 
       <Field icon={Lock} type="password" required autoComplete="current-password" placeholder="Password"
         value={password} onChange={(e: any) => setPassword(e.target.value)} />
       <button type="submit" disabled={busy}
-        className="w-full flex items-center justify-center gap-2 bg-kadi-gold text-kadi-navy font-semibold rounded-ctl py-2.5 text-[14px] hover:brightness-105 disabled:opacity-60 transition-all">
-        {busy ? <Loader2 size={15} className="animate-spin" /> : <>Sign in <ArrowRight size={15} /></>}
+        className="group w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold
+          text-[#14202b] disabled:opacity-60 transition-all duration-200 hover:-translate-y-px active:translate-y-0"
+        style={{
+          background: 'linear-gradient(180deg, #F2C75C 0%, #E0A93C 100%)',
+          boxShadow: '0 6px 18px -6px rgba(224,169,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)',
+        }}>
+        {busy ? <Loader2 size={15} className="animate-spin" />
+          : <>Sign in <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" /></>}
       </button>
       <button type="button" onClick={onSignup}
-        className="w-full text-[12.5px] text-white/60 hover:text-white transition-colors">
-        No account? <span className="underline underline-offset-2">Request access</span>
+        className="w-full text-[12.5px] text-white/50 hover:text-white/85 transition-colors pt-0.5">
+        No account? <span className="text-kadi-gold/85 underline underline-offset-[3px] decoration-kadi-gold/35">Request access</span>
       </button>
     </form>
   );
@@ -302,10 +347,13 @@ function SignUpCard({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <div>
-        <h2 className="text-xl font-semibold">Request access</h2>
-        <p className="text-[12.5px] text-white/50 mt-0.5">Approved by the DGP or Administrator.</p>
+    <form onSubmit={submit} className="space-y-3.5">
+      <div className="pb-1">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-kadi-gold/75">
+          <ShieldCheck size={13} /> Verified access
+        </div>
+        <h2 className="text-[26px] font-semibold tracking-tight mt-2 leading-none">Request access</h2>
+        <p className="text-[12.5px] text-white/45 mt-1.5">Approved by the DGP or Administrator.</p>
       </div>
       {error && <Notice kind="error">{error}</Notice>}
       <Field required placeholder="Full name" value={form.fullName}
@@ -316,18 +364,25 @@ function SignUpCard({ onBack }: { onBack: () => void }) {
         placeholder="Password — at least 10 characters" value={form.password}
         onChange={(e: any) => set('password', e.target.value)} />
       <select value={form.role} onChange={(e) => set('role', e.target.value)}
-        className="w-full bg-white/[0.07] border border-white/15 rounded-ctl px-3 py-2.5 text-[13.5px] text-white outline-none focus:border-kadi-gold/60">
+        className="w-full rounded-xl px-3.5 py-3 text-[13.5px] text-white outline-none transition-all"
+        style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.30)' }}>
         {SIGNUP_ROLES.map((r) => <option key={r.value} value={r.value} className="text-ink">{r.label}</option>)}
       </select>
       {needsDistrict && (
         <select value={form.districtId} onChange={(e) => set('districtId', e.target.value)} required
-          className="w-full bg-white/[0.07] border border-white/15 rounded-ctl px-3 py-2.5 text-[13.5px] text-white outline-none focus:border-kadi-gold/60">
+          className="w-full rounded-xl px-3.5 py-3 text-[13.5px] text-white outline-none transition-all"
+          style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.30)' }}>
           <option value="" className="text-ink">Select your district…</option>
           {districts.map((d) => <option key={d.id} value={d.id} className="text-ink">{d.name}</option>)}
         </select>
       )}
       <button type="submit" disabled={busy}
-        className="w-full flex items-center justify-center gap-2 bg-kadi-gold text-kadi-navy font-semibold rounded-ctl py-2.5 text-[14px] hover:brightness-105 disabled:opacity-60 transition-all">
+        className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold
+          text-[#14202b] disabled:opacity-60 transition-all duration-200 hover:-translate-y-px active:translate-y-0"
+        style={{
+          background: 'linear-gradient(180deg, #F2C75C 0%, #E0A93C 100%)',
+          boxShadow: '0 6px 18px -6px rgba(224,169,60,0.55), inset 0 1px 0 rgba(255,255,255,0.35)',
+        }}>
         {busy ? <Loader2 size={15} className="animate-spin" /> : 'Submit request'}
       </button>
       <button type="button" onClick={onBack}
