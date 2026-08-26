@@ -9,13 +9,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3, Building2 } from 'lucide-react';
+import { Layers, Flame, MapPin, TrendingUp, X, ArrowRight, Clock, Grid3x3, Building2, Moon, Activity } from 'lucide-react';
 import { useGeoPoints, useGeoGrid, useHotspots, useLookups, useDistricts, useNational , useMe, useStations , useGeoIntel } from '../api/hooks';
 import { Section, Chip } from '../components/ui';
 import { Hint } from '../components/viz';
 import kaDistricts from '../geo/karnataka_districts.json';
 import indiaOutline from '../geo/india_outline.json';
 import { Select } from '../components/Select';
+import { InfoDot } from '../components/InfoDot';
 import { IntelligenceBand } from '../components/IntelligenceBand';
 
 // bright, satellite-legible palette
@@ -44,13 +45,41 @@ const STYLE: any = {
       tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] },
     osm: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap',
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'] },
+    // A real dark cartographic basemap, not a darkened satellite image: incident colours and
+    // the pulsing red zones read far better against it, and it is the sane choice on a
+    // control-room screen at night.
+    dark: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap, © CARTO',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      ] },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#08131f' } },
     { id: 'basemap-sat', type: 'raster', source: 'sat', paint: { 'raster-opacity': 1 } },
     { id: 'basemap-osm', type: 'raster', source: 'osm', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.5 } },
+    { id: 'basemap-dark', type: 'raster', source: 'dark', layout: { visibility: 'none' }, paint: { 'raster-opacity': 1 } },
   ],
 };
+
+// Standard shift windows, so a supervisor can jump to "Night" without working out the hours.
+const SHIFTS: [string, string, [number, number]][] = [
+  ['latenight', 'Late night', [0, 4]],
+  ['day', 'Day', [9, 17]],
+  ['evening', 'Evening', [18, 21]],
+  ['night', 'Night', [22, 23]],
+];
+// Recency windows. The corpus spans 43 months; "where is it happening now" and "where has it
+// ever happened" are different questions, and only the first one deploys officers.
+const PERIODS: [string, string][] = [
+  ['', 'All time'],
+  ['180', 'Last 6 months'],
+  ['90', 'Last 3 months'],
+  ['30', 'Last month'],
+  ['15', 'Last 15 days'],
+  ['7', 'Last week'],
+];
 
 const KA_BOUNDS: [[number, number], [number, number]] = [[73.9, 11.4], [78.7, 18.6]];
 type LayerMode = 'density' | 'heat' | 'points';
@@ -70,9 +99,13 @@ export default function MapPage() {
   const markers = useRef<maplibregl.Marker[]>([]);
   const [ready, setReady] = useState(false);
   const [layer, setLayer] = useState<LayerMode>('density');
-  const [basemap, setBasemap] = useState<'sat' | 'streets'>('sat');
+  const [basemap, setBasemap] = useState<'sat' | 'streets' | 'night'>('sat');
   const [head, setHead] = useState('');
   const [hours, setHours] = useState<[number, number]>([0, 23]);
+  const [period, setPeriod] = useState('');
+  // Which preset the current hour range corresponds to, so the dropdown reflects a range set
+  // by dragging the sliders rather than going blank whenever the two are edited directly.
+  const shiftKey = SHIFTS.find(([, , r]) => r[0] === hours[0] && r[1] === hours[1])?.[0] || '';
   const { data: intel, isLoading: intelLoading } = useGeoIntel({ head });
 
   // Map findings drive the map's own controls -- a patrol-window signal sets the hour slider,
@@ -105,13 +138,13 @@ export default function MapPage() {
 
   const { data: districts } = useDistricts();
   const { data: national } = useNational();
-  const { data: points } = useGeoPoints({ head, limit: 9000 });
+  const { data: points } = useGeoPoints({ head, limit: 9000, days: period || undefined });
   const { data: hotspots } = useHotspots();
   const { data: stations } = useStations({ sort: 'zone' });
   const { data: lookups } = useLookups();
   // binned density over the FULL dataset (only fetched when the heat layer is showing)
   const { data: grid } = useGeoGrid(
-    { cell: 0.05, head, hourFrom: hours[0], hourTo: hours[1] }, layer === 'heat');
+    { cell: 0.05, head, hourFrom: hours[0], hourTo: hours[1], days: period || undefined }, layer === 'heat');
 
   const countById = useMemo(() => {
     const m: Record<string, number> = {};
@@ -258,21 +291,44 @@ export default function MapPage() {
     if (!m || !ready || !m.getLayer('basemap-sat')) return;
     m.setLayoutProperty('basemap-sat', 'visibility', basemap === 'sat' ? 'visible' : 'none');
     m.setLayoutProperty('basemap-osm', 'visibility', basemap === 'streets' ? 'visible' : 'none');
+    if (m.getLayer('basemap-dark')) m.setLayoutProperty('basemap-dark', 'visibility', basemap === 'night' ? 'visible' : 'none');
   }, [ready, basemap]);
 
-  // ---- pulsing emerging hotspots ----
+  // ---- pulsing red zones ----
+  //
+  // Two different things pulse, at two different zooms, and the page previously only had the
+  // first. State-wide there is exactly ONE emerging DBSCAN cluster, so clicking into a city
+  // showed nothing pulsing at all and the feature looked broken.
+  //
+  // Drilling into a district now also pulses the stations inside it that are running above
+  // their OWN baseline. That is the right unit at city zoom: a district-level cluster answers
+  // "which neighbourhood", a station answers "whose ground", and only the second one names
+  // someone who can be told to act.
   useEffect(() => {
     const m = map.current;
-    if (!m || !ready || !hotspots) return;
+    if (!m || !ready) return;
     markers.current.forEach((mk) => mk.remove());
     markers.current = [];
-    hotspots.hotspots.filter((h) => h.emergingFlag).forEach((h) => {
+
+    for (const h of (hotspots?.hotspots || []).filter((x) => x.emergingFlag)) {
       const el = document.createElement('div');
       el.className = 'hotspot-pulse';
-      el.title = `Emerging: ${h.recentCount} in 60d vs ~${h.baselineExpected} expected`;
+      el.title = `Emerging cluster: ${h.recentCount} in 60d vs ~${h.baselineExpected} expected`;
       markers.current.push(new maplibregl.Marker({ element: el }).setLngLat([h.centroidLng, h.centroidLat]).addTo(m));
-    });
-  }, [ready, hotspots]);
+    }
+
+    if (selDistrict) {
+      const hot = (stations?.items || []).filter((r: any) => String(r.districtId) === String(selDistrict)
+        && (r.zone === 'red_pulsing' || r.zone === 'red') && r.lat != null && r.lng != null);
+      for (const r of hot) {
+        const el = document.createElement('div');
+        el.className = r.zone === 'red_pulsing' ? 'hotspot-pulse' : 'hotspot-pulse hotspot-pulse--steady';
+        el.title = `${r.unitName}: ${r.current ?? 0} recent vs baseline ${r.baseline ?? 0}`
+          + `${r.zone === 'red_pulsing' ? ' — sharply above its own average' : ' — above its own average'}`;
+        markers.current.push(new maplibregl.Marker({ element: el }).setLngLat([r.lng, r.lat]).addTo(m));
+      }
+    }
+  }, [ready, hotspots, selDistrict, stations]);
 
 
   // ---- police stations, toggled ----
@@ -401,6 +457,7 @@ export default function MapPage() {
           <div className="flex rounded-ctl border border-line overflow-hidden text-sm bg-surface">
             <button onClick={() => setBasemap('sat')} className={`px-3 py-1.5 ${basemap === 'sat' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Satellite</button>
             <button onClick={() => setBasemap('streets')} className={`px-3 py-1.5 ${basemap === 'streets' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}>Streets</button>
+            <button onClick={() => setBasemap('night')} className={`px-3 py-1.5 flex items-center gap-1 ${basemap === 'night' ? 'bg-kadi-navy text-white' : 'text-ink-muted hover:bg-surface-3'}`}><Moon size={13} /> Night</button>
           </div>
           <Select value={head} onChange={setHead} className="w-48"
             options={[{ value: '', label: 'All crime heads' }, ...(lookups?.heads || []).map((h) => ({ value: h.id, label: h.name }))]} />
@@ -438,21 +495,40 @@ export default function MapPage() {
       {layer !== 'density' && (
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="card px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <span className="label flex items-center gap-1.5"><Clock size={13} /> Time of day
-            <Hint text="Layer time over location: narrow the window to see where a crime type concentrates at night vs daytime — the basis for proactive patrol deployment." /></span>
-          <input type="range" min={0} max={23} value={hours[0]} onChange={(e) => setHours(([, b]) => [Math.min(Number(e.target.value), b), b])} className="w-32 accent-kadi-blue" />
-          <input type="range" min={0} max={23} value={hours[1]} onChange={(e) => setHours(([a]) => [a, Math.max(Number(e.target.value), a)])} className="w-32 accent-kadi-blue" />
-          <span className="font-num text-sm text-kadi-navy font-medium">{String(hours[0]).padStart(2, '0')}:00 – {String(hours[1]).padStart(2, '0')}:59</span>
-          <span className="text-xs text-ink-muted">
+            <InfoDot label="Why time of day matters" align="left">
+              <b className="block mb-1 text-kadi-navy">Layering time over location</b>
+              Where a crime type concentrates at 02:00 is rarely where it concentrates at
+              14:00. Narrowing the window turns a map of where crime happened into a map of
+              when to be there, which is what a duty roster actually needs.
+              <b className="block mt-1.5 text-kadi-navy">Read with the period filter</b>
+              The period filter beside it controls how far back the incidents are drawn from,
+              so a shift pattern can be checked against the last week rather than three years.
+            </InfoDot>
+          </span>
+          <input type="range" min={0} max={23} value={hours[0]} onChange={(e) => setHours(([, b]) => [Math.min(Number(e.target.value), b), b])} className="w-28 accent-kadi-blue" />
+          <input type="range" min={0} max={23} value={hours[1]} onChange={(e) => setHours(([a]) => [a, Math.max(Number(e.target.value), a)])} className="w-28 accent-kadi-blue" />
+          <span className="font-num text-sm text-kadi-navy font-medium whitespace-nowrap">{String(hours[0]).padStart(2, '0')}:00 – {String(hours[1]).padStart(2, '0')}:59</span>
+
+          {/* Shift presets as a dropdown rather than four loose chips. They are one choice,
+              not four toggles, and as chips they read as filters that could stack. */}
+          <Select value={shiftKey} onChange={(v) => { const p = SHIFTS.find((x) => x[0] === v); if (p) setHours(p[2]); else setHours([0, 23]); }}
+            className="w-40" title="Jump to a standard shift window"
+            options={[{ value: '', label: 'Whole day' }, ...SHIFTS.map(([k, label, r]) => ({ value: k, label: `${label} · ${String(r[0]).padStart(2, '0')}–${String(r[1]).padStart(2, '0')}` }))]} />
+
+          {/* How far back to draw from. Without this the map answers "where has crime ever
+              happened", which on a 43-month corpus is a very different question from "where
+              is it happening now" -- and only the second one is deployable. */}
+          <Select value={period} onChange={setPeriod} className="w-44" title="How far back to draw incidents from"
+            options={PERIODS.map(([v, label]) => ({ value: v, label }))} />
+
+          <span className="text-xs text-ink-muted whitespace-nowrap">
             {layer === 'heat'
-              ? `${(grid?.total ?? 0).toLocaleString()} incidents (all)`
+              ? `${(grid?.total ?? 0).toLocaleString()} incidents`
               : `${filteredPoints.length.toLocaleString()} incidents (sample)`}
           </span>
-          {(hours[0] !== 0 || hours[1] !== 23) && <button onClick={() => setHours([0, 23])} className="text-xs link">reset</button>}
-          <div className="flex gap-1 ml-auto flex-wrap">
-            {([['Late night', [0, 4]], ['Day', [9, 17]], ['Evening', [18, 21]], ['Night', [22, 23]]] as [string, [number, number]][]).map(([l, r]) => (
-              <button key={l} onClick={() => setHours(r)} className="chip bg-surface-3 text-ink-muted hover:bg-kadi-blue50 hover:text-kadi-blue">{l}</button>
-            ))}
-          </div>
+          {(hours[0] !== 0 || hours[1] !== 23 || period) && (
+            <button onClick={() => { setHours([0, 23]); setPeriod(''); }} className="text-xs link">reset</button>
+          )}
         </motion.div>
       )}
 
@@ -481,6 +557,24 @@ export default function MapPage() {
               <div className="font-medium text-ink-muted mb-1">Crime head</div>
               <div className="space-y-0.5">
                 {lookups.heads.map((h) => <div key={h.id} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: HEAD_COLOR[h.id] }} />{h.name}</div>)}
+              </div>
+            </div>
+          )}
+          {/* Station types sit opposite the crime-head legend: two different things are
+              plotted, and reading one key for both was the source of the confusion. */}
+          {showStations && (
+            <div className="absolute bottom-8 right-3 card px-3 py-2 text-xs bg-white/95 max-w-[210px]">
+              <div className="font-medium text-ink-muted mb-1 flex items-center gap-1">
+                <Building2 size={11} /> Station type
+              </div>
+              <div className="space-y-0.5">
+                {STATION_CATEGORIES.filter(([id]) => !stationCategory || id === stationCategory).map(([id, label]) => (
+                  <div key={id} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-white"
+                      style={{ boxShadow: `0 0 0 2px ${STATION_RING_COLOR[id] || '#0B3D75'}` }} />
+                    {label}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -530,6 +624,11 @@ export default function MapPage() {
             </Section>
           )}
 
+          {/* A compact reading of the current view, not a second dashboard. It answers the
+              two questions the map itself cannot: how concentrated is what I am looking at,
+              and when does it happen -- both recomputed as the filters change. */}
+          <ViewPulse points={filteredPoints} grid={grid} layer={layer} hours={hours} period={period} />
+
           <Section title={<span className="flex items-center gap-2"><Flame size={14} className="text-danger" /> Emerging hotspots</span>}>
             <div className="p-3 space-y-2 max-h-[22vh] overflow-auto">
               {(hotspots?.hotspots || []).filter((h) => h.emergingFlag).map((h) => (
@@ -559,6 +658,69 @@ export default function MapPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Concentration and peak hour for whatever is currently plotted.
+//
+// The Gini-style top-decile share is the useful number here: 9,000 dots on a state map all
+// look like "a lot everywhere", and the one thing a commander needs to know is whether the
+// load is spread or stacked -- those call for opposite deployments.
+function ViewPulse({ points, grid, layer, hours, period }: {
+  points: any[]; grid: any; layer: LayerMode; hours: [number, number]; period: string;
+}) {
+  const stat = useMemo(() => {
+    if (!points.length) return null;
+    const byDistrict = new Map<string, number>();
+    const byHour = new Array(24).fill(0);
+    for (const p of points) {
+      byDistrict.set(p.district, (byDistrict.get(p.district) || 0) + 1);
+      if (p.hour != null) byHour[p.hour] += 1;
+    }
+    const counts = [...byDistrict.values()].sort((a, b) => b - a);
+    const topN = Math.max(1, Math.ceil(counts.length * 0.1));
+    const topShare = Math.round((counts.slice(0, topN).reduce((a, b) => a + b, 0) / points.length) * 100);
+    let peak = 0;
+    for (let h = 1; h < 24; h += 1) if (byHour[h] > byHour[peak]) peak = h;
+    const top = [...byDistrict.entries()].sort((a, b) => b[1] - a[1])[0];
+    return { topShare, topN, peak, peakN: byHour[peak], leader: top?.[0], leaderN: top?.[1], districts: byDistrict.size };
+  }, [points]);
+  if (!stat) return null;
+
+  const periodLabel = PERIODS.find(([v]) => v === period)?.[1] || 'All time';
+  return (
+    <Section title={<span className="flex items-center gap-1.5">
+      <Activity size={14} className="text-kadi-teal" /> This view
+      <InfoDot label="How these are computed" align="right">
+        <b className="block mb-1 text-kadi-navy">Concentration</b>
+        The share of plotted incidents falling in the busiest tenth of districts. A high figure
+        means the load is stacked and can be met by moving resources; a low one means it is
+        spread, and moving resources will not help.
+        <b className="block mt-1.5 text-kadi-navy">Peak hour</b>
+        The single busiest hour among the incidents currently plotted — it moves with the crime
+        head and period filters, so it reflects this selection rather than the corpus.
+        <b className="block mt-1.5 text-kadi-navy">Sampling</b>
+        Point view draws an evenly spaced sample across the whole filtered set so every district
+        is represented. Proportions hold; absolute counts are of the sample.
+      </InfoDot>
+    </span>}>
+      <div className="p-3 space-y-2">
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <Mini label="Concentration" value={`${stat.topShare}%`} accent={stat.topShare >= 60 ? '#C0392B' : undefined} />
+          <Mini label="Peak hour" value={`${String(stat.peak).padStart(2, '0')}:00`} />
+        </div>
+        <div className="text-[11.5px] text-ink-muted leading-relaxed">
+          The busiest {stat.topN} of {stat.districts} district{stat.districts === 1 ? '' : 's'} hold{' '}
+          <b className="text-ink">{stat.topShare}%</b> of what is plotted, led by{' '}
+          <b className="text-ink">{stat.leader}</b> ({stat.leaderN?.toLocaleString()}).{' '}
+          {String(stat.peak).padStart(2, '0')}:00 is the busiest hour with {stat.peakN.toLocaleString()}.
+        </div>
+        <div className="text-[10.5px] text-ink-subtle border-t border-line pt-1.5">
+          {periodLabel} · {String(hours[0]).padStart(2, '0')}:00–{String(hours[1]).padStart(2, '0')}:59 ·{' '}
+          {layer === 'heat' ? `${(grid?.total ?? 0).toLocaleString()} binned` : `${points.length.toLocaleString()} sampled`}
+        </div>
+      </div>
+    </Section>
   );
 }
 

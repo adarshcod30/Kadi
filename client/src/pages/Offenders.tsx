@@ -6,6 +6,7 @@ import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager, QuickFilters } fr
 import { clampPage, clampPageSize } from '../lib/api';
 import { Select } from '../components/Select';
 import { IntelligenceBand } from '../components/IntelligenceBand';
+import { InfoDot, FairnessInfo } from '../components/InfoDot';
 
 const SORTS: [string, string][] = [
   ['risk_desc', 'Highest risk'],
@@ -85,15 +86,25 @@ export default function Offenders() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-kadi-navy">Offender watchlist</h1>
-          <p className="text-sm text-ink-muted flex items-center gap-1.5"><ShieldCheck size={14} className="text-kadi-blue" /> Behaviour-based risk only — no caste, religion, or occupation.</p>
+          <h1 className="text-xl font-semibold text-kadi-navy flex items-center gap-1.5">
+            Offender watchlist
+            <InfoDot label="What this list contains" align="left">
+              <b className="block mb-1 text-kadi-navy">Repeat offenders only</b>
+              Every person here has <b>two or more</b> cases resolved to a single identity by
+              entity resolution. This is not the full accused list — it is the subset who
+              reoffend, which is what a watchlist is for.
+              <b className="block mt-1.5 text-kadi-navy">Name variants are merged</b>
+              “Ravi Kamalapur”, “Ravi Kamalapur B” and “Ravi Kamalapur R” resolve to one person.
+              The ER confidence column shows how certain that merge is; low-confidence merges
+              are flagged for review rather than hidden.
+            </InfoDot>
+          </h1>
+          <p className="text-sm text-ink-muted flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-kadi-blue" /> Behaviour-based risk only
+            <FairnessInfo />
+          </p>
         </div>
       </div>
-
-      <p className="text-[12.5px] text-ink-muted -mt-1">
-        Every person here has <b>two or more</b> cases resolved to one identity — this is the
-        repeat-offender register, not the full accused list.
-      </p>
 
       <IntelligenceBand data={intel} isLoading={intelLoading} onApply={applySignal}
         title="Watchlist intelligence"

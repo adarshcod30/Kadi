@@ -9,7 +9,8 @@
 // the footer says so plainly. In a policing tool the question "did the model make this up?"
 // gets asked immediately, and the honest answer has to be visible on the surface itself.
 import { ReactNode, useState } from 'react';
-import { Sparkles, ChevronDown, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, ChevronDown, ArrowRight } from 'lucide-react';
+import { AiProvenanceInfo } from './InfoDot';
 import type { Intel, Signal } from '../api/hooks';
 
 const SEV: Record<string, { dot: string; ring: string; label: string }> = {
@@ -18,7 +19,7 @@ const SEV: Record<string, { dot: string; ring: string; label: string }> = {
   info: { dot: 'bg-kadi-blue', ring: 'border-l-kadi-blue', label: 'Context' },
 };
 
-export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligence', subtitle, extra }: {
+export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligence', subtitle, extra, defaultOpen = false }: {
   data?: Intel;
   isLoading?: boolean;
   // Applies a signal's query to the page's own filter state. Left to the caller because each
@@ -27,8 +28,12 @@ export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligen
   title?: string;
   subtitle?: string;
   extra?: ReactNode;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  // Collapsed by default. The header already carries the headline count and how many need
+  // acting on -- the part worth seeing without asking. The detail opens on demand rather than
+  // pushing the page's actual content below the fold on arrival.
+  const [open, setOpen] = useState(defaultOpen);
 
   if (isLoading) {
     return (
@@ -55,6 +60,9 @@ export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligen
         className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-3/60 transition-colors">
         <Sparkles size={15} className="text-kadi-gold shrink-0" />
         <span className="text-sm font-semibold text-kadi-navy">{title}</span>
+        <span onClick={(e) => e.stopPropagation()}>
+          <AiProvenanceInfo source={data.insightSource} />
+        </span>
         <span className="text-[12px] text-ink-muted truncate">
           {subtitle || `${signals.length} finding${signals.length === 1 ? '' : 's'} in this view`}
         </span>
@@ -80,14 +88,6 @@ export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligen
 
           {extra}
 
-          <div className="px-4 py-2 flex items-center gap-1.5 text-[11px] text-ink-muted bg-surface-2/50 border-t border-line">
-            <ShieldCheck size={11} className="text-kadi-blue shrink-0" />
-            <span>
-              Findings are computed from the records in this view. The wording is AI-drafted;
-              every figure is not{data.insightSource ? ` · ${data.insightSource}` : ''}.
-              Behaviour and evidence only — never caste, religion or occupation.
-            </span>
-          </div>
         </div>
       )}
     </div>

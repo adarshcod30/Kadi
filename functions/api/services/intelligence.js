@@ -201,7 +201,7 @@ function caseIntelligence(rows, baseline, activeFilters = {}) {
 // the risk score alone does not give one: it deliberately does not encode recency, so a
 // high scorer last active four years ago outranks an active one. These signals supply the
 // dimensions the score leaves out.
-function offenderIntelligence(rows, casesById) {
+function offenderIntelligence(rows, casesById, offendersById) {
   const total = rows.length;
   const signals = [];
   if (!total) return { total: 0, signals, facts: { total: 0 } };
@@ -286,6 +286,109 @@ function offenderIntelligence(rows, casesById) {
     });
   }
 
+  // Acceleration. The risk score answers "how serious is this person's history"; it does not
+  // answer "are they speeding up". Comparing the mean gap between their first offences against
+  // their most recent ones does, and a shortening cycle is the closest thing in this data to a
+  // forward-looking signal -- it is the difference between a bad record and an active spree.
+  const accelerating = [];
+  for (const o of rows) {
+    const ds = (o.caseIds || []).map((id) => casesById.get(String(id))).filter(Boolean)
+      .map((c) => c.crimeRegisteredDate).filter(Boolean).sort();
+    if (ds.length < 6) continue;
+    const gaps = [];
+    for (let i = 1; i < ds.length; i += 1) {
+      gaps.push((Date.parse(`${ds[i]}T00:00:00Z`) - Date.parse(`${ds[i - 1]}T00:00:00Z`)) / 86400000);
+    }
+    const half = Math.floor(gaps.length / 2);
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    const early = mean(gaps.slice(0, half));
+    const late = mean(gaps.slice(half));
+    if (early > 0 && late > 0 && late <= early * 0.6) {
+      accelerating.push({ name: o.canonicalName, early: Math.round(early), late: Math.round(late) });
+    }
+  }
+  if (accelerating.length) {
+    const worst = accelerating.slice().sort((a, b) => a.late - b.late)[0];
+    signals.push({
+      key: 'accelerating',
+      severity: 'high',
+      title: `${accelerating.length} are offending on a shortening cycle`,
+      detail: `The interval between their offences has at least halved. ${worst.name} has gone from roughly one every ${worst.early} days to one every ${worst.late}. This is a tempo signal — the risk score measures history, not whether someone is speeding up.`,
+      query: { sort: 'recent_desc' },
+      queryLabel: 'Sort by recency',
+    });
+  }
+
+  // Prolific but never arrested. This is an enforcement gap rather than a risk finding: the
+  // person is known, resolved across multiple FIRs, and nothing has yet been brought against
+  // them. It is arguably the most directly actionable line on the page.
+  const neverArrested = rows.filter((o) => (o.distinctCases || 0) >= 5 && (o.arrestCount || 0) === 0);
+  if (neverArrested.length) {
+    const top = neverArrested.slice().sort((a, b) => (b.distinctCases || 0) - (a.distinctCases || 0))[0];
+    signals.push({
+      key: 'neverArrested',
+      severity: 'high',
+      title: `${neverArrested.length} are linked to 5+ cases with no arrest on record`,
+      detail: `Identified across multiple FIRs but never arrested. The most prolific, ${top.canonicalName}, is linked to ${top.distinctCases} cases across ${top.distinctDistricts} district${top.distinctDistricts === 1 ? '' : 's'}. This is an enforcement gap, not a scoring one.`,
+      query: { sort: 'cases_desc' },
+      queryLabel: 'Sort by case count',
+    });
+  }
+
+  // Brokers. In network terms the person joining two otherwise separate groups matters more
+  // than the busiest member of either -- removing them splits the network, while removing a
+  // high-volume member of one group leaves it intact. Nothing in a ranked list surfaces this.
+  const bridges = [];
+  if (offendersById) {
+    for (const o of rows) {
+      const co = o.coOffenders || [];
+      if (co.length < 2) continue;
+      const clusters = new Set();
+      for (const c of co) {
+        const peer = offendersById.get(String(c.offenderIdentityId));
+        for (const cl of ((peer && peer.clusterIds) || [])) clusters.add(cl);
+      }
+      for (const cl of (o.clusterIds || [])) clusters.add(cl);
+      if (clusters.size >= 2) bridges.push({ name: o.canonicalName, groups: clusters.size, co: co.length });
+    }
+  }
+  if (bridges.length) {
+    const top = bridges.slice().sort((a, b) => b.groups - a.groups)[0];
+    signals.push({
+      key: 'bridge',
+      severity: 'medium',
+      title: `${bridges.length} connect two or more otherwise separate groups`,
+      detail: `${top.name} sits between ${top.groups} distinct communities through ${top.co} known associates. Brokers hold a network together — removing one splits it, where removing a busy member of a single group does not.`,
+      query: { networked: 'true', sort: 'network_desc' },
+      queryLabel: 'Show networked offenders',
+    });
+  }
+
+  // Specialists. Someone who does one thing repeatedly is predictable, which makes them the
+  // easiest to plan against; a versatile offender is not, and needs a different approach.
+  const specialists = [];
+  for (const o of rows) {
+    const cs = (o.caseIds || []).map((id) => casesById.get(String(id))).filter(Boolean);
+    if (cs.length < 4) continue;
+    const by = new Map();
+    for (const c of cs) by.set(c.crimeSubHead, (by.get(c.crimeSubHead) || 0) + 1);
+    const [label, n] = [...by.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (n / cs.length >= 0.7) specialists.push({ name: o.canonicalName, label, share: pct(n, cs.length) });
+  }
+  if (specialists.length) {
+    const byType = new Map();
+    for (const sp of specialists) byType.set(sp.label, (byType.get(sp.label) || 0) + 1);
+    const top = [...byType.entries()].sort((a, b) => b[1] - a[1])[0];
+    signals.push({
+      key: 'specialists',
+      severity: 'info',
+      title: `${specialists.length} are single-method specialists`,
+      detail: `At least 70% of their cases are one offence type — most commonly ${top[0]} (${top[1]} offender${top[1] === 1 ? '' : 's'}). A repeated method is a predictable one, which makes these the easiest to plan against.`,
+      query: { sort: 'cases_desc' },
+      queryLabel: 'Review by case count',
+    });
+  }
+
   const networked = rows.filter((o) => (o.coOffenders || []).length);
   if (networked.length) {
     const biggest = networked.reduce((m, o) => ((o.coOffenders || []).length > (m.coOffenders || []).length ? o : m), networked[0]);
@@ -305,6 +408,10 @@ function offenderIntelligence(rows, casesById) {
     highRiskAndActive: priority.length,
     activeAcrossDistricts: crossActive.length,
     escalatingGravity: escalating.length,
+    offendingOnShorteningCycle: accelerating.length,
+    prolificWithNoArrest: neverArrested.length,
+    bridgingSeparateGroups: bridges.length,
+    singleMethodSpecialists: specialists.length,
     resumedAfterYearDormant: resurgent.length,
     operatingInGroups: networked.length,
     note: 'Risk is behavioural only. Caste, religion and occupation are excluded by construction.',

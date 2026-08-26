@@ -409,6 +409,28 @@ function healthSummary(user) {
 }
 
 // ---------------- geo ----------------
+// "Last N days", measured against the corpus's own latest registration rather than wall-clock
+// now. A fixed synthetic corpus would otherwise return nothing for "last week" the moment the
+// demo runs a month after generation.
+let _corpusAsOf;
+function corpusAsOf(db) {
+  if (_corpusAsOf === undefined) {
+    let max = null;
+    for (const c of db.caseList) if (c.crimeRegisteredDate && (!max || c.crimeRegisteredDate > max)) max = c.crimeRegisteredDate;
+    _corpusAsOf = max;
+  }
+  return _corpusAsOf;
+}
+function cutoffFor(db, days) {
+  const n = parseInt(days, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const asOf = corpusAsOf(db);
+  if (!asOf) return null;
+  const d = new Date(`${asOf}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
 function geoPoints(user, q = {}) {
   const db = load();
   // Spatial view is state-wide crime-pattern intelligence (aggregate dots), not per-case
@@ -417,6 +439,10 @@ function geoPoints(user, q = {}) {
   if (q.head) rows = rows.filter((c) => c.crimeHeadId === String(q.head));
   if (q.district) rows = rows.filter((c) => c.districtId === String(q.district));
   if (q.dateFrom) rows = rows.filter((c) => c.crimeRegisteredDate >= q.dateFrom);
+  // Filtered here rather than in the client so the even-sampling below draws from the chosen
+  // period. Sampling first and filtering after would return a thin, unrepresentative slice.
+  const cut = cutoffFor(db, q.days);
+  if (cut) rows = rows.filter((c) => c.crimeRegisteredDate >= cut);
   const limit = Math.min(9000, parseInt(q.limit || '6000', 10));
   // even sampling across the whole scoped set so every district shows (not just the first N)
   const step = rows.length > limit ? rows.length / limit : 1;
@@ -428,7 +454,7 @@ function geoPoints(user, q = {}) {
       head: c.crimeHead, headId: c.crimeHeadId, subHead: c.crimeSubHead, gravity: c.gravity,
       district: c.districtName, hour: Number.isFinite(hh) ? hh : null });
   }
-  return { items, total: rows.length, districtCounts: db.hotspots.districtCounts || {} };
+  return { items, total: rows.length, districtCounts: db.hotspots.districtCounts || {}, periodFrom: cut || null };
 }
 
 /**
@@ -448,9 +474,11 @@ function geoGrid(user, q = {}) {
 
   const bins = new Map();
   let total = 0;
+  const gcut = cutoffFor(db, q.days);
   for (const c of db.caseList) {
     if (!c.latitude || !c.longitude) continue;
     if (q.head && c.crimeHeadId !== String(q.head)) continue;
+    if (gcut && c.crimeRegisteredDate < gcut) continue;
     if (!wholeDay) {
       const hh = c.incidentFromDate ? parseInt(c.incidentFromDate.slice(11, 13), 10) : NaN;
       if (!Number.isFinite(hh) || hh < hourFrom || hh > hourTo) continue;

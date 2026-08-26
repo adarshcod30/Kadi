@@ -257,7 +257,7 @@ function buildApp() {
 
   r.get('/offenders/intelligence', handle(async (req) => {
     const list = q.listOffenders(req.user, { ...req.query, page: 1, pageSize: 200 });
-    const out = intel.offenderIntelligence(list.items, q.db().cases);
+    const out = intel.offenderIntelligence(list.items, q.db().cases, q.db().offendersById);
     return withNarrative(req, 'repeat-offender watchlist priorities', out, 200);
   }));
 

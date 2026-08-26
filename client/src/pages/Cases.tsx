@@ -5,6 +5,7 @@ import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, Filt
 import { Share2 } from 'lucide-react';
 import { Select } from '../components/Select';
 import { IntelligenceBand } from '../components/IntelligenceBand';
+import { InfoDot } from '../components/InfoDot';
 import { clampPage, clampPageSize } from '../lib/api';
 
 const SORTS: [string, string][] = [
@@ -105,8 +106,24 @@ export default function Cases() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-kadi-navy">Cases</h1>
-          <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in your scope` : 'Loading…'} · filter by crime head, district, status or gravity. The <b>Links</b> column shows how many other cases each FIR connects to; open any row for its full detail + network.</p>
+          <h1 className="text-xl font-semibold text-kadi-navy flex items-center gap-1.5">
+            Cases
+            <InfoDot label="How to read this register" align="left">
+              <b className="block mb-1 text-kadi-navy">The Links column</b>
+              How many other FIRs this case connects to — through a shared offender,
+              co-accused, near-identical modus operandi, the same place, the same time window,
+              or the same act &amp; section. A station sees only its own register, so a serial
+              offender working across districts is invisible without this.
+              <b className="block mt-1.5 text-kadi-navy">The Health dot</b>
+              Amber or red means the case carries an investigation-health flag — ageing past
+              the peer median for its type, pending beyond threshold, at undetected risk, or
+              matching a false-case pattern. Hover the dot for the specific reasons.
+              <b className="block mt-1.5 text-kadi-navy">Opening a row</b>
+              Takes you to the full FIR with its parties, acts &amp; sections, arrests and its
+              own linkage network.
+            </InfoDot>
+          </h1>
+          <p className="text-sm text-ink-muted">{data ? `${data.total.toLocaleString()} FIRs in your scope` : 'Loading…'}</p>
         </div>
       </div>
 

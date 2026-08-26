@@ -2,6 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react';
 import { useCase, useCaseEntities } from '../api/hooks';
 import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } from '../components/ui';
+import { InfoDot } from '../components/InfoDot';
 
 
 // Zia reads the FIR's own narrative and returns the entities and phrases in it. This is the
@@ -15,8 +16,19 @@ function NarrativeEntities({ id }: { id: string }) {
   const phrases = data.keyphrases || [];
   if (!groups.length && !phrases.length) return null;
   return (
-    <Section title={<span className="flex items-center gap-2">
-      <Sparkles size={14} className="text-kadi-blue" />Read from the narrative</span>}>
+    <Section title={<span className="flex items-center gap-1.5">
+      <Sparkles size={14} className="text-kadi-blue" />Read from the narrative
+      <InfoDot label="How the narrative is read" align="left">
+        <b className="block mb-1 text-kadi-navy">Zia text analytics</b>
+        Named entities and key phrases pulled from this FIR's own account of the offence —
+        the free text that no structured column indexes.
+        <b className="block mt-1.5 text-kadi-navy">Why it matters</b>
+        A sub-head says a case is Online Financial Fraud. Only the narrative says whether the
+        method was a fake KYC call or a QR-code scam, and a series shares the method.
+        <b className="block mt-1.5 text-kadi-navy">What it never reads</b>
+        Caste, religion and occupation. It reads the account of the offence only.
+      </InfoDot>
+    </span>}>
       <div className="p-4 space-y-3">
         {phrases.length > 0 && (
           <div>
@@ -38,10 +50,7 @@ function NarrativeEntities({ id }: { id: string }) {
             </div>
           </div>
         ))}
-        <div className="text-[11px] text-ink-subtle border-t border-line pt-2">
-          Extracted by Zia text analytics from the account of the offence. Evidence and
-          behaviour only — never caste, religion or occupation.
-        </div>
+
       </div>
     </Section>
   );

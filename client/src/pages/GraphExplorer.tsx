@@ -11,6 +11,7 @@ import { WhyPanel } from '../features/graph/WhyPanel';
 import { Empty, Mono, Chip } from '../components/ui';
 import type { GraphNode, GraphEdge } from '../lib/types';
 import { Select } from '../components/Select';
+import { FairnessInfo } from '../components/InfoDot';
 
 const EDGE_TYPES: [string, string][] = [
   ['shared_offender', 'Shared offender'], ['co_accused', 'Co-accused'], ['mo_similarity', 'Similar MO'],
@@ -241,8 +242,8 @@ function GraphIntelligence({ data }: { data: any }) {
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <span className="text-[11.5px] text-ink-subtle">
-              Grounded in this network&rsquo;s own evidence — never caste, religion or occupation.
+            <span className="text-[11.5px] text-ink-subtle flex items-center gap-1">
+              Grounded in this network&rsquo;s own evidence <FairnessInfo />
             </span>
             <button onClick={askAssistant}
               className="btn-outline text-[12.5px] shrink-0 whitespace-nowrap">
