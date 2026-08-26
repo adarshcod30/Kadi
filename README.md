@@ -177,8 +177,12 @@ flowchart LR
 | **React** | One ranked queue: failing cases, active offenders, pulsing stations, cases linking in from outside your scope — severity first, then urgency against the peer median for that crime type |
 | **Forecast** | Emerging risk by z-score against each area's own history · lift-scored co-occurrence between crime types · momentum · shift profile · projections shown with their backtest error |
 | **Register** | File an FIR from a station; approve it as the SP. Lifecycle changes (arrest, chargesheet, closure) go through the same gate carrying before and after |
-| **Assistant** | Bilingual grounded Q&A · voice input · briefing export · falls through to RAG over a 12-document knowledge base |
+| **Assistant** | Bilingual grounded Q&A · voice input and read-aloud · per-answer translation · provenance labels · briefing export · falls through to RAG over a 12-document knowledge base |
 | **About** | Full platform, dataset and fairness documentation |
+
+> **The whole interface is bilingual**, not just the answers. 605 strings are pre-translated
+> and committed; the translator refuses to touch FIR numbers, figures, dates and identifiers,
+> so `100010064202600888` reads the same in either language.
 
 > **Sign in** at the live URL, either with a provisioned `@ksp.gov.in` account
 > (`docs/ACCESS_CREDENTIALS.md`) or through the demo role chooser. Three tiers — state,

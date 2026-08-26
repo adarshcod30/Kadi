@@ -176,6 +176,18 @@ deployed build.
 - **Deterministic first, model second, and the order is the point.** Every number, name and
   percentage is computed from the records by deterministic code. The model is asked only how
   to say it, never what is true, so it cannot invent an FIR number or a statistic.
+- **Voice both ways, and honest about what it can do.** Speech-to-text and read-aloud run in
+  the browser. Chrome ships no Kannada speech voice on most machines, so the voice list is
+  inspected up front and the page states what it can actually do rather than offering a button
+  that does nothing. Microphone errors appear in the page, not in an `alert()`.
+- **Every answer can be read aloud, stopped, or shown in the other language** without re-running
+  the query — re-asking could return different numbers, and the point is to read the *same*
+  answer in another language.
+- **Provenance is visible.** An answer computed from the records and one retrieved from the
+  knowledge base are different kinds of claim, and each is labelled.
+- **A Kannada question that misses the intent patterns is retried in English** before falling
+  through to the knowledge base. Without it, "Which cases are slipping?" asked in Kannada
+  returned "no information is provided" for a question the records answer exactly.
 - When a question is not one the intent engine recognises, it falls through to **QuickML RAG**
   over a 12-document knowledge base built from these docs (`docs/knowledge_base/`), and the
   answer is labelled as coming from the knowledge base rather than from the records.
@@ -260,6 +272,29 @@ deployed build.
   (70.1 vs 68.5). The only feature that separates is the health flag, and that is circular —
   a case is flagged *because* it is stalling. Such a model would predict the base rate for
   everything and call it intelligence.
+
+### F14 · Bilingual interface — P0, and it means the whole interface
+> Switching to ಕನ್ನಡ used to change the answers and leave the buttons in English.
+
+- **605 interface strings, 99% pre-translated** into `client/src/lib/kn.json` — built once by
+  a script and *committed*, so the toggle is instant and the Kannada can be corrected in a diff
+  by someone who reads it. The remainder resolve at runtime and cache in the browser.
+- Coverage does not depend on anyone remembering to wrap a string. A DOM-level translator walks
+  the rendered text and the placeholder, title and aria-label attributes.
+- **What it refuses to touch is the design.** Anything inside `[data-notranslate]`, `.font-mono`
+  or `.font-num`, any form control, and anything that looks like an identifier, a figure, a date
+  or a URL. An FIR number rendered in Kannada numerals is a corrupted record, and an officer
+  searching for `100010064202600888` must find it whatever language the chrome is in. The
+  exclusions are deliberately over-broad: leaving a label in English costs nothing.
+- **Zia does not translate.** A live probe of the SDK on this project returns object detection,
+  OCR, barcode, face analysis, sentiment, keyword extraction and NER — nothing linguistic. So
+  translation runs on the QuickML LLM, batched, cached, and with identifiers masked out before
+  the model sees them and restored after.
+- The cache is keyed on the **masked** text. Sixty worklist rows reading "Open 1283 days — 2.6x
+  the peer median (501d)" are one template: one model call and fifty-nine cache hits instead of
+  sixty calls. This is what makes translating a data-heavy page affordable at all.
+- A translation that lost a placeholder is **refused**. Fluent Kannada with the numbers silently
+  gone is worse than a sentence left in English.
 
 ### F9 · Home dashboard — P0
 - Role-aware landing page: KPI cards, monthly trend, hour × weekday heatmap, disposal
