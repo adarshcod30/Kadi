@@ -35,7 +35,18 @@ function configured() {
 function status() {
   return {
     enabled: true,
-    capabilities: ['ner', 'keyword-extraction', 'sentiment-analysis'],
+    // Split into what the app actually calls and what the instance merely offers. The two
+    // were reported as one list, which advertised sentiment-analysis as wired when nothing
+    // called it. Sentiment is deliberately NOT used: every FIR narrative is an account of a
+    // crime, so the scores carry no signal worth acting on, and adding it to claim the
+    // capability would be a feature for the status page rather than for an officer.
+    inUse: [
+      { capability: 'ner', where: 'GET /cases/:id/entities — entities in a single FIR narrative' },
+      { capability: 'keyword-extraction', where: 'GET /cases/:id/entities and GET /cases/themes — recurring modus-operandi language across a filtered set' },
+    ],
+    availableUnused: [
+      { capability: 'sentiment-analysis', reason: 'no sound application to crime narratives' },
+    ],
     unavailable: ['speech-to-text', 'text-to-speech', 'translate'],
     transport: 'raw HTTPS with header credential (SDK methods return 401)',
     legacyFlag: ENABLED,
@@ -45,7 +56,7 @@ function status() {
     // What the client should do when Zia cannot serve a language directly.
     fallback: 'browser Web Speech API (client-side), already active',
     credentialInHeaders: true,
-    note: 'Enable Zia in the console. If the SDK still 401s, use the raw-HTTPS header-token path from services/datastore.js.',
+    note: 'Reached over raw HTTPS with the credential Catalyst puts on the request; the SDK methods 401 on this instance.',
     lastError,
   };
 }
