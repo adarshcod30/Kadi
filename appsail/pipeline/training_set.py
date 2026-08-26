@@ -272,6 +272,32 @@ def write_csv(data_dir: str, rows, name: str) -> str:
     return path
 
 
+def write_ready_csv(data_dir: str, rows, name: str = "training_set_spike.csv") -> str:
+    """The same data with every decision already applied, so the console needs no cleaning step.
+
+    Three things are done here rather than left to a human in a builder UI, because each is
+    quiet and each is fatal:
+
+      rows      only spike-eligible ones. A 40% rise on a base of two cases is one extra case;
+                training on those teaches the model noise, and they outnumber the real rows
+                three to one, which would drag the positive rate from 16% down to 4%.
+      target_count  DROPPED. It is next month's count sitting in the same file as a label
+                derived from next month's count -- a model handed both scores perfectly in
+                training and is worthless in production. This is the leak that would be
+                easiest to miss and hardest to notice afterwards.
+      labels    row_key is kept so a prediction can be traced back to a district, crime head
+                and month; the other three are dropped as redundant with the ids.
+    """
+    header = ["row_key"] + FEATURES + ["target_spike"]
+    path = os.path.join(common.derived_dir(data_dir), name)
+    eligible = [r for r in rows if r.get("spike_eligible")]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(eligible)
+    return path
+
+
 def attach_socio(data_dir: str):
     """Area-level indicators, read from the pipeline's own socio output."""
     try:
@@ -296,6 +322,10 @@ def compute(tables, unit_district, today: date, data_dir: str):
     if rows:
         meta["path"] = write_csv(data_dir, rows, "training_set.csv")
         meta["file"] = "training_set.csv"
+        # The same data with the filtering and the leaky column already handled, so the console
+        # workflow is upload-and-train with nothing to remember.
+        meta["readyPath"] = write_ready_csv(data_dir, rows)
+        meta["readyFile"] = "training_set_spike.csv"
 
     drows, dmeta = build(tables, unit_district, today, by_head=False, socio=socio)
     if drows:
@@ -304,7 +334,11 @@ def compute(tables, unit_district, today: date, data_dir: str):
 
     meta["alternate"] = dmeta
     meta["recommended"] = {
-        "file": "training_set.csv",
+        "file": "training_set_spike.csv",
+        "alsoAvailable": "training_set.csv -- the full set, if you would rather filter and drop "
+                         "columns in the console yourself. It still contains target_count, which "
+                         "MUST be excluded from the feature set: it is next month's count, and "
+                         "target_spike is derived from it, so a model given both leaks outright.",
         "task": "binary classification",
         "target": "target_spike",
         "filter": "train on rows where spike_eligible = 1",
