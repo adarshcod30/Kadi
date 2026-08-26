@@ -1,0 +1,31 @@
+How offender identities are merged
+
+The same person appears across FIRs under spelling variants — "Ravi Kamalapur", "Ravi
+Kamalapur B", "Ravi Kamalapur R". Entity resolution merges these into one identity so that a
+repeat offender stops looking like three first-time offenders.
+
+What a merge uses
+
+Name similarity, shared co-accused, geographic proximity of the cases, and temporal
+plausibility. A rare surname carries more evidential weight than a common one — and rarity is
+measured as a rate against the corpus population, not a fixed count, so the threshold does
+not erode as the register grows.
+
+ER confidence
+
+Every identity carries a confidence figure, displayed on the watchlist. Merges below the
+confidence threshold are flagged for review, not hidden. An analyst can see that the system
+was unsure and check the merge themselves.
+
+The repeat-offender register
+
+The watchlist contains only identities with two or more cases. It is not the full accused
+list — it is the subset who reoffend, which is what a watchlist is for.
+
+Searching
+
+Searching any known alias returns the identity it resolved into. Looking up "Ravi Kamalapur B"
+finds the merged person, not nothing.
+
+_Corpus as of 2026-07-13: ground-truth recovery 100%, scored on
+every pipeline run against planted patterns rather than asserted._

@@ -1,0 +1,33 @@
+What a link between two cases means
+
+Two FIRs are linked when they share recorded evidence, not when they merely resemble each
+other. Six link types exist, and every link names which one it is and what matched.
+
+Link type — What it means
+Shared offender — The same resolved identity appears as accused in both FIRs.
+Co-accused — Two different people who have been named together in another case.
+Similar modus operandi — The free-text method descriptions are near-identical.
+Same location — The incidents fall within the same tight geographic cluster.
+Same time window — The incidents fall in the same narrow period.
+Shared act & section — The same act and section combination, across differing sub-heads.
+
+How to read a link
+
+A link is a lead, not a conclusion. Most links arise from method, place or timing rather
+than from a shared person — so a linked pair is a reason to look, not proof of connection.
+
+Link strength counts how many *independent kinds* of evidence back the same pair. Two
+cases sharing an offender AND a modus operandi is a stronger claim than either alone, because
+the two are unlikely to coincide by chance.
+
+Every link is click-through. Opening one shows the exact matching attributes and the source
+FIR numbers. If a link cannot show its evidence, it is a bug, not a judgement call.
+
+Why linkage matters operationally
+
+A station sees only its own register. An offender working across district lines is therefore
+invisible from any single desk — each station sees one or two of their cases and no reason to
+connect them. Linkage is what makes that pattern visible from anywhere in the state.
+
+_Corpus as of 2026-07-13: 59,985 FIRs, 127 active offender
+networks, 335 of them operating across district lines._

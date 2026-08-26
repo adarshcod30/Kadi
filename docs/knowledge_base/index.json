@@ -1,61 +1,61 @@
 {
-  "generatedAt": "2026-08-26T09:30:36.067Z",
+  "generatedAt": "2026-08-26T09:54:47.951Z",
   "corpusAsOf": "2026-07-13",
   "documents": [
     {
-      "name": "kadi-what-it-is.md",
+      "name": "kadi-what-it-is.txt",
       "title": "What KADI is",
-      "bytes": 1503
+      "bytes": 1486
     },
     {
-      "name": "case-linkage-explained.md",
+      "name": "case-linkage-explained.txt",
       "title": "What a link between two cases means",
-      "bytes": 1799
+      "bytes": 1751
     },
     {
-      "name": "offender-risk-score.md",
+      "name": "offender-risk-score.txt",
       "title": "How the offender risk score is built",
-      "bytes": 1651
+      "bytes": 1603
     },
     {
-      "name": "entity-resolution.md",
+      "name": "entity-resolution.txt",
       "title": "How offender identities are merged",
-      "bytes": 1342
+      "bytes": 1316
     },
     {
-      "name": "investigation-health.md",
+      "name": "investigation-health.txt",
       "title": "Investigation health flags and what to do about them",
-      "bytes": 1633
+      "bytes": 1586
     },
     {
-      "name": "zones-and-hotspots.md",
+      "name": "zones-and-hotspots.txt",
       "title": "Zones, hotspots and what \"emerging\" means",
-      "bytes": 1339
+      "bytes": 1294
     },
     {
-      "name": "fairness-policy.md",
+      "name": "fairness-policy.txt",
       "title": "The fairness policy, and how it is enforced",
-      "bytes": 1308
+      "bytes": 1278
     },
     {
-      "name": "access-tiers.md",
+      "name": "access-tiers.txt",
       "title": "Who can see what",
-      "bytes": 1269
+      "bytes": 1240
     },
     {
-      "name": "data-dictionary.md",
+      "name": "data-dictionary.txt",
       "title": "Data dictionary",
-      "bytes": 1337
+      "bytes": 1311
     },
     {
-      "name": "per-capita-and-forecast.md",
+      "name": "per-capita-and-forecast.txt",
       "title": "Rates per capita, and the forecast",
-      "bytes": 1320
+      "bytes": 1303
     },
     {
-      "name": "how-to-read-the-screens.md",
+      "name": "how-to-read-the-screens.txt",
       "title": "How to read each screen",
-      "bytes": 1740
+      "bytes": 1691
     }
   ]
 }

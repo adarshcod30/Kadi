@@ -25,6 +25,34 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'docs/knowledge_base');
+
+// The QuickML console accepts .pdf, .docx and .txt — not .md. Plain text is the right target
+// of those three: the content is prose, and a PDF would add a layout layer that retrieval has
+// to strip back off. Markdown syntax is flattened rather than left in, because a retrieved
+// chunk reading "| Factor | What it measures |" is worse context than the same row as a
+// sentence.
+function toPlainText(md) {
+  const out = [];
+  for (const raw of md.split('\n')) {
+    let line = raw;
+    // Table separator rows carry no content.
+    if (/^\s*\|[\s|:-]+\|\s*$/.test(line)) continue;
+    // Table rows become "a — b — c", which reads as a statement.
+    if (/^\s*\|/.test(line)) {
+      const cells = line.split('|').map((c) => c.trim()).filter(Boolean);
+      out.push(cells.join(' — '));
+      continue;
+    }
+    line = line
+      .replace(/^#{1,6}\s*/, '')          // headings keep their words, lose their hashes
+      .replace(/\*\*(.+?)\*\*/g, '$1')  // bold
+      .replace(/_(.+?)_/g, '$1')           // italic
+      .replace(/`(.+?)`/g, '$1')           // inline code
+      .replace(/^\s*[-*]\s+/, '• ');      // bullets
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
 const DERIVED = path.join(ROOT, 'functions/api/data/derived');
 
 const readJson = (name, fallback) => {
@@ -39,7 +67,7 @@ const asOf = stats.computedTs || new Date().toISOString().slice(0, 10);
 const n = (v) => (typeof v === 'number' ? v.toLocaleString('en-IN') : String(v ?? '—'));
 
 const docs = [];
-const doc = (name, title, body) => docs.push({ name, title, body: body.trim() + '\n' });
+const doc = (name, title, body) => docs.push({ name: name.replace(/\.md$/, '.txt'), title, body: toPlainText(body) });
 
 // ---------------------------------------------------------------------------------------
 doc('kadi-what-it-is.md', 'What KADI is', `
@@ -450,7 +478,9 @@ computed deterministically from the records in view.
 fs.mkdirSync(OUT, { recursive: true });
 // Clear previously generated documents so a renamed one does not linger and get retrieved.
 for (const f of fs.readdirSync(OUT)) {
-  if (f.endsWith('.md') && f !== 'KADI_Operating_Reference.md') fs.unlinkSync(path.join(OUT, f));
+  if ((f.endsWith('.txt') || f.endsWith('.md')) && f !== 'KADI_Operating_Reference.md') {
+    fs.unlinkSync(path.join(OUT, f));
+  }
 }
 let bytes = 0;
 for (const d of docs) {

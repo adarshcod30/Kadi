@@ -26,6 +26,9 @@
 //              client_id/client_secret, erroring "client_id cannot be null" otherwise.
 // Set QUICKML_ENABLED=true once the exact payload shape is confirmed with Zoho support.
 const https = require('https');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { URL } = require('url');
 
 let catalyst = null;
@@ -54,6 +57,7 @@ const TIMEOUT_MS = Number(process.env.QUICKML_TIMEOUT_MS || 12000);
 // which is what the 400 PATTERN_NOT_MATCHED was actually complaining about.
 const MODEL = process.env.QUICKML_MODEL || 'crm-di-glm47b_30b_it';
 const ORG = process.env.CATALYST_ORG_ID || '60078029367';
+const PROJECT_ID = process.env.CATALYST_PROJECT_ID || '55468000000013048';
 // The console shows 'Zoho-oauthtoken' in Headers but 'Bearer' in the JS sample.
 // The console is self-inconsistent: the Headers panel shows 'Zoho-oauthtoken' while the
 // JS/Python samples both use 'Bearer'. The samples are the thing that was tested.
@@ -257,91 +261,122 @@ async function ragAnswer(req, { question, lang }) {
 }
 
 /**
- * Probe the QuickML management surface.
- *
- * The RAG call path is written and waiting on one value: a knowledge-base id. Before asking
- * anyone to create one by hand, find out whether the platform exposes a REST route to list or
- * create knowledge bases -- if it does, the KB can be provisioned and refreshed by the same
- * pipeline that produces the corpus, rather than by console clicks that drift out of date.
- *
- * Reports each candidate path's status verbatim. A 404 means the route does not exist; a 401
- * or 403 means it exists and the credential lacks scope, which is a different problem with a
- * different fix.
+ * List what the knowledge base currently holds.
  */
-async function probeKnowledgeBase(req) {
+async function listDocuments(req) {
   const token = await accessToken(req);
   if (!token) return { ok: false, stage: 'token', tokenState };
-  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}`;
-  const paths = [
-    '/rag/knowledgebase', '/rag/knowledge_base', '/rag/knowledgebases',
-    '/knowledgebase', '/rag/documents', '/rag', '/datasets', '/models', '/endpoints',
-  ];
-  const results = [];
-  for (const path of paths) {
-    // eslint-disable-next-line no-await-in-loop
-    const r = await new Promise((resolve) => {
-      const u = new URL(base + path);
-      const rq = https.request({
-        hostname: u.hostname, path: u.pathname, method: 'GET',
-        headers: { Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG, Accept: 'application/json' },
-        timeout: 8000,
-      }, (res) => {
-        let out = '';
-        res.on('data', (c) => { out += c; });
-        res.on('end', () => resolve({ path, status: res.statusCode, body: out.slice(0, 220) }));
-      });
-      rq.on('error', (e) => resolve({ path, status: 0, body: String(e.message).slice(0, 100) }));
-      rq.on('timeout', () => { rq.destroy(); resolve({ path, status: 0, body: 'timeout' }); });
-      rq.end();
+  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}`;
+  const out = await new Promise((resolve) => {
+    const u = new URL(`${base}/rag/documents`);
+    const rq = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'GET',
+      headers: { Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG, Accept: 'application/json' },
+      timeout: 15000,
+    }, (res) => {
+      let b = '';
+      res.on('data', (c) => { b += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body: b }));
     });
-    results.push(r);
+    rq.on('error', (e) => resolve({ status: 0, body: String(e.message) }));
+    rq.on('timeout', () => { rq.destroy(); resolve({ status: 0, body: 'timeout' }); });
+    rq.end();
+  });
+  try {
+    const j = JSON.parse(out.body);
+    return { ok: out.status === 200, status: out.status, documents: j.documents || [] };
+  } catch {
+    return { ok: false, status: out.status, raw: out.body.slice(0, 300) };
   }
-  return { ok: true, base, results };
 }
 
 /**
- * Learn what POST /rag/documents wants.
+ * Upload one document to the knowledge base.
  *
- * The probe found the route exists and the knowledge base is empty. An error body from a
- * deliberately-wrong payload names the missing field, which is faster than guessing the
- * schema -- the same technique that eventually cracked the LLM endpoint's model-id format.
+ * multipart/form-data, hand-built. The endpoint rejected every JSON shape with
+ * LESS_THAN_MIN_OCCURANCE naming `documentName`, which is the signature of a form parameter
+ * rather than a JSON field -- so the body is assembled here rather than pulling in a
+ * form-data dependency for one call inside a function that must stay small.
  */
-async function probeUpload(req) {
-  const token = await accessToken(req);
-  if (!token) return { ok: false, stage: 'token' };
-  const base = `https://api.catalyst.zoho.in/quickml/v1/project/${process.env.CATALYST_PROJECT_ID || '55468000000013048'}`;
-  const attempts = [
-    { label: 'empty', ct: 'application/json', body: JSON.stringify({}) },
-    { label: 'name+content', ct: 'application/json', body: JSON.stringify({ name: 'kadi-probe.txt', content: 'KADI probe document.' }) },
-    { label: 'document_name+text', ct: 'application/json', body: JSON.stringify({ document_name: 'kadi-probe.txt', text: 'KADI probe document.' }) },
+function uploadDocument(req, token, { name, content }) {
+  const boundary = `----kadi${crypto.randomBytes(12).toString('hex')}`;
+  const parts = [
+    `--${boundary}\r\nContent-Disposition: form-data; name="documentName"\r\n\r\n${name}\r\n`,
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\n`
+      + `Content-Type: text/markdown\r\n\r\n${content}\r\n`,
+    `--${boundary}--\r\n`,
   ];
-  const out = [];
-  for (const a of attempts) {
-    // eslint-disable-next-line no-await-in-loop
-    const r = await new Promise((resolve) => {
-      const u = new URL(`${base}/rag/documents`);
-      const rq = https.request({
-        hostname: u.hostname, path: u.pathname, method: 'POST',
-        headers: {
-          Authorization: `${AUTH_PREFIX} ${token}`, 'CATALYST-ORG': ORG,
-          'Content-Type': a.ct, 'Content-Length': Buffer.byteLength(a.body),
-        },
-        timeout: 10000,
-      }, (res) => {
-        let b = '';
-        res.on('data', (c) => { b += c; });
-        res.on('end', () => resolve({ attempt: a.label, status: res.statusCode, body: b.slice(0, 300) }));
-      });
-      rq.on('error', (e) => resolve({ attempt: a.label, status: 0, body: String(e.message) }));
-      rq.on('timeout', () => { rq.destroy(); resolve({ attempt: a.label, status: 0, body: 'timeout' }); });
-      rq.write(a.body); rq.end();
+  const body = Buffer.from(parts.join(''), 'utf8');
+  const u = new URL(`https://api.catalyst.zoho.in/quickml/v1/project/${PROJECT_ID}/rag/documents`);
+  return new Promise((resolve) => {
+    const rq = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'POST',
+      headers: {
+        Authorization: `${AUTH_PREFIX} ${token}`,
+        'CATALYST-ORG': ORG,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+      timeout: 25000,
+    }, (res) => {
+      let b = '';
+      res.on('data', (c) => { b += c; });
+      res.on('end', () => resolve({ name, status: res.statusCode, body: b.slice(0, 300) }));
     });
-    out.push(r);
-  }
-  return { ok: true, attempts: out };
+    rq.on('error', (e) => resolve({ name, status: 0, body: String(e.message) }));
+    rq.on('timeout', () => { rq.destroy(); resolve({ name, status: 0, body: 'timeout' }); });
+    rq.write(body); rq.end();
+  });
 }
 
-// Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant
+/**
+ * Push every bundled knowledge-base document.
+ *
+ * STATUS: blocked on scope, and worth recording rather than deleting.
+ *
+ * The multipart contract is right -- the endpoint stopped complaining about `documentName`
+ * once the body was built as a form. What it returns instead is 401 INVALID_OAUTHSCOPE on
+ * every POST, while GET /rag/documents answers 200 from the same credential. So the token
+ * Catalyst injects into a deployed function carries QuickML.rag.READ and no write scope.
+ *
+ * This is the same shape as the Data Store DDL wall: the path is correct, the credential is
+ * not privileged for it. Uploading is therefore a console action until a write scope is
+ * granted, and this route stays so that the moment it is, the KB can be refreshed by the same
+ * command that regenerates the documents rather than maintained by hand until it silently
+ * disagrees with the product.
+ */
+async function syncKnowledgeBase(req) {
+  const token = await accessToken(req);
+  if (!token) return { ok: false, stage: 'token', tokenState };
+  const dir = path.join(__dirname, '..', 'data', 'kb');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')); } catch {
+    return { ok: false, reason: 'no bundled knowledge-base documents found' };
+  }
+  const results = [];
+  for (const f of files) {
+    const content = fs.readFileSync(path.join(dir, f), 'utf8');
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await uploadDocument(req, token, { name: f, content }));
+  }
+  const uploaded = results.filter((r) => r.status >= 200 && r.status < 300);
+  const scopeBlocked = results.some((r) => r.status === 401 && /OAUTHSCOPE/i.test(r.body));
+  return {
+    ok: uploaded.length > 0,
+    uploaded: uploaded.length,
+    attempted: results.length,
+    // Say which wall this is. A bare 401 reads as "broken"; naming the scope says the request
+    // was correct and the credential was not, which is a different thing to go and fix.
+    blocked: scopeBlocked ? 'QuickML rag write scope' : null,
+    remedy: scopeBlocked
+      ? 'The injected function credential holds QuickML.rag.READ only. Upload the documents in '
+        + 'the QuickML console (RAG > Documents), or grant a write scope and re-run this.'
+      : null,
+    results: results.map((r) => ({ name: r.name, status: r.status, body: r.body.slice(0, 160) })),
+  };
+}
+
+// Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant// Bypasses the QUICKML_ENABLED gate so the contract can be verified before the assistant
 // is switched onto it. Returns the raw upstream reply either way.
 async function selfTest(req) {
   const token = await accessToken(req);
@@ -389,4 +424,4 @@ async function complete(req, { system, user, maxTokens = 220, temperature = 0.35
 }
 
 module.exports = {
-  probeKnowledgeBase, probeUpload, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };
+  listDocuments, syncKnowledgeBase, configured, status, phrase, ragAnswer, selfTest, complete, SYSTEM_PROMPT };

@@ -739,8 +739,13 @@ function buildApp() {
   })));
 
   r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
-  r.get('/ai/kb-probe', handle(async (req) => quickml.probeKnowledgeBase(req)));
-  r.get('/ai/kb-upload-probe', handle(async (req) => quickml.probeUpload(req)));
+  // Knowledge base. Listing is open to the state tier; pushing is an Admin/DGP action because
+  // it replaces what the assistant retrieves from.
+  r.get('/ai/kb', handle(async (req) => quickml.listDocuments(req)));
+  r.post('/admin/sync-knowledge-base', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin', 'DGP']);
+    return quickml.syncKnowledgeBase(req);
+  }));
 
   r.get('/ai/status', handle(async () => ({
     quickml: quickml.status(),
