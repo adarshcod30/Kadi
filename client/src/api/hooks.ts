@@ -264,3 +264,16 @@ export const useDecideUpdate = () =>
     mutationFn: (v: { id: string; decision: 'approve' | 'reject'; note?: string }) =>
       api.post<{ ok: boolean; status: string }>(`/case-updates/${v.id}/decide`, { decision: v.decision, note: v.note || '' }),
   });
+
+// ---- translation ------------------------------------------------------------------------
+// Zia does not translate on this project (a live probe returns vision and text analytics and
+// nothing linguistic), so this runs on the QuickML LLM server-side, batched and cached, with
+// FIR numbers and ids masked out so they survive byte for byte.
+export const useTranslate = () =>
+  useMutation({
+    mutationFn: (v: { texts: string[]; to?: string }) =>
+      api.post<{
+        items: { source: string; text: string; translated: boolean }[];
+        engine: string; translated: number; total: number;
+      }>('/translate', { texts: v.texts, to: v.to || 'kn' }),
+  });

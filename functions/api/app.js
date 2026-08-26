@@ -20,6 +20,7 @@ const fc = require('./services/forecasting');
 const reactq = require('./services/react');
 const submissions = require('./services/submissions');
 const mlforecast = require('./services/mlforecast');
+const translate = require('./services/translate');
 const smartbrowz = require('./services/smartbrowz');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
@@ -213,6 +214,22 @@ function buildApp() {
     audit.record({ user: req.user, action: `case_update_${out.status}`, targetType: 'case',
       targetId: out.caseMasterId, queryText: out.updateType, ip: req.clientIp, req });
     return out;
+  }));
+
+  // ---- translation ---------------------------------------------------------------------
+  // Zia does not translate on this project -- a live probe returns vision and text analytics
+  // and nothing linguistic -- so this runs on the QuickML LLM, batched and cached. Identifiers
+  // are masked before the model sees them: an FIR number rendered in Kannada numerals is a
+  // corrupted record, not a translation.
+  r.post('/translate', handle(async (req) => {
+    const { texts, text, to = 'kn' } = req.body || {};
+    const list = Array.isArray(texts) ? texts : [text];
+    if (!list.length || !list[0]) return { items: [], total: 0 };
+    if (list.length > 300) {
+      const e = new Error('Translate at most 300 strings per call.');
+      e.status = 400; e.code = 'too_many'; throw e;
+    }
+    return translate.translateMany(req, list, to);
   }));
 
   r.get('/lookups', handle(async () => q.lookups()));

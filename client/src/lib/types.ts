@@ -155,6 +155,13 @@ export interface AssistantResponse {
   citations: { type: string; id: string; label: string }[];
   action: { type: string; [k: string]: any } | null;
   fairness: string; grounded: boolean; ttsText?: string;
+  // Where the answer came from. 'knowledge_base' means it fell through the intent engine to
+  // RAG over the uploaded documents; anything else means it was computed from the records.
+  // Different kinds of claim, so the interface labels them differently.
+  source?: string;
+  llm?: string;
+  documentsSearched?: number;
+  deterministicAnswer?: string;
 }
 
 export interface Lookups {

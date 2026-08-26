@@ -1,5 +1,20 @@
-// Minimal i18n (en / kn). Kannada strings for the KSP-facing labels.
-import { createContext, useContext } from 'react';
+// i18n (en / kn), in two layers.
+//
+// LAYER 1 is DICT below: hand-held keys for the chrome that must never be wrong -- the app
+// name, the nav, the role labels. Short, reviewed, and looked up by key.
+//
+// LAYER 2 is tx(): pass it the ENGLISH SENTENCE and it returns the Kannada. It reads
+// kn.json, a dictionary built once by scripts/build_kannada_dictionary.js and committed, so
+// the toggle is instant and the Kannada can be corrected in a diff by someone who reads it.
+// Anything not in that file is translated at runtime through /translate and cached in
+// localStorage, so a string added after the last build still turns over -- once, on first
+// sight, and free from then on.
+//
+// Why two layers rather than one: keys are right for the twenty labels that appear on every
+// screen, and unbearable for the five hundred sentences that do not. Wrapping a sentence in
+// tx() costs nothing at the call site and needs no key invented for it.
+import { createContext, useContext, useEffect, useState } from 'react';
+import KN from './kn.json';
 
 export type Lang = 'en' | 'kn';
 
@@ -81,6 +96,92 @@ export function tr(key: string, lang: Lang): string {
   const e = DICT[key];
   return e ? e[lang] : key;
 }
+
+// ---- layer 2: translate by English source text -------------------------------------------
+const BUILT: Record<string, string> = KN as Record<string, string>;
+const RUNTIME_KEY = 'kadi.kn.runtime';
+
+function loadRuntime(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(RUNTIME_KEY) || '{}'); } catch { return {}; }
+}
+let runtime: Record<string, string> = loadRuntime();
+
+// Subscribers re-render when a batch of runtime translations lands. Without this the first
+// render of a new string stays English until something else happens to re-render it, which
+// looks like the toggle half-worked.
+const subs = new Set<() => void>();
+const notify = () => subs.forEach((f) => f());
+
+const queue = new Set<string>();
+let timer: ReturnType<typeof setTimeout> | null = null;
+let inFlight = false;
+
+async function flush() {
+  timer = null;
+  if (inFlight || !queue.size) return;
+  const batch = [...queue].slice(0, 60);
+  batch.forEach((t) => queue.delete(t));
+  inFlight = true;
+  try {
+    // Imported lazily: i18n is pulled in by nearly every module, and a static import of the
+    // api layer here would make the dependency graph circular.
+    const { api } = await import('./api');
+    const out = await api.post<{ items: { source: string; text: string; translated: boolean }[] }>(
+      '/translate', { to: 'kn', texts: batch },
+    );
+    let changed = false;
+    for (const it of out.items || []) {
+      if (it.translated && it.text && it.text !== it.source) { runtime[it.source] = it.text; changed = true; }
+    }
+    if (changed) {
+      try { localStorage.setItem(RUNTIME_KEY, JSON.stringify(runtime)); } catch { /* quota */ }
+      notify();
+    }
+  } catch {
+    // Untranslated is a fine outcome: the English still renders. Failing loudly here would
+    // put an error banner over a working page because one label did not turn over.
+  } finally {
+    inFlight = false;
+    if (queue.size) timer = setTimeout(flush, 50);
+  }
+}
+
+/**
+ * Translate an English interface string. Returns the English unchanged in English mode, on a
+ * miss, or on any failure -- this never returns empty, because a blank label is worse than an
+ * untranslated one.
+ */
+export function tx(text: string, lang: Lang): string {
+  if (lang !== 'kn' || !text) return text;
+  const hit = BUILT[text] || runtime[text];
+  if (hit) return hit;
+  // Do not queue data. Numbers, ids and single tokens are values, not interface copy, and
+  // sending an FIR number to a translator is how a record gets corrupted.
+  if (/^[\d\s.,:%/-]+$/.test(text) || !/[a-zA-Z]/.test(text)) return text;
+  if (!queue.has(text)) {
+    queue.add(text);
+    if (!timer) timer = setTimeout(flush, 120);
+  }
+  return text;
+}
+
+/** tx() bound to the current language, re-rendering when late translations arrive. */
+export const useTx = () => {
+  const { lang } = useLang();
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump((n) => n + 1);
+    subs.add(f);
+    return () => { subs.delete(f); };
+  }, []);
+  return (text: string) => tx(text, lang);
+};
+
+/** How much of the interface is actually turning over, for the About page to state honestly. */
+export const dictionaryStats = () => ({
+  built: Object.keys(BUILT).length,
+  runtime: Object.keys(runtime).length,
+});
 
 export const LangContext = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({
   lang: 'en', setLang: () => {},

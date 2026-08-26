@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { setRole, getRole, normaliseRole } from './lib/api';
 import { LangContext, Lang } from './lib/i18n';
+import { PageTranslator } from './lib/PageTranslator';
 import About from './pages/About';
 import Dashboard from './pages/Dashboard';
 import Cases from './pages/Cases';
@@ -40,6 +41,7 @@ export default function App() {
   if (loc.pathname === '/login') {
     return (
       <LangContext.Provider value={{ lang, setLang: setLangP }}>
+        <PageTranslator />
         <Login />
       </LangContext.Provider>
     );
@@ -48,6 +50,7 @@ export default function App() {
 
   return (
     <LangContext.Provider value={{ lang, setLang: setLangP }}>
+      <PageTranslator />
       <Shell>
         <Routes>
           <Route path="/about" element={<About />} />
