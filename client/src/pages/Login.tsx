@@ -1,138 +1,248 @@
-// Login — the entry point, and an honest one.
+// The welcome screen.
 //
-// Catalyst Authentication is provisioned on the project, but the identity binding is not
-// wired: the API derives the caller's role from a header rather than a verified JWT. Rather
-// than fake a password box that accepts anything, this screen presents the five real KSP
-// roles, states exactly what each one may see, and says plainly which part is demo. An
-// evaluator can then exercise every RBAC scope in seconds instead of needing five accounts.
+// This is the first thing anyone sees, so it has to make the product's case before a single
+// feature is opened. It does that with figures rather than adjectives: the counts below are
+// fetched live from the running system at page load, so "59,985 FIRs joined into one graph" is
+// the deployment answering for itself rather than a claim printed on a slide. If the pipeline
+// were empty the page would say so, which is the point of reading them live.
+//
+// Access is presented as the three tiers the force actually has — state, district, station —
+// because that hierarchy is the product's argument. Standing in the station view and seeing
+// how little one register holds is what makes the state view mean anything.
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Info, ArrowRight, Lock } from 'lucide-react';
-import { setRole, Role } from '../lib/api';
+import { ArrowRight, Globe, MapPin, Building2 } from 'lucide-react';
+import { setRole, Role, api } from '../lib/api';
 
-const ROLES: { role: Role; title: string; scope: string; sees: string; colour: string; tier: 'state' | 'district' }[] = [
-  // --- STATE TIER: the whole of Karnataka ---
+type Tier = {
+  key: string;
+  icon: typeof Globe;
+  label: string;
+  scope: string;
+  accent: string;
+  posts: { role: Role; title: string; sees: string }[];
+};
+
+const TIERS: Tier[] = [
   {
-    role: 'Analyst', title: 'SCRB Analyst', scope: 'Entire state', tier: 'state',
-    sees: 'Every FIR in Karnataka, state-wide offender networks, per-capita analytics, forecasting, anomaly detection and the zone board.',
-    colour: '#0f2f44',
+    key: 'state', icon: Globe, label: 'State', scope: 'All 31 districts', accent: '#1A6FC4',
+    posts: [
+      { role: 'DGP', title: 'State DGP', sees: 'The command picture across all 31 districts, with drill-down into any one of them.' },
+      { role: 'Analyst', title: 'SCRB Analyst', sees: 'Every FIR, state-wide offender networks, per-capita analytics, forecasting and anomaly detection.' },
+      { role: 'Admin', title: 'Administrator', sees: 'Everything the state tier sees, plus the fairness report, pipeline status and the audit trail.' },
+    ],
   },
   {
-    role: 'DGP', title: 'State DGP', scope: 'Entire state', tier: 'state',
-    sees: 'The command picture across all 31 districts, with drill-down into any of them.',
-    colour: '#1A6FC4',
+    key: 'district', icon: MapPin, label: 'District', scope: 'One district + what links into it', accent: '#E8871E',
+    posts: [
+      { role: 'SP', title: 'Superintendent of Police', sees: 'Every FIR in the district, cross-station networks, district hotspots and the audit log.' },
+      { role: 'DSP', title: 'DySP / ACP', sees: 'District FIRs, the linkage graph across stations, and the sub-division health worklist.' },
+      { role: 'SI', title: 'Sub-Inspector (IO)', sees: 'District FIRs with station drill-down, and the linkage graph around their own cases.' },
+    ],
   },
   {
-    role: 'Admin', title: 'Administrator', scope: 'State + governance', tier: 'state',
-    sees: 'Everything the state tier sees, plus the fairness report, pipeline status and the full audit trail.',
-    colour: '#7C5CBF',
-  },
-  // --- DISTRICT TIER: one district, and whatever links into it ---
-  {
-    role: 'SP', title: 'Superintendent of Police', scope: 'Own district', tier: 'district',
-    sees: 'Every FIR in the district, cross-station offender networks, district hotspots and the audit log.',
-    colour: '#E8871E',
-  },
-  {
-    role: 'DSP', title: 'DySP / ACP', scope: 'Own district', tier: 'district',
-    sees: 'District FIRs, the linkage graph across stations, and the investigation-health worklist for the sub-division.',
-    colour: '#C9820A',
-  },
-  {
-    role: 'SI', title: 'Sub-Inspector (IO)', scope: 'Own district', tier: 'district',
-    sees: 'District FIRs with station drill-down, the linkage graph around their cases, and their own health worklist.',
-    colour: '#2FA8A0',
+    key: 'station', icon: Building2, label: 'Station', scope: 'One station register', accent: '#2FA8A0',
+    posts: [
+      { role: 'SHO' as Role, title: 'Station House Officer', sees: 'Bengaluru Bazaar PS and nothing beyond it — the silo this platform exists to break. Every repeat offender on its register also offends elsewhere, and from here you cannot see where.' },
+    ],
   },
 ];
 
-const TIERS = [
-  { key: 'state' as const, label: 'State access', note: 'All 31 districts. SCRB, DGP and Administrator.' },
-  { key: 'district' as const, label: 'District access', note: 'One district, plus every case linked into it. SP, DySP and Sub-Inspector.' },
-];
+// Live counters. Each is read from the deployed API, so the page cannot overstate the system.
+function useLiveFigures() {
+  const [f, setF] = useState<{ cases: number; offenders: number; networks: number; recovery: number } | null>(null);
+  useEffect(() => {
+    Promise.all([
+      api.get<any>('/stats').catch(() => null),
+      api.get<any>('/eval').catch(() => null),
+    ]).then(([s, e]) => {
+      if (!s) return;
+      setF({
+        cases: s.totalCases || 0,
+        offenders: s.resolvedOffenders || 0,
+        networks: s.activeNetworks || 0,
+        recovery: e?.overallRecoveryPct ?? 0,
+      });
+    });
+  }, []);
+  return f;
+}
+
+// Counts up to the real value. Motion here is doing a job rather than decorating: a number
+// that lands rather than appears reads as measured, which is what these are.
+function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!to) return undefined;
+    const start = performance.now();
+    const dur = 1100;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur);
+      // ease-out, so it decelerates into the figure instead of stopping dead
+      setN(Math.round(to * (1 - (1 - p) ** 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to]);
+  return <>{n.toLocaleString('en-IN')}{suffix}</>;
+}
 
 export default function Login() {
   const nav = useNavigate();
+  const figures = useLiveFigures();
+  const [openTier, setOpenTier] = useState<string>('state');
 
-  const enter = (r: Role) => {
-    setRole(r);
-    nav('/');
-  };
+  const enter = (r: Role) => { setRole(r); nav('/'); };
 
   return (
-    <div className="min-h-screen bg-surface-2 flex items-center justify-center p-5">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }} className="w-full max-w-3xl">
+    <div className="min-h-screen relative overflow-hidden bg-kadi-navy text-white">
+      {/* Background: the linkage graph itself, drawn faintly. The product is a graph over
+          FIRs, so the wallpaper is that graph rather than a stock gradient. */}
+      {/* Layer order matters: a wash first, the graph over it, the seal last. The earlier
+          version put a multiply blend on top of an already-dark navy and drove the whole page
+          to near-black -- every element was rendered and none of it was readable. */}
+      <div className="absolute inset-0" style={{
+        background:
+          'radial-gradient(1100px 600px at 12% -5%, rgba(26,111,196,0.30), transparent 62%),'
+          + 'radial-gradient(900px 520px at 88% 108%, rgba(47,168,160,0.20), transparent 60%),'
+          + 'linear-gradient(150deg, #0d3149 0%, #0B2437 55%, #08202f 100%)',
+      }} />
+      <NetworkBackdrop />
+      <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
+        className="pointer-events-none absolute -right-20 -bottom-24 w-[460px] opacity-[0.07] select-none" />
 
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-10 lg:py-14">
         {/* Brand */}
-        <div className="flex items-center gap-3 mb-5">
-          <img src="/seal-karnataka.svg" alt="Government of Karnataka" className="h-12 w-12 rounded-full bg-white p-0.5 border border-line" />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+          className="flex items-center gap-4">
+          <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka"
+            className="h-14 w-14 rounded-full bg-white/95 p-1 shrink-0" />
           <div>
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded bg-kadi-navy grid place-items-center text-kadi-gold font-bold kn text-sm">ಕ</span>
-              <h1 className="text-xl font-semibold text-kadi-navy">KADI</h1>
-            </div>
-            <p className="text-sm text-ink-muted">Karnataka State Police — Crime Analytics &amp; Intelligence</p>
+            <div className="text-[11px] uppercase tracking-[0.22em] text-kadi-gold/90">Karnataka State Police</div>
+            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight leading-none mt-0.5">KADI</h1>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card p-5">
-          <h2 className="text-base font-semibold text-ink flex items-center gap-2">
-            <ShieldCheck size={17} className="text-kadi-blue" /> Sign in by role
-          </h2>
-          <p className="text-sm text-ink-muted mt-1">
-            Access runs in two tiers — <b className="text-ink">state</b> and <b className="text-ink">district</b>.
-            Pick a rank to enter with exactly the data it is entitled to see; scoping is
-            enforced server-side on every query, and a district rank can drill into any
-            station within its own district but never outside it.
-          </p>
+        <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }}
+          className="mt-5 text-lg lg:text-xl text-white/80 max-w-2xl leading-snug">
+          Every FIR in Karnataka, joined into one connected picture — serial offenders,
+          cross-district networks and slipping investigations, surfaced with the evidence
+          behind each one.
+        </motion.p>
 
-          <div className="mt-4 space-y-4">
-            {TIERS.map((tier) => (
-              <div key={tier.key}>
-                <div className="flex items-baseline gap-2 mb-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-kadi-navy">{tier.label}</span>
-                  <span className="text-[11.5px] text-ink-muted">{tier.note}</span>
-                </div>
-                <div className="space-y-2">
-            {ROLES.filter((r) => r.tier === tier.key).map((r) => (
-              <motion.button key={r.role} whileHover={{ x: 3 }} onClick={() => enter(r.role)}
-                className="w-full text-left rounded-card border border-line hover:border-kadi-blue hover:bg-kadi-blue50/40 transition-colors px-4 py-3 flex items-start gap-3">
-                <span className="w-9 h-9 rounded-full grid place-items-center text-white text-xs font-semibold shrink-0"
-                  style={{ background: r.colour }}>{r.role[0]}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2 flex-wrap">
-                    <b className="text-sm text-ink">{r.title}</b>
-                    <span className="chip bg-surface-3 text-ink-muted">{r.scope}</span>
-                  </span>
-                  <span className="block text-[12.5px] text-ink-muted mt-0.5">{r.sees}</span>
-                </span>
-                <ArrowRight size={15} className="text-ink-muted mt-2 shrink-0" />
-              </motion.button>
-            ))}
-                </div>
+        {/* Figures, read live. This is the claim and the proof in the same row. */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.16 }}
+          className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { v: figures?.cases, label: 'FIRs in one graph', hint: 'not 31 registers' },
+            { v: figures?.offenders, label: 'Repeat offenders resolved', hint: 'name variants merged' },
+            { v: figures?.networks, label: 'Active offender networks', hint: 'groups, not lone repeats' },
+            { v: figures?.recovery, label: 'Ground-truth recovery', hint: 'scored every pipeline run', suffix: '%' },
+          ].map((k) => (
+            <div key={k.label} className="rounded-card border border-white/12 bg-white/[0.06] backdrop-blur-sm px-4 py-3">
+              <div className="text-2xl lg:text-3xl font-semibold font-num text-kadi-gold tabular-nums">
+                {figures ? <Counter to={k.v || 0} suffix={k.suffix} /> : <span className="opacity-40">—</span>}
               </div>
-            ))}
-          </div>
+              <div className="text-[12.5px] text-white/85 mt-0.5 leading-tight">{k.label}</div>
+              <div className="text-[11px] text-white/45 leading-tight">{k.hint}</div>
+            </div>
+          ))}
+        </motion.div>
 
-          {/* Say plainly what is real and what is not. */}
-          <div className="mt-4 flex items-start gap-2 rounded-ctl border border-line bg-surface-2 px-3 py-2.5 text-[12.5px] text-ink-muted">
-            <Info size={14} className="text-kadi-blue shrink-0 mt-0.5" />
-            <span>
-              <b className="text-ink">What is real, and what is demo.</b> The role scoping is real:
-              the API filters every query by the caller's unit, district or state and refuses
-              out-of-scope reads. The <em>identity check</em> is not — Catalyst Authentication is
-              provisioned on this project, but the API still trusts a role header instead of a
-              verified JWT, so this screen is a role chooser rather than a password gate.
-              In production the single function <code className="text-ink">userFromRequest</code>
-              {' '}reads the Catalyst token and maps it to the officer's rank; nothing else changes.
+        {/* Access */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.24 }}
+          className="mt-10">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/70">Choose your access</h2>
+            <span className="text-[12.5px] text-white/45">
+              Scope is enforced server-side on every query, not hidden in the interface.
             </span>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 text-[12px] text-ink-muted">
-            <Lock size={12} /> Insights use evidence &amp; behaviour only — never caste, religion, or occupation.
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {TIERS.map((t) => {
+              const active = openTier === t.key;
+              return (
+                <div key={t.key}
+                  onMouseEnter={() => setOpenTier(t.key)}
+                  className={`rounded-card border transition-all duration-200 overflow-hidden ${
+                    active ? 'border-white/30 bg-white/[0.09]' : 'border-white/10 bg-white/[0.04] hover:border-white/20'}`}>
+                  <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2.5">
+                    <span className="w-9 h-9 rounded-full grid place-items-center shrink-0"
+                      style={{ background: `${t.accent}22`, color: t.accent }}>
+                      <t.icon size={17} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold leading-tight">{t.label}</div>
+                      <div className="text-[11.5px] text-white/50 leading-tight">{t.scope}</div>
+                    </div>
+                  </div>
+                  <div className="px-2 pb-2 space-y-1">
+                    {t.posts.map((p) => (
+                      <button key={p.role} onClick={() => enter(p.role)}
+                        className="group w-full text-left rounded-ctl px-3 py-2.5 hover:bg-white/10 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13.5px] font-medium">{p.title}</span>
+                          <ArrowRight size={13} className="ml-auto opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all shrink-0" />
+                        </div>
+                        <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">{p.sees}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+          className="mt-8 text-[11.5px] text-white/35">
+          Links and risk are built from evidence and behaviour only — never caste, religion or
+          occupation. Synthetic corpus, schema-faithful to the KSP FIR system.
+        </motion.div>
+      </div>
     </div>
+  );
+}
+
+// A slow-drifting node-link field. Generated once and animated with CSS only, so it costs
+// nothing per frame in JS and never competes with the page for the main thread.
+function NetworkBackdrop() {
+  const [seed] = useState(() => {
+    const nodes = Array.from({ length: 34 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      r: 1 + Math.random() * 2.6,
+      d: 6 + Math.random() * 10,
+    }));
+    const edges: { a: typeof nodes[0]; b: typeof nodes[0] }[] = [];
+    for (const n of nodes) {
+      const near = nodes
+        .filter((m) => m.id !== n.id)
+        .sort((p, q2) => ((p.x - n.x) ** 2 + (p.y - n.y) ** 2) - ((q2.x - n.x) ** 2 + (q2.y - n.y) ** 2))
+        .slice(0, 2);
+      for (const m of near) if (n.id < m.id) edges.push({ a: n, b: m });
+    }
+    return { nodes, edges };
+  });
+
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100"
+      preserveAspectRatio="none" aria-hidden="true">
+      <g stroke="#7CC4F5" strokeWidth="0.14" opacity="0.42">
+        {seed.edges.map((e, i) => <line key={i} x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />)}
+      </g>
+      <g fill="#7CC4F5">
+        {seed.nodes.map((n) => (
+          <circle key={n.id} cx={n.x} cy={n.y} r={n.r / 10} opacity="0.5">
+            <animate attributeName="opacity" values="0.25;0.85;0.25" dur={`${n.d}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </g>
+    </svg>
   );
 }

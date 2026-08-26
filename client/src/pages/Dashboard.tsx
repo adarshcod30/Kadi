@@ -4,7 +4,7 @@ import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, 
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
 import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
-import { StateCommand, DistrictCommand, CommandInsight } from '../components/CommandViews';
+import { StateCommand, DistrictCommand, StationCommand, CommandInsight } from '../components/CommandViews';
 import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
 import {
@@ -134,16 +134,20 @@ export default function Dashboard() {
       </motion.div>
 
       <p className="text-xs text-ink-muted -mt-1">
-        {command?.view === 'district'
-          ? `Operational view — every figure below is ${command.districtName}. Use the scope control in the header to switch district.`
-          : 'Command view — all 31 districts. Drill into any one from the table below, or from the header.'}
+        {command?.view === 'station'
+          ? `Station view — every figure below is ${command.unitName} only. This is the whole of what this desk can read.`
+          : command?.view === 'district'
+            ? `Operational view — every figure below is ${command.districtName}. Use the scope control in the header to switch district.`
+            : 'Command view — all 31 districts. Drill into any one from the table below, or from the header.'}
       </p>
 
       {/* The two tiers get different panels, not the same panels with smaller numbers. */}
       <CommandInsight text={command?.insight} view={command?.view || 'state'} />
-      {command?.view === 'district'
-        ? <DistrictCommand data={command} />
-        : <StateCommand data={command} />}
+      {command?.view === 'station'
+        ? <StationCommand data={command} />
+        : command?.view === 'district'
+          ? <DistrictCommand data={command} />
+          : <StateCommand data={command} />}
 
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: trend + heatmap + districts */}

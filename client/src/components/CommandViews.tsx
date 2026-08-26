@@ -26,7 +26,7 @@ export function CommandInsight({ text, view }: { text?: string; view: string }) 
       <Sparkles size={15} className="text-kadi-blue shrink-0 mt-0.5" />
       <div className="min-w-0">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-kadi-blue mb-0.5">
-          {view === 'state' ? 'The state picture' : 'Your district today'}
+          {view === 'state' ? 'The state picture' : view === 'station' ? 'Your register today' : 'Your district today'}
         </div>
         <p className="text-[13px] text-ink leading-relaxed">{text}</p>
       </div>
@@ -153,5 +153,72 @@ export function DistrictCommand({ data }: { data: any }) {
         </Section>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * STATION: one register, and the exact size of what it cannot see.
+ *
+ * This view exists to be uncomfortable. Every other screen in KADI shows what an officer can
+ * reach; this one leads with what they cannot -- the count of cases their own FIRs connect to
+ * that sit outside this station entirely. That number is the argument for the whole platform,
+ * and at station level it can be stated exactly instead of described.
+ */
+export function StationCommand({ data }: { data: any }) {
+  const nav = useNavigate();
+  if (!data) return <div className="card"><Skeleton rows={6} /></div>;
+  const outsideShare = data.total ? Math.round((data.linkedOutTotal / data.total) * 10) / 10 : 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatBox label="FIRs on this register" value={data.total?.toLocaleString()} />
+        <StatBox label="Still open" value={data.open?.toLocaleString()} />
+        <StatBox label="Carrying a health flag" value={data.flagged?.toLocaleString()} accent="#C9820A" />
+        <StatBox label="Heinous" value={data.heinous?.toLocaleString()} accent="#C0392B" />
+      </div>
+
+      {/* The finding. Deliberately the largest element on the page. */}
+      <div className="rounded-card border-2 border-kadi-teal/40 bg-gradient-to-br from-kadi-teal/[0.07] to-transparent p-4">
+        <div className="flex items-start gap-3">
+          <Share2 size={18} className="text-kadi-teal shrink-0 mt-1" />
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-kadi-teal">
+              What this register cannot see
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl font-semibold font-num text-kadi-navy">
+                {data.linkedOutTotal?.toLocaleString()}
+              </span>
+              <span className="text-[13.5px] text-ink">
+                cases outside {data.unitName} that its own FIRs connect to
+              </span>
+            </div>
+            <p className="text-[12.5px] text-ink-muted mt-1.5 leading-relaxed">
+              {data.linkedWithinStation?.toLocaleString()} of your {data.total?.toLocaleString()} cases
+              share an offender, co-accused, modus operandi, place, time window or act &amp; section
+              with a case registered elsewhere — <b className="text-ink">{data.linkedOutOtherDistricts?.toLocaleString()}</b> of
+              them in another district entirely. That is {outsideShare}× your own caseload sitting
+              beyond your reach, and from this desk you cannot open any of it.
+            </p>
+            <button onClick={() => nav('/graph')}
+              className="mt-2.5 btn-outline text-[12.5px] inline-flex items-center gap-1.5">
+              See the connections <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatBox({ label, value, accent }: { label: string; value?: string; accent?: string }) {
+  return (
+    <div className="card p-3">
+      <div className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</div>
+      <div className="text-2xl font-semibold font-num mt-0.5" style={accent ? { color: accent } : { color: '#0f2f44' }}>
+        {value ?? '—'}
+      </div>
+    </div>
   );
 }

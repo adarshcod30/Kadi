@@ -1,14 +1,35 @@
 // Role-based access control. Enforced server-side on every endpoint.
 //
-// TWO TIERS, not five roles. The brief asks for district-level drill-down as a first-class
-// capability, and five overlapping roles made that muddy -- three different scopes, none of
-// them the one the brief actually names. So scope is now a two-position switch:
+// THREE TIERS, mirroring how the force is actually organised -- state, district, station.
+// Each is a genuine read boundary enforced on every query, not a label:
 //
-//   STATE     SCRB Analyst, DGP, Administrator   all 31 districts
-//   DISTRICT  SI, DySP, SP                        one district, plus cases linked into it
+//   STATE    SCRB Analyst, DGP, Administrator   all 31 districts
+//   DISTRICT SP, DySP                            one district, plus cases linked into it
+//   STATION  SHO                                 one police station's own register
 //
-// Station is a drill-down *within* a scope (?unit=), not a third role tier. An SI and an SP
-// see the same district; what differs is what they do with it, not what they can read.
+// The station tier is the ground floor of the hierarchy and the one the whole product argues
+// against: an SHO sees their own register and nothing else, which is precisely the silo the
+// brief describes. Giving that view its own login makes the argument demonstrable rather than
+// asserted -- you can stand in it, see how little is visible, and then step up a tier.
+//
+// Only ONE station is provisioned, deliberately. This is a prototype, and a station tier that
+// works for one real station with real volume is more honest than 298 shells. Bengaluru Bazaar
+// PS was chosen because it carries the largest register in Bengaluru City (276 cases, 152 of
+// them linked to cases elsewhere), so the silo argument has something to show.
+// Names for the scope readout. Kept here rather than looked up from the store so rbac stays
+// free of a data dependency -- it is imported by tests that never load the corpus.
+const DISTRICT_NAMES = {
+  1: 'Bengaluru City', 2: 'Bengaluru Rural', 3: 'Mysuru', 4: 'Mandya', 5: 'Hassan',
+  6: 'Tumakuru', 7: 'Kalaburagi', 8: 'Ballari', 9: 'Vijayapura', 10: 'Belagavi',
+  11: 'Dharwad', 12: 'Hubballi-Dharwad', 13: 'Udupi', 14: 'Dakshina Kannada',
+  15: 'Uttara Kannada', 16: 'Shivamogga', 17: 'Chitradurga', 18: 'Davanagere',
+  19: 'Kolar', 20: 'Chikkaballapura', 21: 'Ramanagara', 22: 'Chamarajanagar',
+  23: 'Kodagu', 24: 'Chikkamagaluru', 25: 'Haveri', 26: 'Gadag', 27: 'Bagalkote',
+  28: 'Koppal', 29: 'Raichur', 30: 'Yadgir', 31: 'Bidar',
+};
+
+const STATION_UNIT_ID = '46';
+const STATION_NAME = 'Bengaluru Bazaar PS';
 
 const ROLES = {
   // --- state tier ---
@@ -18,6 +39,10 @@ const ROLES = {
   // --- district tier ---
   SP: { level: 3, label: 'Superintendent of Police', scope: 'district', tier: 'district' },
   DSP: { level: 4, label: 'DySP / ACP', scope: 'district', tier: 'district' },
+  // --- station tier ---
+  SHO: { level: 5, label: 'Station House Officer', scope: 'unit', tier: 'station' },
+  // SI keeps its district scope so existing saved links and cached clients do not silently
+  // narrow. New station-level access is SHO.
   SI: { level: 5, label: 'Sub-Inspector (IO)', scope: 'district', tier: 'district' },
 };
 
@@ -31,6 +56,7 @@ const DEMO_USERS = {
   SP: { appUserId: 'U-SP', name: 'SP Bengaluru City', role: 'SP', unitId: null, districtId: '1' },
   DSP: { appUserId: 'U-DSP', name: 'DySP M. Rao', role: 'DSP', unitId: null, districtId: '1' },
   SI: { appUserId: 'U-SI', name: 'PSI R. Kumar', role: 'SI', unitId: '1', districtId: '1' },
+  SHO: { appUserId: 'U-SHO', name: `SHO ${STATION_NAME}`, role: 'SHO', unitId: STATION_UNIT_ID, districtId: '1' },
 };
 
 function resolveRole(raw) {
@@ -52,6 +78,9 @@ function userFromRequest(req) {
   // State tier may drill INTO any district and back out again -- that is the whole point of
   // holding the state view. District tier may switch which district it looks at but can
   // never widen past one, so ?district= narrows for everyone and widens for nobody.
+  // A station user is pinned. Ignoring these rather than applying them keeps the boundary in
+  // one place (caseInScope) instead of two that must agree.
+  if (user.roleMeta.tier === 'station') return user;
   if (q.district) {
     user.districtId = String(q.district);
     if (user.roleMeta.tier === 'state') user.drilledFromState = true;
@@ -63,6 +92,10 @@ function userFromRequest(req) {
 // Predicate: can this user see this case?
 function caseInScope(user, c) {
   const { scope } = user.roleMeta;
+  // Station tier first and unconditionally. ?district= and ?unit= must not be able to move it:
+  // a tier whose boundary can be widened by editing the URL is decoration, and this is the one
+  // tier the product's whole argument rests on being real.
+  if (user.roleMeta.tier === 'station') return String(c.unitId) === String(user.unitId);
   if (user.drillUnitId && String(c.unitId) !== user.drillUnitId) return false;
   // A state user who has drilled into a district reads as that district until they drill out.
   if (user.drilledFromState) return String(c.districtId) === String(user.districtId);
@@ -83,8 +116,13 @@ function requireRole(user, allowed) {
 
 function capabilities(user) {
   const stateTier = user.roleMeta.tier === 'state';
+  const stationTier = user.roleMeta.tier === 'station';
   const drilled = Boolean(user.drilledFromState);
   return {
+    unitName: stationTier ? STATION_NAME : null,
+    // Resolved here so the shell can name the scope without a second lookup. The footer says
+    // "Bengaluru City", not "district 1" -- an id tells a viewer nothing about what they hold.
+    districtName: user.districtId ? (DISTRICT_NAMES[String(user.districtId)] || null) : null,
     role: user.role,
     label: user.roleMeta.label,
     scope: user.roleMeta.scope,
@@ -93,14 +131,20 @@ function capabilities(user) {
     drillUnitId: user.drillUnitId || null,
     canViewVulnerability: true,
     canViewAudit: stateTier || user.role === 'SP',
+    isStation: stationTier,
     canAdmin: user.role === 'Admin',
     // Everyone can move between districts. Only a state user can step back out to the whole
     // state, which is the difference the two tiers actually encode.
-    canSwitchDistrict: true,
+    // A station officer has exactly one register. Offering a district switcher would
+    // imply a choice that does not exist for them.
+    canSwitchDistrict: !stationTier,
     canViewWholeState: stateTier,
     drilledFromState: drilled,
-    effectiveScope: drilled ? 'district' : user.roleMeta.scope,
+    effectiveScope: stationTier ? 'unit' : (drilled ? 'district' : user.roleMeta.scope),
   };
 }
 
-module.exports = { ROLES, ALIASES, DEMO_USERS, userFromRequest, caseInScope, requireRole, capabilities };
+module.exports = {
+  ROLES, ALIASES, DEMO_USERS, userFromRequest, caseInScope, requireRole, capabilities,
+  STATION_UNIT_ID, STATION_NAME,
+};

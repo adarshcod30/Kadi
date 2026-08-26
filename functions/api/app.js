@@ -90,11 +90,32 @@ function buildApp() {
   // One route, two products. The tier decides which command view you get, and the payload
   // says which one so the client renders the right thing rather than guessing from shape.
   r.get('/command', handle(async (req) => {
-    const stateView = req.user.roleMeta.tier === 'state' && !req.user.drilledFromState;
-    const body = stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
-    const out = { view: stateView ? 'state' : 'district', ...body };
+    const tier = req.user.roleMeta.tier;
+    const stateView = tier === 'state' && !req.user.drilledFromState;
+    const stationView = tier === 'station';
+    const body = stationView ? q.stationCommand(req.user)
+      : stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
+    const out = { view: stationView ? 'station' : stateView ? 'state' : 'district', ...body };
     if (String(req.query.explain) !== 'true') return out;
     const zoneLabel = (z) => ZONE_LABEL_TEXT[z] || z || 'at baseline';
+    if (stationView) {
+      // Narrated through SIGNALS_SYSTEM, not the generic prompt. Handed a loose fact bag the
+      // model welded two independent figures into one claim -- "83 open cases, which is 108
+      // carrying a health flag" -- the same re-nouning failure the intelligence bands hit.
+      // Self-contained findings with their units attached remove the opportunity.
+      const f = {
+        findings: [
+          `1. ${body.unitName} holds ${body.total.toLocaleString('en-IN')} FIRs on its own register, of which ${body.open.toLocaleString('en-IN')} are still open.`,
+          `2. ${body.flagged.toLocaleString('en-IN')} of those FIRs carry an investigation-health flag. This is a separate count from the open figure above.`,
+          `3. ${body.linkedWithinStation.toLocaleString('en-IN')} of this station's cases connect to a case registered elsewhere, and those connect out to ${body.linkedOutTotal.toLocaleString('en-IN')} cases beyond this register — ${body.linkedOutOtherDistricts.toLocaleString('en-IN')} of them in another district. This officer cannot open any of them.`,
+          `4. Against its own historical average this station is ${zoneLabel(body.zone)}.`,
+        ],
+        recordsInView: body.total.toLocaleString('en-IN'),
+      };
+      const r2 = await insight.generate(req, 'a single police station register and what it cannot see', f,
+        { maxTokens: 190, system: insight.SIGNALS_SYSTEM });
+      return { ...out, insight: r2.text, insightSource: r2.source };
+    }
     const facts = stateView ? {
       scope: 'Karnataka, 31 districts',
       districtsNeedingAttention: body.needsAttention,

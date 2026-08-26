@@ -237,3 +237,65 @@ test('paging survives junk query params', () => {
   // ask for the whole 60k corpus.
   assert.strictEqual(q.listCases(analyst, { pageSize: '99999' }).pageSize, 200);
 });
+
+// The station tier is the ground floor of the hierarchy and the one the product's argument
+// rests on being real: an SHO sees their own register and nothing else. A boundary that can be
+// widened by editing a query string is decoration, so it is asserted rather than assumed.
+test('station tier: pinned to one register, and cannot be widened by query params', () => {
+  const q = require('../api/services/queries');
+  const sho = rbac.userFromRequest({
+    headers: { 'x-kadi-role': 'SHO' },
+    // A deliberate attempt to escape: another district AND another station.
+    query: { district: '5', unit: '99' },
+  });
+  assert.strictEqual(sho.roleMeta.tier, 'station');
+  assert.strictEqual(sho.unitId, rbac.STATION_UNIT_ID, 'must stay on its own station');
+  assert.strictEqual(sho.districtId, '1', '?district= must not move a station user');
+  assert.ok(!sho.drillUnitId, '?unit= must not be honoured for a station user');
+
+  assert.ok(rbac.caseInScope(sho, { unitId: rbac.STATION_UNIT_ID, districtId: '1' }));
+  assert.ok(!rbac.caseInScope(sho, { unitId: '35', districtId: '1' }), 'other station in same district blocked');
+  assert.ok(!rbac.caseInScope(sho, { unitId: '99', districtId: '5' }), 'the escape attempt is blocked');
+
+  const caps = rbac.capabilities(sho);
+  assert.strictEqual(caps.effectiveScope, 'unit');
+  assert.strictEqual(caps.canViewWholeState, false);
+  assert.strictEqual(caps.canSwitchDistrict, false, 'a station officer has exactly one register');
+  assert.strictEqual(caps.canViewAudit, false);
+
+  // Every list must narrow, not just the case register. Offenders was the one that leaked:
+  // it fell through to the state watchlist because the narrowing test only knew two tiers.
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  const sCases = q.listCases(sho, { pageSize: 1 });
+  const aCases = q.listCases(analyst, { pageSize: 1 });
+  assert.ok(sCases.total > 0 && sCases.total < aCases.total / 50, 'station register is a small slice');
+
+  const sOff = q.listOffenders(sho, { pageSize: 1 });
+  assert.ok(sOff.total > 0, 'station should still surface its own repeat offenders');
+  assert.ok(sOff.total < q.listOffenders(analyst, { pageSize: 1 }).total, 'offenders must narrow');
+  assert.strictEqual(sOff.scope, 'unit');
+
+  assert.ok(q.listHealth(sho, { pageSize: 1 }).total < q.listHealth(analyst, { pageSize: 1 }).total);
+  assert.ok(q.geoPoints(sho, { limit: 9000 }).total < q.geoPoints(analyst, { limit: 9000 }).total,
+    'the dot map must not show the whole state to a station officer');
+  assert.ok(q.alerts(sho).length <= q.alerts(analyst).length);
+  assert.ok(q.stats(sho).totalCases < q.stats(analyst).totalCases);
+
+  // Every case the station CAN see must genuinely belong to it.
+  for (const c of q.listCases(sho, { pageSize: 200 }).items) {
+    assert.strictEqual(String(c.unitId), rbac.STATION_UNIT_ID);
+  }
+});
+
+test('existing two tiers are unchanged by the addition of the third', () => {
+  const q = require('../api/services/queries');
+  const analyst = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  const sp = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP };
+  assert.strictEqual(rbac.capabilities(analyst).effectiveScope, 'state');
+  assert.strictEqual(rbac.capabilities(sp).effectiveScope, 'district');
+  assert.ok(q.listCases(analyst, { pageSize: 1 }).total > q.listCases(sp, { pageSize: 1 }).total);
+  assert.ok(q.listOffenders(sp, { pageSize: 1 }).total < q.listOffenders(analyst, { pageSize: 1 }).total);
+  // SI stays district-scoped: existing saved links must not silently narrow to a station.
+  const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI };
+  assert.strictEqual(si.roleMeta.tier, 'district');
+});

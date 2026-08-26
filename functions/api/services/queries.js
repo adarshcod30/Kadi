@@ -18,6 +18,14 @@ const FAIRNESS_STATEMENT =
 function pageOf(q) { return Math.max(1, parseInt(q.page, 10) || 1); }
 function pageSizeOf(q, fallback) { return Math.min(200, Math.max(1, parseInt(q.pageSize, 10) || fallback)); }
 
+// The scope label a response reports. Centralised because the three tiers now have to agree
+// across every endpoint, and inlining the ternary in each was how a bad edit reached three
+// call sites at once.
+function scopeLabel(user, narrowed) {
+  if (user && user.roleMeta && user.roleMeta.tier === 'station') return 'unit';
+  return narrowed ? 'district' : 'state';
+}
+
 function scoped(user, list) {
   // The fast path must not skip a state user who has drilled into a district. This
   // short-circuit was defeating drill-down across every query that goes through here: the
@@ -262,7 +270,28 @@ function listOffenders(user, q = {}) {
   // also works elsewhere stays visible -- that cross-jurisdiction reach is the finding, not
   // something to hide from the district that is dealing with them.
   const did = user && user.districtId ? String(user.districtId) : null;
-  const narrowed = user && ((user.roleMeta && user.roleMeta.tier === 'district') || user.drilledFromState);
+  const tier = user && user.roleMeta ? user.roleMeta.tier : null;
+
+  // Station tier: the watchlist must narrow to people who actually appear in THIS station's
+  // register. It was falling through to the state list because the narrowing test only knew
+  // about the district tier -- an SHO saw 276 cases and all 578 offenders, which is both a
+  // scoping hole and the opposite of the point the station view exists to make.
+  if (tier === 'station' && user.unitId) {
+    const db2 = load();
+    const mine = new Set();
+    for (const c of db2.caseList) if (String(c.unitId) === String(user.unitId)) mine.add(String(c.caseMasterId));
+    rows = rows.filter((o) => (o.caseIds || []).some((id) => mine.has(String(id))));
+    // Reach is the finding here: someone with cases at this station AND elsewhere is exactly
+    // what a single register cannot show, so it is computed rather than left to be inferred.
+    rows = rows.map((o) => {
+      const here = (o.caseIds || []).filter((id) => mine.has(String(id))).length;
+      return { ...o, casesAtMyStation: here, casesElsewhere: (o.distinctCases || 0) - here };
+    });
+    if (q.origin === 'visiting') rows = rows.filter((o) => o.casesElsewhere > 0);
+    if (q.origin === 'local') rows = rows.filter((o) => o.casesElsewhere === 0);
+  }
+
+  const narrowed = user && (tier === 'district' || user.drilledFromState);
   if (narrowed && did) {
     rows = rows.filter((o) => (o.districts || []).map(String).includes(did));
     // Two very different people share this list. One is based here and works only here. The
@@ -315,9 +344,13 @@ function listOffenders(user, q = {}) {
   const pageSize = pageSizeOf(q, 50);
   return {
     items: rows.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, sort,
-    scope: narrowed ? 'district' : 'state',
-    reachingIn: narrowed ? rows.filter((o) => o.reachesIn).length : null,
-    basedHere: narrowed ? rows.filter((o) => o.basedHere).length : null,
+    scope: tier === 'station' ? 'unit' : (narrowed ? 'district' : 'state'),
+    reachingIn: tier === 'station'
+      ? rows.filter((o) => o.casesElsewhere > 0).length
+      : (narrowed ? rows.filter((o) => o.reachesIn).length : null),
+    basedHere: tier === 'station'
+      ? rows.filter((o) => o.casesElsewhere === 0).length
+      : (narrowed ? rows.filter((o) => o.basedHere).length : null),
     // Whole-filtered-set counts, so the summary describes the selection rather than the page.
     summary: {
       high: rows.reduce((n, o) => n + (o.band === 'High' ? 1 : 0), 0),
@@ -435,7 +468,13 @@ function geoPoints(user, q = {}) {
   const db = load();
   // Spatial view is state-wide crime-pattern intelligence (aggregate dots), not per-case
   // detail — shown to all analytical roles; individual case detail stays RBAC-scoped.
+  //
+  // The station tier is the exception. Its entire purpose is to show how little one register
+  // holds, so handing it a state-wide dot map would contradict the view it demonstrates.
   let rows = db.caseList.filter((c) => c.latitude && c.longitude);
+  if (user && user.roleMeta && user.roleMeta.tier === 'station') {
+    rows = rows.filter((c) => String(c.unitId) === String(user.unitId));
+  }
   if (q.head) rows = rows.filter((c) => c.crimeHeadId === String(q.head));
   if (q.district) rows = rows.filter((c) => c.districtId === String(q.district));
   if (q.dateFrom) rows = rows.filter((c) => c.crimeRegisteredDate >= q.dateFrom);
@@ -534,7 +573,7 @@ function hotspots(user, q = {}) {
 
   return {
     hotspots: hs,
-    scope: narrowed ? 'district' : 'state',
+    scope: scopeLabel(user, narrowed),
     districtCounts: db.hotspots.districtCounts || {},
     // A spatial cluster answers "where". Adding "when to be there" is the deployable half.
     // Filtered on the binomial test rather than raw share: with 190 clusters and four
@@ -827,6 +866,64 @@ module.exports = {
     };
   },
 
+  // STATION: one register, and the exact size of what it cannot see.
+  //
+  // A station user was falling through to districtCommand, which handed them all 120
+  // Bengaluru City stations and the district's 41.1% share of state volume -- a scope leak,
+  // and the opposite of what this tier exists to show.
+  //
+  // The headline figure here is deliberately the uncomfortable one: how many of this
+  // station's own cases link to a case it has no visibility of. That number IS the argument
+  // for the platform, and at station level it can be stated exactly rather than described.
+  stationCommand: (user) => {
+    const db = load();
+    const uid = String(user.unitId);
+    const mine = db.caseList.filter((c) => String(c.unitId) === uid);
+    const mineIds = new Set(mine.map((c) => String(c.caseMasterId)));
+
+    const linkedOut = [];
+    const seen = new Set();
+    let sameDistrict = 0;
+    for (const id of mineIds) {
+      for (const e of (db.adjacency[id] || [])) {
+        const nid = String(e.neighborId);
+        if (mineIds.has(nid) || seen.has(nid)) continue;
+        const nc = db.cases.get(nid);
+        if (!nc) continue;
+        seen.add(nid);
+        if (String(nc.districtId) === String(user.districtId)) sameDistrict += 1;
+        linkedOut.push({
+          caseMasterId: nid, crimeNo: nc.crimeNo,
+          districtName: nc.districtName, unitName: nc.unitName,
+          crimeSubHead: nc.crimeSubHead, edgeType: e.edgeType, strength: e.strength,
+          linkedToLocalCase: id,
+        });
+      }
+    }
+    const zoneByUnit = new Map(((db.zones || {}).stations || []).map((z) => [String(z.unitId), z]));
+    const z = zoneByUnit.get(uid) || {};
+    const stateTotal = db.stats.totalCases || 1;
+
+    return {
+      unitId: uid,
+      unitName: (mine[0] && mine[0].unitName) || '',
+      districtName: (mine[0] && mine[0].districtName) || '',
+      total: mine.length,
+      open: mine.filter((c) => String(c.statusId) === '1').length,
+      flagged: mine.filter((c) => c.healthSeverity).length,
+      heinous: mine.filter((c) => String(c.gravityId) === '1').length,
+      linkedWithinStation: mine.filter((c) => (c.linkedCount || 0) > 0).length,
+      // The cases beyond this register that its own cases connect to.
+      linkedOutTotal: linkedOut.length,
+      linkedOutSameDistrict: sameDistrict,
+      linkedOutOtherDistricts: linkedOut.length - sameDistrict,
+      linkedOutSample: linkedOut.slice(0, 40),
+      zone: z.zone || 'normal',
+      changePct: z.changePct ?? 0,
+      shareOfState: Math.round((mine.length / stateTotal) * 1000) / 10,
+    };
+  },
+
   occasions: () => load().occasions,   // calendar effects are state-level by nature
   // Zone board. State tier sees every district plus the station alerts; district tier sees
   // only its own district and the stations inside it -- the same two-tier rule as everywhere
@@ -908,7 +1005,7 @@ module.exports = {
     return {
       items: rows,
       total: rows.length,
-      scope: narrowed ? 'district' : 'state',
+      scope: scopeLabel(user, narrowed),
       districtId: narrowed ? String(user.districtId) : null,
       summary: tally,
       mappable: rows.filter((r) => r.lat != null).length,
@@ -1109,7 +1206,31 @@ module.exports = {
       },
     };
   },
-  alerts: (user) => load().alerts,
+  // Alerts were returned unscoped to everyone -- a station officer saw the state-wide
+  // watchlist, which both leaks beyond their tier and buries the handful that concern them.
+  // Filtered to alerts whose subject actually touches their register.
+  alerts: (user) => {
+    const db = load();
+    const all = db.alerts || [];
+    if (!user || !user.roleMeta) return all;
+    const { tier } = user.roleMeta;
+    if (tier === 'state' && !user.drilledFromState) return all;
+
+    const inScope = new Set();
+    for (const c of db.caseList) if (rbac.caseInScope(user, c)) inScope.add(String(c.caseMasterId));
+    const offInScope = new Set();
+    for (const o of db.offenders) {
+      if ((o.caseIds || []).some((id) => inScope.has(String(id)))) offInScope.add(String(o.offenderIdentityId));
+    }
+    return all.filter((a) => {
+      if (a.caseMasterId) return inScope.has(String(a.caseMasterId));
+      if (a.offenderIdentityId) return offInScope.has(String(a.offenderIdentityId));
+      // Cluster, hotspot and anomaly alerts carry no single owning case; keep them for the
+      // district tier (they are district-level findings) and drop them at station level,
+      // where they describe ground the officer does not hold.
+      return tier !== 'station';
+    });
+  },
   evalReport: () => load().evalReport,
   // Behavioural outliers, scoped to the viewer. The pipeline has computed these all along
   // and only a count ever reached the UI, so the reasoning behind each one -- which is the
@@ -1151,7 +1272,7 @@ module.exports = {
       caseTotal: cases.length,
       stations,
       stationTotal: stations.length,
-      scope: narrowed ? 'district' : 'state',
+      scope: scopeLabel(user, narrowed),
     };
   },
   clusters: () => load().clusters,

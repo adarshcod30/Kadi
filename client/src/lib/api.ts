@@ -2,14 +2,16 @@
 const BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
 
 // Two tiers. State: Analyst, DGP, Admin. District: SP, DSP, SI.
-export type Role = 'Analyst' | 'DGP' | 'Admin' | 'SP' | 'DSP' | 'SI';
+export type Role = 'Analyst' | 'DGP' | 'Admin' | 'SP' | 'DSP' | 'SI' | 'SHO';
 export const STATE_ROLES: Role[] = ['Analyst', 'DGP', 'Admin'];
 export const DISTRICT_ROLES: Role[] = ['SP', 'DSP', 'SI'];
+// The station tier: one register, no drill-out. See rbac.js for why only one is provisioned.
+export const STATION_ROLES: Role[] = ['SHO'];
 export const isStateTier = (r: Role) => STATE_ROLES.includes(r);
 // Older saved sessions and shared links still carry the previous names.
 const LEGACY: Record<string, Role> = { Inspector: 'SI', ACP: 'DSP', SCRB: 'Analyst' };
 export const normaliseRole = (r: string | null): Role =>
-  (['Analyst','DGP','Admin','SP','DSP','SI'].includes(r || '') ? r : LEGACY[r || ''] || 'Analyst') as Role;
+  (['Analyst','DGP','Admin','SP','DSP','SI','SHO'].includes(r || '') ? r : LEGACY[r || ''] || 'Analyst') as Role;
 
 // Read defensively. This runs at module scope, so anything that imports the API layer
 // without a browser storage implementation -- tests, SSR, some privacy modes -- crashed on
