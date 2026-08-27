@@ -96,20 +96,21 @@ export default function Login() {
       {/* The building sits on the floor of the page, spanning the full width and bleeding off
           the bottom, so it is architecture the content stands on rather than a picture beside
           it. Behind everything, and faint enough to read as embossed paper. */}
-      {/* Masked at both ends so it dissolves into the paper instead of ending in a rule --
-          the widest step otherwise draws a hard horizontal line across the whole page. */}
-      <div className="pointer-events-none absolute -bottom-4 left-0 w-[125%] -translate-x-[10%] h-[38vh] max-h-[340px] select-none"
-        style={{
-          maskImage: 'linear-gradient(180deg, transparent 0%, black 30%, black 72%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, black 30%, black 72%, transparent 100%)',
-        }}>
+      {/* The building owns the bottom of the page. Full width and taller than the drawing
+          needed, because a photograph carries detail a silhouette does not and cropping it to
+          a thin band wastes it. Headquarters does its own masking. */}
+      <div className="pointer-events-none absolute bottom-0 left-0 w-full h-[52vh] max-h-[460px] select-none">
         <Headquarters className="w-full h-full" />
       </div>
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.25fr_452px]">
         {/* ---- Left: the state, the name, the numbers ---- */}
         <div className="relative flex flex-col justify-center px-8 lg:px-14 py-12 overflow-hidden">
-          <div className="pointer-events-none absolute right-[-3%] top-1/2 -translate-y-1/2 w-[42%] max-w-[360px] hidden xl:block opacity-90">
+          {/* Moved up and inboard. It used to sit centred on the column's vertical midline and
+              hard against the right edge, which put it exactly where a wide photograph of the
+              building needs to be. Raising it gives the building the bottom of the page and
+              stops the two competing for the same space. */}
+          <div className="pointer-events-none absolute right-[6%] top-[4%] w-[38%] max-w-[330px] hidden xl:block opacity-95">
             <LoginHero variant="light" />
           </div>
 
@@ -181,7 +182,7 @@ export default function Login() {
           {/* The crest behind the form. Large, faint and bled off the bottom-right so it
               anchors the column without ever sitting behind a line of text. */}
           <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
-            className="pointer-events-none absolute -right-24 -bottom-20 w-[400px] select-none"
+            className="pointer-events-none absolute right-[-8%] bottom-[14%] w-[300px] select-none"
             style={{
               // Desaturated before it is faded. At 7% the full-colour crest still showed its
               // reds and golds and read as a stain on the panel; flattened to white it reads

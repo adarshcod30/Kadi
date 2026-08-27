@@ -12,9 +12,10 @@
 // not there fall through to the drawing. Which means when you have a photograph you are
 // cleared to use, adding it is a copy command.
 //
-// The drawing is deliberately reticent: one colour, low contrast, sitting under the content as
-// a watermark. A login screen that puts a building above the words on it has its priorities
-// backwards.
+// The photograph is shown in FULL COLOUR, cropped to the building and masked at the top so the
+// sky dissolves into the page rather than ending in a hard horizon. The drawing that stands in
+// for it is deliberately reticent by comparison -- a flat watermark cannot carry colour without
+// looking like a mistake, and a photograph can.
 import { useState } from 'react';
 
 export function Headquarters({ className = '', tone = '#0B2942' }: { className?: string; tone?: string }) {
@@ -31,11 +32,21 @@ export function Headquarters({ className = '', tone = '#0B2942' }: { className?:
         className={className}
         style={{
           objectFit: 'cover',
-          // Flattened to a single hue so a photograph, whatever its colour balance, sits in
-          // the page's palette rather than fighting it.
-          filter: 'grayscale(1) contrast(1.05) brightness(1.06)',
-          mixBlendMode: 'multiply',
-          opacity: 0.16,
+          // Anchored low so a wide panorama crops to the building and its steps rather than to
+          // a band of sky.
+          objectPosition: 'center 68%',
+          // Colour, lifted slightly. A government building photographed at midday is high-key
+          // already; a touch of saturation stops it going chalky against warm paper.
+          filter: 'saturate(1.06) contrast(1.02)',
+          // Masked at the top so the sky fades into the page instead of drawing a horizon
+          // across it, and feathered at the sides so the panorama has no cut edges.
+          maskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 26%, black 58%, black 100%),'
+            + ' linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 26%, black 58%, black 100%),'
+            + ' linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%)',
+          maskComposite: 'intersect',
+          WebkitMaskComposite: 'source-in',
+          opacity: 0.92,
         }}
       />
     );
