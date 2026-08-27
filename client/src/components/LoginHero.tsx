@@ -66,7 +66,16 @@ function buildShapes(): Shape[] {
 const HOT = ['1', '3', '10', '14', '16'];
 const ARCS: [string, string][] = [['1', '3'], ['1', '10'], ['3', '14'], ['1', '16'], ['10', '16']];
 
-export function LoginHero() {
+/**
+ * `variant` exists because the same drawing has to work on two grounds.
+ *
+ * On the dark hero the state read as light strokes glowing out of the background. On a light
+ * page that inverts completely: pale strokes vanish into the paper and the glow becomes a
+ * grey smudge. So the light variant uses deep navy linework, a denser fill, and drops the
+ * outer glow for a soft drop-shadow -- an engraved look rather than a lit one.
+ */
+export function LoginHero({ variant = 'dark' }: { variant?: 'dark' | 'light' }) {
+  const light = variant === 'light';
   const shapes = useMemo(buildShapes, []);
   const byId = useMemo(() => new Map(shapes.map((s) => [s.id, s])), [shapes]);
   // Draw-on, so the state assembles rather than appearing. It reads as the system building a
@@ -76,19 +85,32 @@ export function LoginHero() {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" aria-hidden="true"
-      style={{ filter: 'drop-shadow(0 0 42px rgba(26,111,196,0.30))' }}>
+      style={{
+        filter: light
+          ? 'drop-shadow(0 18px 34px rgba(11,41,66,0.18))'
+          : 'drop-shadow(0 0 42px rgba(26,111,196,0.30))',
+      }}>
       <defs>
-        <linearGradient id="kaFill" x1="0" y1="0" x2="0.6" y2="1">
-          <stop offset="0%" stopColor="#1A6FC4" stopOpacity="0.20" />
-          <stop offset="100%" stopColor="#2FA8A0" stopOpacity="0.09" />
+        <linearGradient id={`kaFill-${variant}`} x1="0" y1="0" x2="0.6" y2="1">
+          {light ? (
+            <>
+              <stop offset="0%" stopColor="#1A6FC4" stopOpacity="0.30" />
+              <stop offset="100%" stopColor="#2FA8A0" stopOpacity="0.16" />
+            </>
+          ) : (
+            <>
+              <stop offset="0%" stopColor="#1A6FC4" stopOpacity="0.20" />
+              <stop offset="100%" stopColor="#2FA8A0" stopOpacity="0.09" />
+            </>
+          )}
         </linearGradient>
-        <linearGradient id="arcLine" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#E8B44A" stopOpacity="0" />
-          <stop offset="45%" stopColor="#E8B44A" stopOpacity="0.85" />
-          <stop offset="100%" stopColor="#7CC4F5" stopOpacity="0" />
+        <linearGradient id={`arcLine-${variant}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={light ? '#C9820A' : '#E8B44A'} stopOpacity="0" />
+          <stop offset="45%" stopColor={light ? '#C9820A' : '#E8B44A'} stopOpacity={light ? 0.95 : 0.85} />
+          <stop offset="100%" stopColor={light ? '#0B2942' : '#7CC4F5'} stopOpacity="0" />
         </linearGradient>
-        <radialGradient id="hotGlow">
-          <stop offset="0%" stopColor="#E8871E" stopOpacity="0.55" />
+        <radialGradient id={`hotGlow-${variant}`}>
+          <stop offset="0%" stopColor="#E8871E" stopOpacity={light ? 0.38 : 0.55} />
           <stop offset="100%" stopColor="#E8871E" stopOpacity="0" />
         </radialGradient>
       </defs>
@@ -96,9 +118,9 @@ export function LoginHero() {
       {/* Districts */}
       <g>
         {shapes.map((s, i) => (
-          <path key={s.id} d={s.d} fill="url(#kaFill)" stroke="#7CC4F5"
+          <path key={s.id} d={s.d} fill={`url(#kaFill-${variant})`} stroke={light ? '#0B2942' : '#7CC4F5'}
             strokeWidth={HOT.includes(s.id) ? 0.9 : 0.5}
-            strokeOpacity={HOT.includes(s.id) ? 0.55 : 0.28}
+            strokeOpacity={HOT.includes(s.id) ? (light ? 0.75 : 0.55) : (light ? 0.35 : 0.28)}
             style={{
               opacity: drawn ? 1 : 0,
               transition: `opacity 700ms ease ${i * 26}ms`,
@@ -124,7 +146,7 @@ export function LoginHero() {
           const path = `M${A.cx},${A.cy} Q${qx},${qy} ${B.cx},${B.cy}`;
           return (
             <g key={`${a}-${b}`}>
-              <path d={path} fill="none" stroke="url(#arcLine)" strokeWidth="1.4" strokeLinecap="round" />
+              <path d={path} fill="none" stroke={`url(#arcLine-${variant})`} strokeWidth="1.4" strokeLinecap="round" />
               {/* A packet running the arc: the link is a live connection, not a drawn line.
                   The motion is applied to a wrapper <g>, not to the circle itself. React can
                   mount an <animate> child before its parent's attributes land, and SMIL then
@@ -132,7 +154,7 @@ export function LoginHero() {
                   so the ordering stops mattering. */}
               <g>
                 <animateMotion dur={`${3.4 + i * 0.7}s`} repeatCount="indefinite" path={path} />
-                <circle r="2.2" fill="#E8B44A">
+                <circle r="2.2" fill={light ? '#C9820A' : '#E8B44A'}>
                   <animate attributeName="opacity" values="0;1;1;0" dur={`${3.4 + i * 0.7}s`} repeatCount="indefinite" />
                 </circle>
               </g>
@@ -152,9 +174,10 @@ export function LoginHero() {
                   geometry each frame, and React can mount the <animate> child before the
                   parent's r attribute lands -- which SMIL reports as r="undefined". A
                   transform sidesteps both: it composites, and it needs nothing from r. */}
-              <circle cx={s.cx} cy={s.cy} r="22" fill="url(#hotGlow)"
+              <circle cx={s.cx} cy={s.cy} r="22" fill={`url(#hotGlow-${variant})`}
                 style={{ transformOrigin: `${s.cx}px ${s.cy}px`, animation: `kadi-hot ${3 + i * 0.4}s ease-in-out infinite` }} />
-              <circle cx={s.cx} cy={s.cy} r="3.1" fill="#E8871E" stroke="#fff" strokeWidth="0.9" strokeOpacity="0.85" />
+              <circle cx={s.cx} cy={s.cy} r="3.1" fill="#E8871E"
+                stroke={light ? '#fff' : '#fff'} strokeWidth={light ? 1.2 : 0.9} strokeOpacity={light ? 1 : 0.85} />
             </g>
           );
         })}

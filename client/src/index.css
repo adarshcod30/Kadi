@@ -58,6 +58,21 @@ h1, h2, h3 { font-family: Ubuntu, 'Open Sans', system-ui, sans-serif; }
   to   { opacity: 1; transform: translateY(0); }
 }
 .page-enter { animation: kadi-page-in 0.2s ease-out both; }
+
+/* Entrance animations for the login screen, in CSS for the same reason the page transition
+   is: a framer-motion tween that misses its scheduling never recovers, and on this screen the
+   thing it left invisible was the sign-in card itself. A login page whose form does not appear
+   is not a styling bug. */
+@keyframes kadi-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes kadi-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes kadi-fade { from { opacity: 0; } to { opacity: 1; } }
+.rise      { animation: kadi-rise 0.55s ease-out both; }
+.rise-1    { animation: kadi-rise 0.55s ease-out 0.14s both; }
+.fade-slow { animation: kadi-fade 0.5s ease-out 0.5s both; }
+.slide-in  { animation: kadi-slide-in 0.5s ease-out 0.1s both; }
+@media (prefers-reduced-motion: reduce) {
+  .rise, .rise-1, .fade-slow, .slide-in { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
 }

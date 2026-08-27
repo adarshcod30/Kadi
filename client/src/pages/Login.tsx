@@ -8,10 +8,10 @@
 // they are read from the running deployment, so an empty pipeline would show empty counters.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Globe, MapPin, Building2, Loader2, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { setRole, setToken, signOut, Role, api } from '../lib/api';
 import { LoginHero } from '../components/LoginHero';
+import { Headquarters } from '../components/Headquarters';
 
 const DOMAIN = 'ksp.gov.in';
 
@@ -73,94 +73,122 @@ export default function Login() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#071a28] text-white">
-      {/* Depth, in three layers: a cool base, a warm bloom behind the map so the state reads
-          as lit from within, and a fine grid that gives the dark ground a surface. */}
+    <div className="min-h-screen relative overflow-hidden bg-[#F6F3EB] text-kadi-navy">
+      {/* LIGHT GROUND, DARK DOOR.
+          The page is paper -- warm ivory rather than white, because a pure #fff field under a
+          navy wordmark reads as a spec sheet. Depth comes from three soft blooms and a fine
+          navy grid, the same construction the dark version used, inverted. The sign-in column
+          stays dark: it is the one thing on this screen you are meant to act on, and a dark
+          panel on a light page is the strongest contrast available without shouting. */}
       <div className="absolute inset-0" style={{
         background:
-          'radial-gradient(900px 620px at 34% 42%, rgba(26,111,196,0.28), transparent 62%),'
-          + 'radial-gradient(700px 460px at 88% 8%, rgba(232,180,74,0.10), transparent 60%),'
-          + 'radial-gradient(800px 520px at 6% 96%, rgba(47,168,160,0.14), transparent 62%),'
-          + 'linear-gradient(160deg, #0b2942 0%, #082032 52%, #061722 100%)',
+          'radial-gradient(1000px 680px at 30% 38%, rgba(26,111,196,0.10), transparent 62%),'
+          + 'radial-gradient(760px 500px at 86% 6%, rgba(232,180,74,0.16), transparent 60%),'
+          + 'radial-gradient(820px 560px at 4% 98%, rgba(47,168,160,0.10), transparent 62%),'
+          + 'linear-gradient(160deg, #FBF9F4 0%, #F4F1E8 55%, #EFEBE0 100%)',
       }} />
-      <div className="absolute inset-0 opacity-[0.045]" style={{
-        backgroundImage: 'linear-gradient(#7CC4F5 1px, transparent 1px), linear-gradient(90deg, #7CC4F5 1px, transparent 1px)',
+      <div className="absolute inset-0 opacity-[0.05]" style={{
+        backgroundImage: 'linear-gradient(#0B2942 1px, transparent 1px), linear-gradient(90deg, #0B2942 1px, transparent 1px)',
         backgroundSize: '54px 54px',
-        maskImage: 'radial-gradient(ellipse 85% 70% at 50% 45%, black, transparent)',
-        WebkitMaskImage: 'radial-gradient(ellipse 85% 70% at 50% 45%, black, transparent)',
+        maskImage: 'radial-gradient(ellipse 88% 74% at 44% 46%, black, transparent)',
+        WebkitMaskImage: 'radial-gradient(ellipse 88% 74% at 44% 46%, black, transparent)',
       }} />
+      {/* The building sits on the floor of the page, spanning the full width and bleeding off
+          the bottom, so it is architecture the content stands on rather than a picture beside
+          it. Behind everything, and faint enough to read as embossed paper. */}
+      {/* Masked at both ends so it dissolves into the paper instead of ending in a rule --
+          the widest step otherwise draws a hard horizontal line across the whole page. */}
+      <div className="pointer-events-none absolute -bottom-4 left-0 w-[125%] -translate-x-[10%] h-[38vh] max-h-[340px] select-none"
+        style={{
+          maskImage: 'linear-gradient(180deg, transparent 0%, black 30%, black 72%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, black 30%, black 72%, transparent 100%)',
+        }}>
+        <Headquarters className="w-full h-full" />
+      </div>
 
-      <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.25fr_440px]">
+      <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.25fr_452px]">
         {/* ---- Left: the state, the name, the numbers ---- */}
         <div className="relative flex flex-col justify-center px-8 lg:px-14 py-12 overflow-hidden">
-          {/* The map sits behind the wordmark rather than beside it, so the two read as one
-              composition instead of two panels sharing a column. */}
-          <div className="pointer-events-none absolute right-[-3%] top-1/2 -translate-y-1/2 w-[42%] max-w-[360px] hidden xl:block opacity-80">
-            <LoginHero />
+          <div className="pointer-events-none absolute right-[-3%] top-1/2 -translate-y-1/2 w-[42%] max-w-[360px] hidden xl:block opacity-90">
+            <LoginHero variant="light" />
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}
-            className="relative">
+          <div className="rise relative">
             <div className="flex items-center gap-3.5">
+              {/* On paper the crest needs no white disc behind it -- the ring and shadow were
+                  there to lift it off a dark field. */}
               <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka"
-                className="h-14 w-14 rounded-full bg-white/95 p-1 shrink-0 shadow-lg" />
-              <div className="h-10 w-px bg-white/15" />
-              <div className="text-[10.5px] uppercase tracking-[0.26em] text-kadi-gold/85 leading-relaxed">
+                className="h-16 w-16 shrink-0 drop-shadow-sm" />
+              <div className="h-10 w-px bg-kadi-navy/15" />
+              <div className="text-[10.5px] uppercase tracking-[0.26em] text-kadi-navy/60 leading-relaxed">
                 Karnataka<br />State Police
               </div>
             </div>
 
-            <h1 className="mt-6 text-[5.5rem] lg:text-[7rem] font-bold tracking-[-0.04em] leading-[0.85]"
-              style={{ textShadow: '0 4px 40px rgba(0,0,0,0.45)' }}>
+            <h1 className="mt-6 text-[5.5rem] lg:text-[7rem] font-bold tracking-[-0.04em] leading-[0.85] text-kadi-navy">
               KADI
             </h1>
             <div className="mt-2 flex items-center gap-3">
-              <span className="h-px w-10 bg-kadi-gold/70" />
-              <span className="text-[12px] uppercase tracking-[0.2em] text-white/55">
+              <span className="h-px w-10 bg-kadi-gold" />
+              <span className="text-[12px] uppercase tracking-[0.2em] text-kadi-navy/55">
                 Crime Analytics &amp; Intelligence
               </span>
             </div>
-            <p className="mt-5 text-[15px] text-white/65 max-w-[26rem] leading-relaxed">
+            <p className="mt-5 text-[15px] text-kadi-navy/70 max-w-[26rem] leading-relaxed">
               Every FIR in Karnataka held as one connected graph — so a serial offender working
               across three districts stops looking like three unrelated cases.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.14 }}
-            className="relative mt-9 grid grid-cols-2 gap-x-8 gap-y-5 max-w-[24rem]">
+          <div className="rise-1 relative mt-9 grid grid-cols-2 gap-x-8 gap-y-5 max-w-[24rem]">
             {[
               { v: figures?.cases, label: 'FIRs in one graph' },
               { v: figures?.offenders, label: 'Repeat offenders resolved' },
               { v: figures?.networks, label: 'Active offender networks' },
               { v: figures?.recovery, label: 'Ground-truth recovery', suffix: '%' },
             ].map((k) => (
-              <div key={k.label} className="border-l-2 border-kadi-gold/45 pl-3.5">
-                <div className="text-[26px] font-semibold font-num text-kadi-gold tabular-nums leading-none">
+              <div key={k.label} className="border-l-2 border-kadi-gold pl-3.5">
+                <div className="text-[26px] font-semibold font-num text-kadi-navy tabular-nums leading-none">
                   {figures ? <Counter to={k.v || 0} suffix={k.suffix} /> : <span className="opacity-25">—</span>}
                 </div>
-                <div className="text-[11.5px] text-white/55 mt-1.5 leading-tight">{k.label}</div>
+                <div className="text-[11.5px] text-kadi-navy/55 mt-1.5 leading-tight">{k.label}</div>
               </div>
             ))}
-          </motion.div>
+          </div>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-            className="relative mt-9 text-[11px] text-white/30 max-w-[26rem] leading-relaxed">
+          <div className="fade-slow relative mt-9 text-[11px] text-kadi-navy/40 max-w-[26rem] leading-relaxed">
             Evidence and behaviour only — never caste, religion or occupation.
             Synthetic corpus, schema-faithful to the KSP FIR system.
-          </motion.div>
+          </div>
         </div>
 
         {/* ---- Right: the door ---- */}
-        <motion.div initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-          className="relative flex flex-col justify-center px-7 py-10 border-l border-white/[0.08] overflow-hidden"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', backdropFilter: 'blur(14px)' }}>
+        <div
+          className="slide-in relative flex flex-col justify-center px-7 py-10 overflow-hidden text-white lg:my-6 lg:mr-6 lg:rounded-2xl"
+          style={{
+            // The one dark element on the page, and it is the door. Detached into a card with
+            // a real shadow so it sits ON the paper rather than being a second background --
+            // a full-bleed dark column next to a light one reads as two pages stitched
+            // together, which is what the earlier split-screen looked like.
+            background: 'linear-gradient(165deg, #0E3252 0%, #0A2438 55%, #071A28 100%)',
+            boxShadow: '0 30px 70px -20px rgba(11,41,66,0.45), 0 0 0 1px rgba(11,41,66,0.10)',
+          }}>
           {/* A gold hairline down the seam: the KSP rule that runs under the app's header,
               carried onto the entry screen so the two feel like one product. */}
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-kadi-gold/45 to-transparent" />
+          {/* The KSP gold rule, now along the top edge of the card where it reads as the
+              header band the app itself carries, rather than a seam between two columns. */}
+          <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-kadi-gold to-transparent" />
           {/* The crest behind the form. Large, faint and bled off the bottom-right so it
               anchors the column without ever sitting behind a line of text. */}
           <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
-            className="pointer-events-none absolute -right-24 -bottom-20 w-[400px] opacity-[0.05] select-none" />
+            className="pointer-events-none absolute -right-24 -bottom-20 w-[400px] select-none"
+            style={{
+              // Desaturated before it is faded. At 7% the full-colour crest still showed its
+              // reds and golds and read as a stain on the panel; flattened to white it reads
+              // as an embossed watermark, which is what it is for.
+              filter: 'grayscale(1) brightness(3)',
+              opacity: 0.06,
+            }} />
           <div className="pointer-events-none absolute inset-x-0 -top-24 h-56"
             style={{ background: 'radial-gradient(60% 100% at 50% 100%, rgba(232,180,74,0.10), transparent 70%)' }} />
 
@@ -201,7 +229,7 @@ export default function Login() {
               pinned to its own.
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
