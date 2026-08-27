@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck, Info } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand, useMix } from '../api/hooks';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand, useMix, useStations } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { StateCommand, DistrictCommand, StationCommand, CommandInsight } from '../components/CommandViews';
 import { HeatMap, Donut, Legend, VizCard, Hint, DoublePie, stagger, rise } from '../components/viz';
@@ -75,6 +76,7 @@ export default function Dashboard() {
   const { data: fc } = useForecast();
   const { data: command } = useCommand();
   const { data: mix } = useMix();
+  const { data: socio } = useSocio();
 
   // The final month in `trend` is the month still in progress, so it carries a
   // fraction of a normal month's FIRs and renders as a cliff. The pipeline already
@@ -150,8 +152,21 @@ export default function Dashboard() {
             : 'Command view — all 31 districts. Drill into any one from the table below, or from the header.'}
       </p>
 
+      {/* Station drill (P2-10): a senior officer can step inside one station's register. Shown
+          for state and district scope; the station view itself carries a way back out. */}
+      {command?.view !== 'station' && <StationDrill me={me} />}
+
       {/* The two tiers get different panels, not the same panels with smaller numbers. */}
       <CommandInsight text={command?.insight} view={command?.view || 'state'} />
+      {/* When someone has drilled into a station (?unit= in the URL), give them the way out. A
+          real station account never carries ?unit= — its scope comes from the token, not the
+          query — so the presence of the param is itself the signal that this is a drill. */}
+      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('unit') && (
+        <button onClick={() => { const u = new URL(window.location.href); u.searchParams.delete('unit'); window.location.href = u.toString(); }}
+          className="btn-outline text-sm inline-flex items-center gap-1.5">
+          <ArrowRight size={14} className="rotate-180" /> Leave station view
+        </button>
+      )}
       {command?.view === 'station'
         ? <StationCommand data={command} />
         : command?.view === 'district'
@@ -178,24 +193,19 @@ export default function Dashboard() {
           </VizCard>
 
           <VizCard title={t('whenCrime')} hint="Spatiotemporal signal: darker cells are hours with more incidents. Night-time and weekend spikes guide patrol deployment.">
-            {stats ? <HeatMap data={stats.heat} /> : <Skeleton rows={4} />}
+            {stats ? (<>
+              <HeatMap data={stats.heat} />
+              {/* A derived reading under the grid (P2-1), so the panel states its own finding
+                  rather than leaving the eye to hunt the darkest cell. */}
+              <HeatPeak heat={stats.heat} />
+            </>) : <Skeleton rows={4} />}
           </VizCard>
 
-          <VizCard title={t('topDistricts')} hint="Case counts per district — click through to the district drill-down on the map." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
-            <div className="h-56 p-3">
-              {districts ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={districts.districts.slice(0, 8)} layout="vertical" margin={{ left: 10 }}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="district" width={110} tick={{ fontSize: 11, fill: '#1C2A3A' }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Bar dataKey="total" radius={[0, 4, 4, 0]} animationDuration={800}>
-                      {districts.districts.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={i === 0 ? '#0f2f44' : '#1A6FC4'} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <Skeleton rows={4} />}
-            </div>
+          {/* District standings (P2-4): all 31 ranked, not a top-8 bar chart, with the viewer's
+              own district highlighted and pulled into view — so it answers "where does my
+              district stand" for every district, which the old chart could not. */}
+          <VizCard title="District standings" hint="Every district ranked by case volume, with its rate per 100k alongside. Your own district is highlighted — the answer to 'where do I stand' is different for each district, so the whole ladder is shown rather than the top few." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
+            <DistrictStandings districts={districts} socio={socio} focusId={(stats as any)?.districtId} onOpen={(id: string) => nav(`/map?district=${id}`)} />
           </VizCard>
 
           {/* Disposal funnel — the left column was a card shorter than the right, leaving a
@@ -331,7 +341,7 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-kadi-navy">{t('pictureBehind')}</h2>
           <p className="text-sm text-ink-muted">— where it is heading, what kind, why there, and who carries it.</p>
         </div>
-        <HomeAnalytics stats={stats} />
+        <HomeAnalytics stats={stats} tier={homeTier} command={command} />
       </motion.div>
 
       {/* The capability tour, the fairness panel and the how-it-works trio all moved to About
@@ -345,6 +355,99 @@ export default function Dashboard() {
           <ArrowRight size={14} />
         </button>
       </div>
+    </div>
+  );
+}
+
+// The full district ladder. Merges volume (districts) with rate per 100k (socio), ranks by
+// volume, and highlights the viewer's own district — scrolling it into view so a district
+// officer lands on their own row. Replaces the top-8 bar chart (P2-4).
+// Step inside a single station (P2-10). Bengaluru City has a full register on Bengaluru Bazaar
+// PS (276 cases); the rest are shallow but real. Picking one sets ?unit= and the command view
+// re-renders as that station's own picture — the silo argument, made from a senior seat.
+function StationDrill({ me }: { me: any }) {
+  const [open, setOpen] = useState(false);
+  // Default to Bengaluru City's stations — the one district provisioned with real station depth.
+  const districtId = me?.capabilities?.districtId || '1';
+  const { data } = useStations({ district: districtId });
+  const stations = (data?.items || []).slice(0, 10);
+  const go = (unitId: string) => {
+    const u = new URL(window.location.href);
+    u.searchParams.set('unit', unitId);
+    if (!u.searchParams.get('district')) u.searchParams.set('district', String(districtId));
+    window.location.href = u.toString();
+  };
+  if (!stations.length) return null;
+  return (
+    <div className="card p-3">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 text-left">
+        <Layers size={15} className="text-kadi-teal shrink-0" />
+        <span className="text-sm font-semibold text-kadi-navy">View a police station</span>
+        <span className="text-[12px] text-ink-muted">— step inside one register, {data?.items?.[0]?.districtName || 'Bengaluru City'}</span>
+        <ArrowRight size={14} className={`ml-auto text-ink-muted transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-2 grid sm:grid-cols-2 gap-1.5">
+          {stations.map((s: any) => (
+            <button key={s.unitId} onClick={() => go(s.unitId)}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-ctl border border-line hover:bg-kadi-teal/10 text-left">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${s.zone === 'red_pulsing' ? 'animate-pulse' : ''}`}
+                style={{ background: s.zone === 'red_pulsing' ? '#C0392B' : s.zone === 'yellow' ? '#C9820A' : '#3AA76D' }} />
+              <span className="text-[13px] text-ink flex-1 truncate">{s.unitName}</span>
+              <span className="font-num text-[12px] text-ink-muted">{s.cases?.toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The one sentence the heatmap is trying to say: which day and which window carry the most.
+function HeatPeak({ heat }: { heat: { dow: number; hour: number; count: number }[] }) {
+  if (!heat?.length) return null;
+  const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const byHour = new Array(24).fill(0);
+  const byDow = new Array(7).fill(0);
+  let total = 0;
+  for (const c of heat) { byHour[c.hour] += c.count; byDow[c.dow] += c.count; total += c.count; }
+  // Busiest 4-hour window.
+  let best = 0, bestSum = -1;
+  for (let h = 0; h < 24; h += 1) { let s = 0; for (let k = 0; k < 4; k += 1) s += byHour[(h + k) % 24]; if (s > bestSum) { bestSum = s; best = h; } }
+  const topDow = byDow.indexOf(Math.max(...byDow));
+  const share = total ? Math.round((bestSum / total) * 100) : 0;
+  const fmt = (h: number) => `${String(h).padStart(2, '0')}:00`;
+  return (
+    <p className="px-4 pb-3 text-[12px] text-ink-muted">
+      Busiest on <b className="text-ink">{DOW[topDow]}</b>, and the <b className="text-ink">{fmt(best)}–{fmt((best + 4) % 24)}</b> window
+      carries <b className="text-ink">{share}%</b> of all incidents — the block to weight patrol cover toward.
+    </p>
+  );
+}
+
+function DistrictStandings({ districts, socio, focusId, onOpen }: {
+  districts: any; socio: any; focusId?: string; onOpen: (id: string) => void;
+}) {
+  if (!districts) return <Skeleton rows={6} />;
+  const rateById = new Map<string, any>((socio?.districts || []).map((d: any) => [String(d.districtId), d.ratePer100k]));
+  const rows = [...(districts.districts || [])];
+  const max = districts.maxCount || Math.max(1, ...rows.map((r: any) => r.total));
+  return (
+    <div className="max-h-[340px] overflow-auto p-2">
+      {rows.map((d: any, i: number) => {
+        const isFocus = focusId && String(d.districtId) === String(focusId);
+        return (
+          <button key={d.districtId} onClick={() => onOpen(String(d.districtId))}
+            ref={isFocus ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left ${isFocus ? 'bg-kadi-saffron/15 ring-1 ring-kadi-saffron/40' : 'hover:bg-kadi-blue50'}`}>
+            <span className="w-5 text-ink-muted font-num text-xs shrink-0">{i + 1}</span>
+            <span className={`flex-1 truncate ${isFocus ? 'font-semibold text-kadi-navy' : ''}`}>{d.district}{isFocus ? ' ★' : ''}</span>
+            <span className="w-16 h-1.5 bg-surface-3 rounded overflow-hidden shrink-0"><span className="block h-full" style={{ width: `${(d.total / max) * 100}%`, background: isFocus ? '#E8871E' : '#1A6FC4' }} /></span>
+            <span className="font-num text-xs w-14 text-right text-ink">{d.total.toLocaleString()}</span>
+            <span className="font-num text-[11px] w-16 text-right text-ink-muted" title="per 100k">{rateById.get(String(d.districtId)) ?? '—'}/100k</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

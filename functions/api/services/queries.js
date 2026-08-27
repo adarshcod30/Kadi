@@ -1091,7 +1091,9 @@ module.exports = {
   // for the platform, and at station level it can be stated exactly rather than described.
   stationCommand: (user) => {
     const db = load();
-    const uid = String(user.unitId);
+    // A state/district user drilling into one station carries the target as drillUnitId; a
+    // station-tier officer carries their own unitId. Either way, this view is that one station.
+    const uid = String(user.drillUnitId || user.unitId);
     const mine = db.caseList.filter((c) => String(c.unitId) === uid);
     const mineIds = new Set(mine.map((c) => String(c.caseMasterId)));
 

@@ -315,8 +315,11 @@ function buildApp() {
   // says which one so the client renders the right thing rather than guessing from shape.
   r.get('/command', handle(async (req) => {
     const tier = req.user.roleMeta.tier;
-    const stateView = tier === 'state' && !req.user.drilledFromState;
-    const stationView = tier === 'station';
+    // A ?unit= drill (Bengaluru City station view, P2-10) turns any tier into a station view of
+    // that one register, so a DGP or SP can stand inside a single station.
+    const drilledStation = Boolean(req.user.drillUnitId);
+    const stateView = tier === 'state' && !req.user.drilledFromState && !drilledStation;
+    const stationView = tier === 'station' || drilledStation;
     const body = stationView ? q.stationCommand(req.user)
       : stateView ? q.stateCommand(req.user) : q.districtCommand(req.user);
     const out = { view: stationView ? 'station' : stateView ? 'state' : 'district', ...body };
