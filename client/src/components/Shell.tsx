@@ -26,8 +26,9 @@ const NAV = [
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
-  // About left the sidebar (P1-4): it is orientation material, reached from the Home hero and
-  // the top bar, not a daily destination. The /about ROUTE stays registered so those links work.
+  // About sits at the very bottom of the rail: orientation material, not a daily destination,
+  // so it is last — below the operational and admin sections, out of the way but reachable.
+  { to: '/about', icon: Info, key: 'about' },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
