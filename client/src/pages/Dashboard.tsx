@@ -203,15 +203,19 @@ export default function Dashboard() {
               the brief flagged, with the emerging clusters (a spatial signal, distinct from the
               volume ladder below it). */}
           <VizCard title="Where crime happens" hint="Emerging clusters — places where recent activity far exceeds the local baseline. This is the spatial half of the pattern the heatmap shows in time; the two together say where to be, and when." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
-            <WhereCrime hotspots={hotspots} onOpen={() => nav('/map')} />
+            <WhereCrime hotspots={hotspots} tier={homeTier} onOpen={() => nav('/map')} />
           </VizCard>
 
+          {/* Hidden at station tier: a ladder of 31 districts is not this desk's business.
+              A station officer's home carries only what their own register can act on. */}
+          {homeTier !== 'station' && (<>
           {/* District standings (P2-4): all 31 ranked, not a top-8 bar chart, with the viewer's
               own district highlighted and pulled into view — so it answers "where does my
               district stand" for every district, which the old chart could not. */}
           <VizCard title="District standings" hint="Every district ranked by case volume, with its rate per 100k alongside. Your own district is highlighted — the answer to 'where do I stand' is different for each district, so the whole ladder is shown rather than the top few." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
             <DistrictStandings districts={districts} socio={socio} focusId={(stats as any)?.districtId} onOpen={(id: string) => nav(`/map?district=${id}`)} />
           </VizCard>
+          </>)}
 
           {/* Disposal funnel — the left column was a card shorter than the right, leaving a
               visible gap, and clearance rate is the metric a DGP actually asks for. */}
@@ -309,7 +313,7 @@ export default function Dashboard() {
             </div>
           </VizCard>
 
-          {national && (
+          {national && homeTier !== 'station' && (
             <VizCard title={t('indiaContext')} hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context). Karnataka stays pinned in view even when its rank falls outside the top 15.">
               <div className="p-3 text-sm">
                 <p className="text-xs text-ink-muted mb-2">Karnataka ranks <b className="text-kadi-navy">#{national.focusRank}</b> of {national.states.length} · {national.focusRatePerLakh}/lakh</p>
@@ -337,11 +341,15 @@ export default function Dashboard() {
       {/* Full width, not the left column (P2). The right column runs out above it, so inside the
           grid this card left a block of empty space beside itself. At full width the slope bars
           also have the room the comparison actually needs. */}
+      {/* Both of these compare DISTRICTS, so neither belongs on a station's home — an SHO
+          cannot act on where Kodagu ranks per capita. Hidden at station tier. */}
+      {homeTier !== 'station' && (
       <VizCard title={t('countsMislead')}
         hint="Bars show how far a district moves when you divide by population. Green means it is worse per-capita than raw counts suggest; red means it only looked bad because it is populous."
         action={<button onClick={() => nav('/intelligence')} className="text-xs link">Intelligence</button>}>
         <RankShift />
       </VizCard>
+      )}
 
       {/* The drill sits AFTER the state picture, not above it: you read the state, then step
           down a level. State drills into a district; a district drills into one of its
@@ -438,7 +446,7 @@ function ScopeDrill({ me, view, districts }: { me: any; view?: string; districts
 
 // The spatial companion to the "when" heatmap (P1-6). Emerging clusters, grouped by district,
 // with how far each sits above its local baseline — a "where to be" to the heatmap's "when".
-function WhereCrime({ hotspots, onOpen }: { hotspots: any; onOpen: () => void }) {
+function WhereCrime({ hotspots, tier, onOpen }: { hotspots: any; tier?: string; onOpen: () => void }) {
   if (!hotspots) return <Skeleton rows={4} />;
   const emerging = (hotspots.hotspots || []).filter((h: any) => h.emergingFlag);
   if (!emerging.length) {
@@ -457,7 +465,11 @@ function WhereCrime({ hotspots, onOpen }: { hotspots: any; onOpen: () => void })
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="p-3 space-y-1.5">
-      <div className="px-1 text-[12px] text-ink-muted">{emerging.length} emerging cluster{emerging.length === 1 ? '' : 's'} across {rows.length} district{rows.length === 1 ? '' : 's'} — recent activity far above the local baseline.</div>
+      <div className="px-1 text-[12px] text-ink-muted">
+        {emerging.length} emerging cluster{emerging.length === 1 ? '' : 's'}
+        {tier === 'station' ? ' on this register' : ` across ${rows.length} district${rows.length === 1 ? '' : 's'}`}
+        {' '}— recent activity far above the local baseline.
+      </div>
       {rows.map((r) => (
         <button key={r.name} onClick={onOpen} className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-kadi-blue50 text-sm text-left">
           <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse shrink-0" />

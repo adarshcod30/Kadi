@@ -855,6 +855,17 @@ function hotspots(user, q = {}) {
     const did = String(user.districtId);
     hs = hs.filter((h) => h.districtId === did);
   }
+  // A station desk gets ITS OWN clusters, not the district's. geoPoints already filters to the
+  // unit at station tier and this was the inconsistency: the dot map showed one station's
+  // incidents while the hotspot list beside it showed the whole district's, which is not
+  // "where crime happens" for the officer reading it.
+  const unitId = user && (user.drillUnitId || (user.roleMeta.tier === 'station' ? user.unitId : null));
+  if (unitId) {
+    hs = hs.filter((h) => (h.caseIds || []).some((id) => {
+      const c = db.cases.get(String(id));
+      return c && String(c.unitId) === String(unitId);
+    }));
+  }
   if (q.emerging === 'true') hs = hs.filter((h) => h.emergingFlag);
   if (q.window) hs = hs.filter((h) => h.temporal && h.temporal.peakWindow === q.window);
 

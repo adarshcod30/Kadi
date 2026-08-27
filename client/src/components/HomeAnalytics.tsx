@@ -12,8 +12,12 @@
 // forecast, the state's crime mix or a treemap of all 31 districts. So at district scope the
 // panels re-point at that district's own numbers: its trend, its crime mix, where it ranks,
 // and which of ITS stations carries the load — the last replacing "who carries the volume",
-// which is a state question. The station tier collapses to the two panels that still mean
-// something for one register.
+// which is a state question.
+//
+// A STATION GETS ONE PANEL. Three of the four answer questions about districts — the crime mix
+// over a few hundred FIRs is a handful of slices, "why it is there" plots 31 districts, and the
+// treemap ranks districts by share. None of that is actionable from one desk. So the station
+// keeps its own registered volume over time and nothing else.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -121,8 +125,12 @@ export default function HomeAnalytics({ stats, tier = 'state', command }: { stat
   const { data: socio } = useSocio();
   const { data: fc } = useForecast();
   const [band, setBand] = useState<string | null>(null);
-  const district = tier === 'district';
-  const rank = stats?.rankContext;
+  const station = tier === 'station';
+  // A station's charts are its own or they are noise. "What kind of crime" over 276 FIRs is a
+  // handful of slices, "why it is there" compares 31 districts, and the treemap ranks districts
+  // by share — none of which an SHO can act on. So the station keeps ONE panel: its own trend.
+  const district = tier === 'district' || station;
+  const rank = station ? null : stats?.rankContext;
 
   // Heading series. State uses the fitted forecast with its 95% band; a district uses its own
   // monthly trend (already scoped in stats.trend) so the line is the district's, not the state's.
@@ -156,6 +164,37 @@ export default function HomeAnalytics({ stats, tier = 'state', command }: { stat
   // Stations in this district, for the panel that replaces "who carries the volume" (P2-7).
   const stations = (command?.stations || []).slice(0, 8);
   const maxStation = Math.max(1, ...stations.map((s: any) => s.total || 0));
+
+  // The station view is one card, full width: its own registered volume over time. Everything
+  // else in this section answers a question about districts.
+  if (station) {
+    const unit = command?.unitName || 'this station';
+    return (
+      <motion.div variants={rise}>
+        <Card title={`Where ${unit} is heading`} icon={<TrendingUp size={15} className="text-kadi-teal" />}
+          hint="FIRs registered on this station's own register, month by month. This is your register's trend — not the district's and not the state's.">
+          <div className="p-4">
+            <div className="h-[236px]">
+              <ResponsiveContainer width="100%" height="100%" key={forecastSeries.length}>
+                <ComposedChart data={forecastSeries} margin={{ top: 6, right: 12, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#EDF1F6" vertical={false} />
+                  <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }} minTickGap={28} />
+                  <YAxis tick={AXIS} tickLine={false} axisLine={false} width={38} allowDecimals={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
+                  <Line type="monotone" dataKey="actual" stroke="#2FA8A0" strokeWidth={2.2} dot={false}
+                    isAnimationActive={false} name="FIRs registered" connectNulls />
+                  <RLegend wrapperStyle={{ fontSize: 11 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-1 text-[12px] text-ink-muted">
+              {(stats?.totalCases ?? 0).toLocaleString()} FIRs on this register across the window shown.
+            </p>
+          </div>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div variants={rise} className="space-y-4">
