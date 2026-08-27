@@ -149,12 +149,10 @@ export default function GraphExplorer() {
           canvas read as too tall) -- the canvas does not shrink to make room for Intelligence
           below it; the PAGE scrolls instead (Shell's <main> is already overflow-auto). */}
       <div className="h-[calc((100vh-8.5rem)*0.9)] grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
-        {/* Controls */}
+        {/* Controls. The legend used to head this column; it moved to the foot of the Why panel
+            on the right — a key is something you consult while reading the canvas, so it belongs
+            beside the evidence you are reading, not above the controls you set once. */}
         <div className="card overflow-auto p-3 space-y-4 xl:max-h-none max-h-72">
-          <Control title="Legend" icon={<Info size={13} />}>
-            <GraphLegend />
-          </Control>
-
           <Control title="Layout" icon={<GitBranch size={13} />}>
             <div className="grid grid-cols-2 gap-1">
               {LAYOUTS.map(([k, label]) => (
@@ -252,14 +250,22 @@ export default function GraphExplorer() {
           )}
         </div>
 
-        {/* Why panel */}
-        <div className="card overflow-auto max-h-96 xl:max-h-none">
+        {/* Why panel, with the legend at its foot. The panel scrolls as one column, so the key
+            sits under whatever evidence is open and stays reachable without leaving the canvas. */}
+        <div className="card overflow-auto max-h-96 xl:max-h-none flex flex-col">
           <AnimatePresence mode="wait">
             <motion.div key={sel?.edge?.id || sel?.node?.id || 'empty'}
               initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
               <WhyPanel node={sel?.node} edge={sel?.edge} onClose={() => setSel(null)} fairness={data?.explanation?.fairness} />
             </motion.div>
           </AnimatePresence>
+          <div className="mt-auto border-t border-line p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Info size={13} className="text-ink-muted" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Legend</span>
+            </div>
+            <GraphLegend />
+          </div>
         </div>
       </div>
 
