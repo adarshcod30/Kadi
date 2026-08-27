@@ -64,6 +64,19 @@ export function StateCommand({ data }: { data: any }) {
                 </span>
               )}
             </div>
+            {/* Column headings, so the three bare numbers on each row say what they are at the
+                point of reading — the footnote below described them, but a reader scanning the
+                figures should not have to leave the table to find out what they mean. */}
+            <div className="flex items-center gap-3 px-2 py-1.5 border-b border-line sticky top-0 bg-surface
+              text-[10.5px] uppercase tracking-wide text-ink-muted font-semibold">
+              <span className="w-2 shrink-0" />
+              <span className="flex-1">District</span>
+              <span className="hidden md:block w-40">Driving the move</span>
+              <span className="w-20 text-right">Total FIRs</span>
+              <span className="w-16 text-right">Serious</span>
+              <span className="w-16 text-right">vs base</span>
+              <span className="w-[13px] shrink-0" />
+            </div>
             <div className="max-h-[420px] overflow-auto">
               {(data.districts || []).map((d: any) => (
                 <button key={d.districtId}
@@ -71,11 +84,11 @@ export function StateCommand({ data }: { data: any }) {
                     u.searchParams.set('district', d.districtId); window.location.href = u.toString(); }}
                   className="w-full flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE[d.zone]?.pulse ? 'animate-pulse' : ''}`}
-                    style={{ background: ZONE[d.zone]?.dot || '#3AA76D' }} />
+                    style={{ background: ZONE[d.zone]?.dot || '#3AA76D' }} title={ZONE[d.zone]?.label} />
                   <span className="text-[13px] text-ink flex-1 truncate">{d.districtName}</span>
                   <span className="hidden md:block text-[11.5px] text-ink-muted w-40 truncate">{d.driverHead || ''}</span>
-                  <span className="font-num text-[12.5px] text-ink-muted w-20 text-right">{d.total?.toLocaleString()}</span>
-                  <span className="font-num text-[12.5px] text-ink-muted w-16 text-right" title="serious flags">{d.seriousFlags}</span>
+                  <span className="font-num text-[12.5px] text-ink w-20 text-right">{d.total?.toLocaleString()}</span>
+                  <span className="font-num text-[12.5px] text-ink-muted w-16 text-right">{d.seriousFlags}</span>
                   <span className={`font-num text-[12.5px] w-16 text-right font-medium ${
                     d.changePct > 10 ? 'text-danger' : d.changePct < -5 ? 'text-kadi-teal' : 'text-ink-muted'}`}>
                     {d.changePct > 0 ? '+' : ''}{d.changePct}%
@@ -85,8 +98,8 @@ export function StateCommand({ data }: { data: any }) {
               ))}
             </div>
             <p className="px-2 pt-2 text-[11.5px] text-ink-muted">
-              Columns: district, what is driving the move, total FIRs, serious flags, change against its own baseline.
-              Click any row to drill into that district.
+              <b>Serious</b> is high-severity health flags. <b>vs base</b> compares this month with the
+              district&rsquo;s own 12-month baseline, not with other districts. Click any row to drill in.
             </p>
           </div>
         </Section>

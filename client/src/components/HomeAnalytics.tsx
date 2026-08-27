@@ -64,20 +64,34 @@ function fitLine(pts: { x: number; y: number }[]) {
 // share in the middle; click again to clear. Responsive to the container.
 function CrimePie({ data, centerLabel }: { data: { name: string; count: number }[]; centerLabel: string }) {
   const [sel, setSel] = useState<string | null>(null);
+  // Hover reported ABOVE the ring rather than in a floating tooltip, which would sit on top of
+  // the donut and cover the centre figure.
+  const [hover, setHover] = useState<string | null>(null);
   const total = data.reduce((s, d) => s + d.count, 0) || 1;
   const slices = data.map((d, i) => ({ ...d, color: HEAD_COLOR[d.name] || SLICE[i % SLICE.length], pct: +(100 * d.count / total).toFixed(1) }));
   const active = sel ? slices.find((s) => s.name === sel) : null;
+  const hovered = hover ? slices.find((s) => s.name === hover) : null;
   return (
     <div className="p-4">
-      <div className="relative h-[210px]">
+      <div className="h-6 flex items-center justify-center px-2">
+        {hovered ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] max-w-full">
+            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: hovered.color }} />
+            <span className="text-ink font-medium truncate">{hovered.name}</span>
+            <span className="font-num text-ink-muted whitespace-nowrap">{hovered.count.toLocaleString()} FIRs · {hovered.pct}%</span>
+          </span>
+        ) : (
+          <span className="text-[11.5px] text-ink-subtle">Hover a slice for its figure</span>
+        )}
+      </div>
+      <div className="relative h-[210px]" onMouseLeave={() => setHover(null)}>
         <ResponsiveContainer width="100%" height="100%" key={slices.length}>
           <PieChart>
             <Pie data={slices} dataKey="count" nameKey="name" innerRadius="52%" outerRadius="92%" paddingAngle={2} stroke="none"
+              onMouseEnter={(d: any) => setHover(d?.name ?? null)}
               onClick={(d: any) => setSel((c) => (c === d.name ? null : d.name))}>
               {slices.map((s) => <Cell key={s.name} fill={s.color} cursor="pointer" opacity={sel && sel !== s.name ? 0.32 : 1} />)}
             </Pie>
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
-              formatter={(v: any, _n: any, p: any) => [`${Number(v).toLocaleString()} FIRs (${p.payload.pct}%)`, p.payload.name]} />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 grid place-items-center pointer-events-none">

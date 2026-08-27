@@ -92,6 +92,10 @@ const STATUS_COLOR: Record<string, string> = {
 export function DoublePie({ mix, headColor }: { mix: any; headColor: (name: string) => string }) {
   const [selStatus, setSelStatus] = useState<string | null>(null);
   const [selHead, setSelHead] = useState<string | null>(null);
+  // Hover readout. Recharts' floating tooltip lands on top of the donut and covers the centre
+  // figure, so the hovered slice is reported in a fixed strip ABOVE the chart instead — outside
+  // the ring, where nothing can overlap it.
+  const [hover, setHover] = useState<{ name: string; value: number; pct: number; color: string } | null>(null);
   if (!mix) return null;
 
   const statuses = mix.statuses as { id: string; name: string; count: number }[];
@@ -116,25 +120,50 @@ export function DoublePie({ mix, headColor }: { mix: any; headColor: (name: stri
   const total = selHead ? outer.reduce((a, b) => a + b.value, 0)
     : selStatus ? inner.reduce((a, b) => a + b.value, 0) : mix.total;
 
+  const grand = (selHead || selStatus) ? total : mix.total;
+  const enter = (d: any, ring: 'outer' | 'inner') => {
+    const base = ring === 'outer' ? outer : inner;
+    const hit = base.find((x) => x.name === d.name);
+    if (!hit) return;
+    const sum = base.reduce((a, b) => a + b.value, 0) || 1;
+    setHover({ name: hit.name, value: hit.value, pct: +(100 * hit.value / sum).toFixed(1), color: hit.color });
+  };
+
   return (
     <div className="p-3">
-      <div className="relative h-56">
+      {/* The hover readout, ABOVE the ring. Fixed height so the chart never shifts as it
+          appears and disappears. */}
+      <div className="h-6 flex items-center justify-center px-2">
+        {hover ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] max-w-full">
+            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: hover.color }} />
+            <span className="text-ink font-medium truncate">{hover.name}</span>
+            <span className="font-num text-ink-muted whitespace-nowrap">{hover.value.toLocaleString()} · {hover.pct}%</span>
+          </span>
+        ) : (
+          <span className="text-[11.5px] text-ink-subtle">Hover a slice for its figure</span>
+        )}
+      </div>
+      <div className="relative h-56" onMouseLeave={() => setHover(null)}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={inner} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={2} stroke="none"
+              onMouseEnter={(d: any) => enter(d, 'inner')}
               onClick={(d: any) => setSelHead((cur) => (cur === d.name ? null : d.name))}>
               {inner.map((d, i) => <Cell key={i} fill={d.color} cursor="pointer" opacity={selHead && selHead !== d.name ? 0.35 : 1} />)}
             </Pie>
             <Pie data={outer} dataKey="value" nameKey="name" innerRadius={70} outerRadius={92} paddingAngle={2} stroke="none"
+              onMouseEnter={(d: any) => enter(d, 'outer')}
               onClick={(d: any) => setSelStatus((cur) => { const id = statuses.find((s) => s.name === d.name)?.id || null; return cur === id ? null : id; })}>
               {outer.map((d, i) => <Cell key={i} fill={d.color} cursor="pointer" opacity={selStatus && statuses.find((s) => s.id === selStatus)?.name !== d.name ? 0.35 : 1} />)}
             </Pie>
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
+            {/* No <Tooltip>: it renders over the donut and covers the centre figure. The strip
+                above carries the same information where nothing overlaps it. */}
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="text-center">
-            <div className="text-lg font-semibold font-num text-kadi-navy">{total?.toLocaleString()}</div>
+            <div className="text-lg font-semibold font-num text-kadi-navy">{grand?.toLocaleString()}</div>
             <div className="text-[10px] text-ink-muted uppercase">
               {selStatus ? statuses.find((s) => s.id === selStatus)?.name : selHead || 'all cases'}
             </div>

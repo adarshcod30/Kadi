@@ -153,10 +153,6 @@ export default function Dashboard() {
             : 'Command view — all 31 districts. Drill into any one from the table below, or from the header.'}
       </p>
 
-      {/* Station drill (P2-10): a senior officer can step inside one station's register. Shown
-          for state and district scope; the station view itself carries a way back out. */}
-      {command?.view !== 'station' && <StationDrill me={me} />}
-
       {/* The two tiers get different panels, not the same panels with smaller numbers. */}
       <CommandInsight text={command?.insight} view={command?.view || 'state'} />
       {/* When someone has drilled into a station (?unit= in the URL), give them the way out. A
@@ -253,12 +249,6 @@ export default function Dashboard() {
             ) : <Skeleton rows={4} />}
           </VizCard>
 
-          {/* Headline finding, and it fills the column that was running short. */}
-          <VizCard title={t('countsMislead')}
-            hint="Bars show how far a district moves when you divide by population. Green means it is worse per-capita than raw counts suggest; red means it only looked bad because it is populous."
-            action={<button onClick={() => nav('/intelligence')} className="text-xs link">Intelligence</button>}>
-            <RankShift />
-          </VizCard>
         </div>
 
         {/* Right: eval, donuts, alerts */}
@@ -344,6 +334,20 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* Full width, not the left column (P2). The right column runs out above it, so inside the
+          grid this card left a block of empty space beside itself. At full width the slope bars
+          also have the room the comparison actually needs. */}
+      <VizCard title={t('countsMislead')}
+        hint="Bars show how far a district moves when you divide by population. Green means it is worse per-capita than raw counts suggest; red means it only looked bad because it is populous."
+        action={<button onClick={() => nav('/intelligence')} className="text-xs link">Intelligence</button>}>
+        <RankShift />
+      </VizCard>
+
+      {/* The drill sits AFTER the state picture, not above it: you read the state, then step
+          down a level. State drills into a district; a district drills into one of its
+          stations — the chain of command, one rung at a time. */}
+      {command?.view !== 'station' && <ScopeDrill me={me} view={command?.view} districts={districts} />}
+
       {/* ---- Analytical section: forecast, composition, correlation, volume ---- */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="mt-4">
         <div className="flex items-baseline gap-2 mb-3">
@@ -371,39 +375,59 @@ export default function Dashboard() {
 // The full district ladder. Merges volume (districts) with rate per 100k (socio), ranks by
 // volume, and highlights the viewer's own district — scrolling it into view so a district
 // officer lands on their own row. Replaces the top-8 bar chart (P2-4).
-// Step inside a single station (P2-10). Bengaluru City has a full register on Bengaluru Bazaar
-// PS (276 cases); the rest are shallow but real. Picking one sets ?unit= and the command view
-// re-renders as that station's own picture — the silo argument, made from a senior seat.
-function StationDrill({ me }: { me: any }) {
+// Step down one level (P2-10). The chain of command has rungs, and the control names the next
+// one down rather than skipping it: at STATE you step into a district, at DISTRICT you step into
+// one of its stations. Offering "view a police station" to a DGP jumped two levels and implied
+// the state view was about stations, which it is not.
+function ScopeDrill({ me, view, districts }: { me: any; view?: string; districts?: any }) {
   const [open, setOpen] = useState(false);
-  // Default to Bengaluru City's stations — the one district provisioned with real station depth.
+  const stateView = view === 'state';
   const districtId = me?.capabilities?.districtId || '1';
-  const { data } = useStations({ district: districtId });
-  const stations = (data?.items || []).slice(0, 10);
-  const go = (unitId: string) => {
+  // Stations only fetched when they are what is being offered.
+  const { data: stationData } = useStations(stateView ? {} : { district: districtId });
+  const districtRows = (districts?.districts || []).slice(0, 12);
+  const stationRows = stateView ? [] : (stationData?.items || []).slice(0, 10);
+  const rows: { id: string; name: string; count: number; zone?: string }[] = stateView
+    ? districtRows.map((d: any) => ({ id: String(d.districtId), name: d.district, count: d.total }))
+    : stationRows.map((s: any) => ({ id: String(s.unitId), name: s.unitName, count: s.cases, zone: s.zone }));
+
+  const go = (id: string) => {
     const u = new URL(window.location.href);
-    u.searchParams.set('unit', unitId);
-    if (!u.searchParams.get('district')) u.searchParams.set('district', String(districtId));
+    if (stateView) { u.searchParams.set('district', id); u.searchParams.delete('unit'); }
+    else {
+      u.searchParams.set('unit', id);
+      if (!u.searchParams.get('district')) u.searchParams.set('district', String(districtId));
+    }
     window.location.href = u.toString();
   };
-  if (!stations.length) return null;
+
+  if (!rows.length) return null;
+  const title = stateView ? 'View a district' : 'View a police station';
+  const sub = stateView
+    ? '— step down to one of the 31 districts'
+    : `— step inside one register, ${stationData?.items?.[0]?.districtName || 'this district'}`;
+  const tone = stateView ? '#E8871E' : '#2FA8A0';
+
   return (
     <div className="card p-3">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 text-left">
-        <Layers size={15} className="text-kadi-teal shrink-0" />
-        <span className="text-sm font-semibold text-kadi-navy">View a police station</span>
-        <span className="text-[12px] text-ink-muted">— step inside one register, {data?.items?.[0]?.districtName || 'Bengaluru City'}</span>
+        <Layers size={15} className="shrink-0" style={{ color: tone }} />
+        <span className="text-sm font-semibold text-kadi-navy">{title}</span>
+        <span className="text-[12px] text-ink-muted">{sub}</span>
         <ArrowRight size={14} className={`ml-auto text-ink-muted transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="mt-2 grid sm:grid-cols-2 gap-1.5">
-          {stations.map((s: any) => (
-            <button key={s.unitId} onClick={() => go(s.unitId)}
-              className="flex items-center gap-2 px-2.5 py-2 rounded-ctl border border-line hover:bg-kadi-teal/10 text-left">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${s.zone === 'red_pulsing' ? 'animate-pulse' : ''}`}
-                style={{ background: s.zone === 'red_pulsing' ? '#C0392B' : s.zone === 'yellow' ? '#C9820A' : '#3AA76D' }} />
-              <span className="text-[13px] text-ink flex-1 truncate">{s.unitName}</span>
-              <span className="font-num text-[12px] text-ink-muted">{s.cases?.toLocaleString()}</span>
+        <div className="mt-2 grid sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+          {rows.map((r) => (
+            <button key={r.id} onClick={() => go(r.id)}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-ctl border border-line text-left hover:bg-surface-3"
+              style={{ borderLeftWidth: 3, borderLeftColor: tone }}>
+              {r.zone && (
+                <span className={`w-2 h-2 rounded-full shrink-0 ${r.zone === 'red_pulsing' ? 'animate-pulse' : ''}`}
+                  style={{ background: r.zone === 'red_pulsing' ? '#C0392B' : r.zone === 'yellow' ? '#C9820A' : '#3AA76D' }} />
+              )}
+              <span className="text-[13px] text-ink flex-1 truncate">{r.name}</span>
+              <span className="font-num text-[12px] text-ink-muted">{r.count?.toLocaleString()}</span>
             </button>
           ))}
         </div>
