@@ -99,7 +99,7 @@ export default function Login() {
       {/* The building owns the bottom of the page. Full width and taller than the drawing
           needed, because a photograph carries detail a silhouette does not and cropping it to
           a thin band wastes it. Headquarters does its own masking. */}
-      <div className="pointer-events-none absolute bottom-0 left-0 w-full h-[52vh] max-h-[460px] select-none">
+      <div className="pointer-events-none absolute bottom-0 left-0 w-full h-[46vh] max-h-[400px] select-none">
         <Headquarters className="w-full h-full" />
       </div>
 
@@ -110,7 +110,10 @@ export default function Login() {
               hard against the right edge, which put it exactly where a wide photograph of the
               building needs to be. Raising it gives the building the bottom of the page and
               stops the two competing for the same space. */}
-          <div className="pointer-events-none absolute right-[6%] top-[4%] w-[38%] max-w-[330px] hidden xl:block opacity-95">
+          {/* right-0 puts the state's right edge exactly on the column boundary, which is
+              where the sign-in card starts. The two now meet rather than leaving a gutter of
+              empty paper between them. */}
+          <div className="pointer-events-none absolute right-0 top-[4%] w-[40%] max-w-[350px] hidden xl:block opacity-95">
             <LoginHero variant="light" />
           </div>
 
@@ -157,7 +160,11 @@ export default function Login() {
             ))}
           </div>
 
-          <div className="fade-slow relative mt-9 text-[11px] text-kadi-navy/40 max-w-[26rem] leading-relaxed">
+          {/* Sits lowest on the page, which is where the photograph is strongest. Darker than
+              the rest of the quiet copy and given a paper-coloured halo, so the one line making
+              a fairness claim stays legible against masonry. */}
+          <div className="fade-slow relative mt-9 text-[11px] text-kadi-navy/60 max-w-[26rem] leading-relaxed"
+            style={{ textShadow: '0 1px 3px rgba(246,243,235,0.9), 0 0 10px rgba(246,243,235,0.7)' }}>
             Evidence and behaviour only — never caste, religion or occupation.
             Synthetic corpus, schema-faithful to the KSP FIR system.
           </div>
@@ -182,13 +189,25 @@ export default function Login() {
           {/* The crest behind the form. Large, faint and bled off the bottom-right so it
               anchors the column without ever sitting behind a line of text. */}
           <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt=""
-            className="pointer-events-none absolute right-[-8%] bottom-[14%] w-[300px] select-none"
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-0 w-[290px] select-none"
             style={{
-              // Desaturated before it is faded. At 7% the full-colour crest still showed its
-              // reds and golds and read as a stain on the panel; flattened to white it reads
-              // as an embossed watermark, which is what it is for.
-              filter: 'grayscale(1) brightness(3)',
-              opacity: 0.06,
+              // In colour, and sitting on the floor of the card.
+              //
+              // It was greyed to near-white and tucked into the bottom-right corner, which made
+              // the state emblem look like a smudge. Centred and anchored to the bottom edge it
+              // reads as a crest at the foot of an official document, which is where a crest
+              // belongs; and at full colour it is recognisably the Karnataka emblem rather than
+              // a grey shape. Half-opacity keeps it under the form without washing the colour
+              // out of it.
+              // Colour kept, weight reduced. At half opacity the lions were reading through
+              // the demo-tier buttons and the caption under them; this is low enough to sit
+              // behind text and still be recognisably the emblem rather than a grey shape.
+              opacity: 0.3,
+              filter: 'saturate(1.15)',
+              // Fades in from the top so the emblem has no hard upper edge cutting across the
+              // buttons above it.
+              maskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.4) 38%, black 70%, black 100%)',
+              WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.4) 38%, black 70%, black 100%)',
             }} />
           <div className="pointer-events-none absolute inset-x-0 -top-24 h-56"
             style={{ background: 'radial-gradient(60% 100% at 50% 100%, rgba(232,180,74,0.10), transparent 70%)' }} />

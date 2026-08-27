@@ -40,13 +40,18 @@ export function Headquarters({ className = '', tone = '#0B2942' }: { className?:
           filter: 'saturate(1.06) contrast(1.02)',
           // Masked at the top so the sky fades into the page instead of drawing a horizon
           // across it, and feathered at the sides so the panorama has no cut edges.
-          maskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 26%, black 58%, black 100%),'
-            + ' linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 26%, black 58%, black 100%),'
-            + ' linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%)',
+          // The mask does the real work here. At full strength this photograph swallowed the
+          // stat block and the fairness line -- a login page where the copy is harder to read
+          // than the wallpaper has its priorities backwards. It now stays transparent through
+          // the upper half, where the text lives, and only reaches full weight near the floor
+          // of the page where nothing is written.
+          maskImage: 'linear-gradient(180deg, transparent 0%, transparent 22%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.8) 74%, black 100%),'
+            + ' linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, transparent 22%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.8) 74%, black 100%),'
+            + ' linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
           maskComposite: 'intersect',
           WebkitMaskComposite: 'source-in',
-          opacity: 0.92,
+          opacity: 0.78,
         }}
       />
     );
