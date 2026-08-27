@@ -233,7 +233,11 @@ export default function Health() {
                             <b className="text-xs uppercase tracking-wide">Recommended action</b>
                             <div className="mt-0.5">{h.recommendationText}</div>
                           </div>
-                          <div className="flex gap-2">
+                          {/* Right-aligned: left-aligned inside the right-hand column they
+                              landed mid-row and read as centred, which is nowhere. At the
+                              panel's right edge they line up under the row's own Network
+                              button, so the actions for a case sit in one vertical lane. */}
+                          <div className="flex gap-2 justify-end">
                             <button onClick={() => nav(`/cases/${h.caseMasterId}`)} className="btn-outline text-xs inline-flex items-center gap-1.5">
                               <FileText size={12} /> Open case
                             </button>
