@@ -2,21 +2,16 @@
 import { ReactNode, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Info } from 'lucide-react';
+import { InfoDot } from './InfoDot';
 
 // Info hint: a small (i) that reveals a description on hover — used to explain each viz.
+//
+// A second implementation of InfoDot, and it carried the same two faults InfoDot had: an
+// absolutely positioned panel that any overflow-hidden card could clip, and a close on the
+// first pixel of mouse-out. Delegating means charts inherit the pinning and the portal for
+// free, and there is one of these to fix next time rather than two.
 export function Hint({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <Info size={13} className="text-ink-muted hover:text-kadi-blue cursor-help" />
-      {open && (
-        <span className="absolute z-40 top-5 right-0 w-56 card p-2 text-xs text-ink font-normal normal-case tracking-normal shadow-hover">
-          {text}
-        </span>
-      )}
-    </span>
-  );
+  return <InfoDot width="w-56">{text}</InfoDot>;
 }
 
 // Staggered entrance for a grid of children.

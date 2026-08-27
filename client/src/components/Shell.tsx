@@ -12,7 +12,7 @@ import { useMe, useAlerts, useLookups, useSubmissions } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
 import { setRole, getRole, signOut as clearSession, Role } from '../lib/api';
 import { SeverityDot } from './ui';
-import { useDismiss } from '../lib/useDismiss';
+import { Popover, usePopover } from '../lib/Popover';
 
 const NAV = [
   { to: '/', icon: Home, key: 'home', end: true },
@@ -31,7 +31,7 @@ const NAV = [
 
 export function Shell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
+  const alertsPop = usePopover();
   const { lang, setLang } = useLang();
   const t = useT();
   const nav = useNavigate();
@@ -40,7 +40,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data: alerts } = useAlerts();
   const role = getRole();
 
-  const alerts_ = useDismiss<HTMLDivElement>(showAlerts, () => setShowAlerts(false), { closeOnLeave: true });
 
   const [search, setSearch] = useState('');
   const doSearch = (e: React.FormEvent) => {
@@ -108,15 +107,20 @@ export function Shell({ children }: { children: ReactNode }) {
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
         <ScopeBadge me={me} />
-        <div className="relative" ref={alerts_.ref} {...alerts_.hoverProps}>
-          <button onClick={() => setShowAlerts((s) => !s)} className="relative p-1.5 rounded hover:bg-white/10">
-            <Bell size={18} />
-            {alerts && alerts.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-kadi-gold text-kadi-navy font-semibold text-[10px] rounded-full w-4 h-4 grid place-items-center">{alerts.length}</span>
-            )}
-          </button>
-          {showAlerts && <AlertsPanel onClose={() => setShowAlerts(false)} />}
-        </div>
+        <button ref={alertsPop.anchorRef as React.RefObject<HTMLButtonElement>}
+          onClick={alertsPop.toggle} {...alertsPop.holdProps}
+          aria-expanded={alertsPop.open} title={t('alerts')}
+          className="relative p-1.5 rounded hover:bg-white/10">
+          <Bell size={18} />
+          {alerts && alerts.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-kadi-gold text-kadi-navy font-semibold text-[10px] rounded-full w-4 h-4 grid place-items-center">{alerts.length}</span>
+          )}
+        </button>
+        <Popover open={alertsPop.open} anchorRef={alertsPop.anchorRef} panelRef={alertsPop.panelRef}
+          side="bottom" align="end" {...alertsPop.panelProps}
+          className="pop-in w-80 card text-ink shadow-xl" style={{ maxHeight: '70vh' }}>
+          <AlertsPanel onClose={alertsPop.close} />
+        </Popover>
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -197,8 +201,7 @@ function FairnessBanner() {
 // Without this the two-tier model was invisible: a Sub-Inspector and the DGP saw the same
 // chrome, and the only difference was in figures nobody was comparing side by side.
 function ScopeBadge({ me }: { me: any }) {
-  const [open, setOpen] = useState(false);
-  const dismiss = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
+  const p = usePopover();
   const { data: lookups } = useLookups();
   if (!me) return null;
   const cap = me.capabilities || {};
@@ -241,8 +244,9 @@ function ScopeBadge({ me }: { me: any }) {
   };
 
   return (
-    <div className="relative hidden sm:block" ref={dismiss.ref} {...dismiss.hoverProps}>
-      <button onClick={() => setOpen((o) => !o)}
+    <div className="hidden sm:block">
+      <button ref={p.anchorRef as React.RefObject<HTMLButtonElement>}
+        onClick={p.toggle} {...p.holdProps} aria-expanded={p.open}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border transition-colors ${
           atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
                   : 'bg-kadi-gold/20 border-kadi-gold/40 hover:bg-kadi-gold/30'}`}>
@@ -252,8 +256,11 @@ function ScopeBadge({ me }: { me: any }) {
         <ChevronDown size={12} className="opacity-70" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 mt-1 w-64 max-h-[420px] overflow-auto bg-surface border border-line rounded-card shadow-lg z-50 py-1">
+      <Popover open={p.open} anchorRef={p.anchorRef} panelRef={p.panelRef}
+        side="bottom" align="end" {...p.panelProps}
+        className="pop-in w-64 bg-surface border border-line rounded-card shadow-xl py-1"
+        style={{ maxHeight: 420 }}>
+        <>
           {cap.canViewWholeState && (
             <>
               <button onClick={() => go(null)}
@@ -276,8 +283,8 @@ function ScopeBadge({ me }: { me: any }) {
               {d.name}
             </button>
           ))}
-        </div>
-      )}
+        </>
+      </Popover>
     </div>
   );
 }
@@ -311,8 +318,7 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
   authenticated?: boolean; email?: string | null;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const { ref, hoverProps } = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
+  const p = usePopover();
   const roles: Role[] = ['DGP', 'Analyst', 'Admin', 'SP', 'DSP', 'SI', 'SHO'];
   // Clears the session token as well as the demo role. Dropping only the role left a
   // valid token in storage, so 'sign out' returned you to the door already signed in.
@@ -326,10 +332,19 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
     : tier === 'district' ? (districtName || 'One district') : 'All 31 districts';
 
   return (
-    <div className="border-t border-line relative" ref={ref} {...hoverProps}
-      onMouseEnter={() => setOpen(true)}>
-      {open && (
-        <div className="absolute left-2 right-2 bottom-full mb-2 w-[15.5rem] card p-0 z-40 text-ink shadow-xl overflow-hidden">
+    <div className="border-t border-line">
+      {/* WHY SIGN OUT USED TO DISAPPEAR AS YOU REACHED FOR IT.
+          This row spread its hover handlers and then wrote onMouseEnter={() => setOpen(true)}
+          after the spread. The later prop wins, so the handler that CANCELS a pending close was
+          silently thrown away. The panel sits a few pixels clear of this row, and crossing that
+          dead space fires mouseleave and schedules a close; re-entering the panel never
+          cancelled it, so the menu closed a quarter of a second later -- right as the pointer
+          arrived on Sign out. usePopover keeps one timer that both the row and the panel can
+          cancel, so the two are a single region, and clicking pins the panel outright. */}
+      <Popover open={p.open} anchorRef={p.anchorRef} panelRef={p.panelRef}
+        side="top" align="start" {...p.panelProps}
+        className="pop-in w-[15.5rem] card p-0 text-ink shadow-xl">
+        <>
           <div className="px-3 py-2.5 bg-kadi-navy text-white">
             <div className="text-[10.5px] uppercase tracking-[0.14em] text-white/55">
               {authenticated ? 'Signed in as' : 'Demo access'}
@@ -353,7 +368,7 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
           )}
           <div className={`pb-1 max-h-[13rem] overflow-auto ${authenticated ? 'hidden' : ''}`}>
             {roles.map((r) => (
-              <button key={r} onClick={() => { setOpen(false); onChangeRole(r); }}
+              <button key={r} onClick={() => { p.close(); onChangeRole(r); }}
                 className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 hover:bg-kadi-blue50 ${
                   r === role ? 'text-kadi-blue font-medium' : 'text-ink'}`}>
                 <span className="w-5 h-5 rounded-full bg-surface-3 grid place-items-center text-[10px] font-semibold shrink-0">{r[0]}</span>
@@ -366,14 +381,18 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
             className="w-full text-left px-3 py-2 text-[13px] text-danger hover:bg-red-50 flex items-center gap-2 border-t border-line">
             <LogOut size={14} /> {t('signOut')}
           </button>
-        </div>
-      )}
+        </>
+      </Popover>
 
       {/* The resting state. A tier-coloured ring around the initial is the whole status
           indicator: which of the three levels you are standing at, readable at a glance and
           still readable when the rail is collapsed to icons. */}
-      <div className={`flex items-center gap-2.5 cursor-default transition-colors ${
-        open ? 'bg-surface-3' : 'hover:bg-surface-3/70'} ${collapsed ? 'justify-center p-2' : 'px-3 py-2.5'}`}>
+      <div ref={p.anchorRef as React.RefObject<HTMLDivElement>}
+        {...p.hoverProps} onClick={p.toggle} role="button" tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.toggle(); } }}
+        aria-expanded={p.open} aria-label="Account"
+        className={`flex items-center gap-2.5 cursor-pointer transition-colors outline-none ${
+          p.open ? 'bg-surface-3' : 'hover:bg-surface-3/70'} ${collapsed ? 'justify-center p-2' : 'px-3 py-2.5'}`}>
         <span className={`relative w-8 h-8 rounded-full bg-kadi-navy text-white grid place-items-center text-xs font-semibold shrink-0 ring-2 ${meta.ring}`}>
           {role[0]}
           <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-surface grid place-items-center ${meta.tint}`}>
@@ -404,7 +423,9 @@ function AlertsPanel({ onClose }: { onClose: () => void }) {
     else if (a.kind === 'health') nav('/health');
   };
   return (
-    <div className="absolute right-0 mt-2 w-80 card z-30 text-ink max-h-[70vh] overflow-auto">
+    // No positioning here any more: the panel is placed and clipped by Popover, which puts it
+    // in a portal so the header's stacking context cannot cap it.
+    <div>
       <div className="px-4 py-2 border-b border-line flex items-center justify-between">
         <span className="text-sm font-semibold">{t('alerts')}</span>
         <button onClick={onClose}><X size={14} className="text-ink-muted" /></button>

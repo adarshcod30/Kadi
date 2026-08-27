@@ -6,12 +6,16 @@
 // That is why only "a few dropdowns" behaved: the rest were never ours to control.
 //
 // This is a drop-in replacement with the same value/onChange/options shape, rendered in the
-// page so it obeys the same dismissal rules as everything else -- hover-out, outside click,
-// Escape -- and looks identical across macOS, Windows and Linux instead of inheriting three
-// different native widgets.
+// page so it obeys the same dismissal rules as everything else -- outside click, Escape -- and
+// looks identical across macOS, Windows and Linux instead of inheriting three native widgets.
+//
+// The list is portalled. Filter rows live inside cards, and half the cards in this app are
+// overflow-hidden, so a 31-district list opened inside one was being cut off at the card's
+// edge. It also means the list stays open once clicked: it is pinned until you choose an
+// option, click outside, or press Escape, rather than closing because the pointer drifted.
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { useDismiss } from '../lib/useDismiss';
+import { Popover, usePopover } from '../lib/Popover';
 
 export type Option = { value: string; label: string };
 
@@ -24,32 +28,28 @@ export function Select({ value, onChange, options, className = '', placeholder, 
   title?: string;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const [dropUp, setDropUp] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const { ref, hoverProps } = useDismiss<HTMLDivElement>(open, () => setOpen(false), { closeOnLeave: true });
+  const p = usePopover();
 
   const selected = options.find((o) => o.value === value);
   const label = selected?.label ?? placeholder ?? '';
 
+  // Flipping and clamping are Popover's job now -- it measures the real panel rather than
+  // guessing its height from the option count, which is what this had to do from here.
   const openMenu = () => {
-    // Flip upward when there is not enough room below. A filter row near the bottom of a long
-    // register would otherwise open a 31-district list off the edge of the screen.
-    const r = btnRef.current?.getBoundingClientRect();
-    if (r) setDropUp(window.innerHeight - r.bottom < Math.min(264, options.length * 34 + 16));
     setActive(Math.max(0, options.findIndex((o) => o.value === value)));
-    setOpen(true);
+    p.toggle();
   };
+  const open = p.open;
 
   // Keep the highlighted option in view when arrowing through a long list.
   useEffect(() => {
-    if (!open || !listRef.current) return;
-    listRef.current.querySelectorAll('[data-opt]')[active]?.scrollIntoView({ block: 'nearest' });
-  }, [active, open]);
+    if (!open || !p.panelRef.current) return;
+    p.panelRef.current.querySelectorAll('[data-opt]')[active]?.scrollIntoView({ block: 'nearest' });
+  }, [active, open, p.panelRef]);
 
-  const commit = (v: string) => { onChange(v); setOpen(false); btnRef.current?.focus(); };
+  const commit = (v: string) => { onChange(v); p.close(); btnRef.current?.focus(); };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!open) {
@@ -61,13 +61,13 @@ export function Select({ value, onChange, options, className = '', placeholder, 
     else if (e.key === 'Home') { e.preventDefault(); setActive(0); }
     else if (e.key === 'End') { e.preventDefault(); setActive(options.length - 1); }
     else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (options[active]) commit(options[active].value); }
-    else if (e.key === 'Tab') setOpen(false);
+    else if (e.key === 'Tab') p.close();
   };
 
   return (
-    <div className={`relative ${className}`} ref={ref} {...hoverProps}>
-      <button ref={btnRef} type="button" title={title || label} disabled={disabled}
-        onClick={() => (open ? setOpen(false) : openMenu())} onKeyDown={onKeyDown}
+    <div className={className}>
+      <button ref={mergeRefs(btnRef, p.anchorRef)} type="button" title={title || label} disabled={disabled}
+        onClick={openMenu} {...p.holdProps} onKeyDown={onKeyDown}
         aria-haspopup="listbox" aria-expanded={open}
         className={`input w-full flex items-center gap-2 text-left ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
@@ -76,10 +76,12 @@ export function Select({ value, onChange, options, className = '', placeholder, 
         <ChevronDown size={14} className={`shrink-0 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div ref={listRef} role="listbox" tabIndex={-1}
-          className={`absolute left-0 z-50 min-w-full w-max max-w-[min(20rem,80vw)] max-h-64 overflow-auto
-            bg-surface border border-line rounded-card shadow-lg py-1 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+      <Popover open={open} anchorRef={p.anchorRef} panelRef={p.panelRef}
+        side="bottom" align="start" gap={4} matchAnchorWidth {...p.panelProps}
+        role="listbox" tabIndex={-1}
+        className="pop-in w-max max-w-[min(20rem,80vw)] bg-surface border border-line rounded-card shadow-xl py-1"
+        style={{ maxHeight: 256 }}>
+        <>
           {options.map((o, i) => {
             const isSel = o.value === value;
             return (
@@ -92,8 +94,16 @@ export function Select({ value, onChange, options, className = '', placeholder, 
               </button>
             );
           })}
-        </div>
-      )}
+        </>
+      </Popover>
     </div>
   );
+}
+
+// The trigger is both the keyboard-focus target and the popover's measuring anchor, and those
+// are two different refs wanting the same element.
+function mergeRefs<T>(...refs: (React.MutableRefObject<T | null> | React.RefObject<T>)[]) {
+  return (node: T | null) => {
+    refs.forEach((r) => { (r as React.MutableRefObject<T | null>).current = node; });
+  };
 }

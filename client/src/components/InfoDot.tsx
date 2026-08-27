@@ -6,12 +6,24 @@
 // and the reader who most needed the explanation had already scrolled past it.
 //
 // So the copy moves behind an (i): present on the element it describes, silent until asked,
-// and never competing with the data for the same space. Hover reveals, moving away hides,
-// keyboard focus works the same way.
-import { ReactNode, useRef, useState } from 'react';
+// and never competing with the data for the same space.
+//
+// HOVER REVEALS, A CLICK PINS. Brushing past shows the note and moving away takes it back.
+// Clicking keeps it until you dismiss it, because a note you deliberately opened is one you
+// intend to read -- and several of these are long enough to want a second pass, or contain a
+// figure worth selecting.
+//
+// The panel is portalled (see Popover), which is the fix for the failure that made these
+// unreliable: the note is nearly always attached to a card header, and half the cards in the
+// app are overflow-hidden. Inside a collapsed intelligence band -- a strip about forty pixels
+// tall -- the note was being clipped to a sliver of its first line. It looked like the note
+// was broken; the box around it was.
+import { ReactNode } from 'react';
 import { Info } from 'lucide-react';
+import { Popover, usePopover } from '../lib/Popover';
 
 type Align = 'left' | 'right' | 'center';
+const ALIGN = { left: 'start', right: 'end', center: 'center' } as const;
 
 export function InfoDot({ children, align = 'right', size = 13, className = '', label = 'More information', width = 'w-72' }: {
   children: ReactNode;
@@ -21,36 +33,26 @@ export function InfoDot({ children, align = 'right', size = 13, className = '', 
   label?: string;
   width?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [up, setUp] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  const show = () => {
-    // Flip above the icon when it sits low in the viewport, or the panel opens off-screen --
-    // which is exactly where these end up, since they annotate footers and table headers.
-    const r = ref.current?.getBoundingClientRect();
-    if (r) setUp(window.innerHeight - r.bottom < 200);
-    setOpen(true);
-  };
-
-  const pos = align === 'left' ? 'left-0' : align === 'center' ? 'left-1/2 -translate-x-1/2' : 'right-0';
+  const p = usePopover();
 
   return (
-    <span ref={ref} className={`relative inline-flex align-middle ${className}`}
-      onMouseEnter={show} onMouseLeave={() => setOpen(false)}>
-      <button type="button" aria-label={label} tabIndex={0}
-        onFocus={show} onBlur={() => setOpen(false)}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (open) setOpen(false); else show(); }}
+    <span className={`inline-flex align-middle ${className}`}>
+      <button type="button" aria-label={label} aria-expanded={p.open} tabIndex={0}
+        ref={p.anchorRef as React.RefObject<HTMLButtonElement>}
+        {...p.hoverProps}
+        onFocus={p.openNow} onBlur={p.scheduleClose}
+        // stopPropagation because several of these sit inside a row or header that is itself
+        // clickable, and asking what a column means should not also navigate away.
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); p.toggle(); }}
         className="inline-flex items-center text-ink-muted hover:text-kadi-blue focus:text-kadi-blue outline-none cursor-help">
         <Info size={size} />
       </button>
-      {open && (
-        <span
-          className={`absolute z-50 ${pos} ${up ? 'bottom-6' : 'top-6'} ${width} card p-2.5 shadow-lg
-            text-[12px] leading-relaxed text-ink font-normal normal-case tracking-normal text-left`}>
-          {children}
-        </span>
-      )}
+      <Popover open={p.open} anchorRef={p.anchorRef} panelRef={p.panelRef}
+        side="bottom" align={ALIGN[align]} {...p.panelProps}
+        className={`pop-in ${width} card p-2.5 shadow-xl text-[12px] leading-relaxed text-ink
+          font-normal normal-case tracking-normal text-left`}>
+        {children}
+      </Popover>
     </span>
   );
 }

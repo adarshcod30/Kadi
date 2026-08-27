@@ -56,23 +56,29 @@ export function IntelligenceBand({ data, isLoading, onApply, title = 'Intelligen
 
   return (
     <div className="card overflow-hidden">
-      <button onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-3/60 transition-colors">
-        <Sparkles size={15} className="text-kadi-gold shrink-0" />
-        <span className="text-sm font-semibold text-kadi-navy">{title}</span>
-        <span onClick={(e) => e.stopPropagation()}>
-          <AiProvenanceInfo source={data.insightSource} />
-        </span>
-        <span className="text-[12px] text-ink-muted truncate">
-          {subtitle || `${signals.length} finding${signals.length === 1 ? '' : 's'} in this view`}
-        </span>
+      {/* The (i) is a SIBLING of the disclosure button, not a child of it. It used to be nested
+          inside, which is invalid -- a button may not contain another button -- and needed a
+          stopPropagation wrapper to stop asking what the panel is from also collapsing it.
+          Two buttons in a row need neither. */}
+      <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-surface-3/60 transition-colors">
+        <button onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2 text-left min-w-0 flex-1">
+          <Sparkles size={15} className="text-kadi-gold shrink-0" />
+          <span className="text-sm font-semibold text-kadi-navy shrink-0">{title}</span>
+          <span className="text-[12px] text-ink-muted truncate">
+            {subtitle || `${signals.length} finding${signals.length === 1 ? '' : 's'} in this view`}
+          </span>
+        </button>
+        <AiProvenanceInfo source={data.insightSource} />
         {highCount > 0 && (
           <span className="text-[11px] font-medium bg-red-50 text-danger rounded-full px-2 py-0.5 shrink-0">
             {highCount} to act on
           </span>
         )}
-        <ChevronDown size={15} className={`ml-auto shrink-0 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+        <button onClick={() => setOpen((o) => !o)} aria-label={open ? 'Collapse' : 'Expand'} className="shrink-0">
+          <ChevronDown size={15} className={`text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
 
       {open && (
         <div className="border-t border-line">
