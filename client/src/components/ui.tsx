@@ -166,7 +166,11 @@ export function FilterChips({ items, onRemove, onClear }: {
 //
 // "Page 4" alone does not tell you how much is left; "76-100 of 59,985" does, and it is the
 // difference between a list that feels navigable and one that feels bottomless.
-const PAGE_SIZES = [25, 50, 100, 200];
+// A caller may pass a page size that is not on this list (Health defaults to 30), and a Select
+// whose value matches no option renders BLANK -- which is what the empty dropdown in the pager
+// was. The current size is folded into the options below so the control always shows its own
+// value, whatever the caller chose.
+const PAGE_SIZES = [25, 30, 50, 100, 200];
 export function Pager({ page, pageSize, total, onPage, onPageSize }: {
   page: number; pageSize: number; total: number;
   onPage: (n: number) => void; onPageSize?: (n: number) => void;
@@ -185,7 +189,8 @@ export function Pager({ page, pageSize, total, onPage, onPageSize }: {
             {' · '}
             <Select value={String(pageSize)} onChange={(v) => onPageSize(Number(v))}
               className="inline-block w-32 align-middle ml-0.5"
-              options={PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} per page` }))} />
+              options={[...new Set([...PAGE_SIZES, pageSize])].sort((a, b) => a - b)
+                .map((n) => ({ value: String(n), label: `${n} per page` }))} />
           </>
         )}
       </span>
