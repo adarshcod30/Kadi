@@ -15,6 +15,25 @@ import { Headquarters } from '../components/Headquarters';
 
 const DOMAIN = 'ksp.gov.in';
 
+/**
+ * The page's light: cool on the left, warm on the right.
+ *
+ * `a` scales every alpha, because this is painted TWICE. Once beneath the photograph, where it
+ * is the colour of the paper. Once above it at a fraction of the weight, where it is a colour
+ * grade -- the photograph is a white building under a white sky, and a white building sitting
+ * on tinted paper looks pasted onto it rather than lit by it. Matched light is what makes a
+ * composited element belong to the scene; the second pass costs one div and buys exactly that.
+ *
+ * Two blooms per side rather than one. A single radial pools in a spot and leaves the rest of
+ * that edge grey; a pair carries the colour down the full height of the page.
+ */
+const glow = (a: number) => [
+  `radial-gradient(1150px 950px at 100% 14%, rgba(232,180,74,${0.22 * a}), transparent 66%)`,
+  `radial-gradient(950px 820px at 94% 82%, rgba(232,180,74,${0.16 * a}), transparent 64%)`,
+  `radial-gradient(1150px 950px at 0% 22%, rgba(26,111,196,${0.2 * a}), transparent 66%)`,
+  `radial-gradient(950px 840px at 3% 88%, rgba(26,111,196,${0.14 * a}), transparent 64%)`,
+].join(',');
+
 const DEMO_TIERS: { key: string; icon: typeof Globe; label: string; scope: string; role: Role; accent: string }[] = [
   { key: 'state', icon: Globe, label: 'State', scope: 'All 31 districts', role: 'DGP', accent: '#1A6FC4' },
   { key: 'district', icon: MapPin, label: 'District', scope: 'One district, switchable', role: 'SP', accent: '#E8871E' },
@@ -80,12 +99,20 @@ export default function Login() {
           navy grid, the same construction the dark version used, inverted. The sign-in column
           stays dark: it is the one thing on this screen you are meant to act on, and a dark
           panel on a light page is the strongest contrast available without shouting. */}
+      {/* BLUE ON THE LEFT, GOLD ON THE RIGHT, and both barely there.
+          The paper was doing nothing -- three unrelated blooms scattered over an off-white
+          field, which reads as white. This gives the page a direction instead: cool down the
+          side the state and the wordmark occupy, warm up the side the sign-in card does, so
+          the eye is walked across the screen toward the one thing it is meant to act on.
+          Two blooms per side rather than one, because a single radial pools in a spot and
+          leaves the rest of that edge grey; a pair runs the colour down the full height.
+          Held at the same weight as the warm halo that already sits over the sign-in card,
+          which is the reference for how light "a glow" means here -- about a sixth of an
+          alpha, spread over most of the viewport. Any heavier and it stops being paper. */}
       <div className="absolute inset-0" style={{
-        background:
-          'radial-gradient(1000px 680px at 30% 38%, rgba(26,111,196,0.10), transparent 62%),'
-          + 'radial-gradient(760px 500px at 86% 6%, rgba(232,180,74,0.16), transparent 60%),'
-          + 'radial-gradient(820px 560px at 4% 98%, rgba(47,168,160,0.10), transparent 62%),'
-          + 'linear-gradient(160deg, #FBF9F4 0%, #F4F1E8 55%, #EFEBE0 100%)',
+        // Paper under the glow, kept almost neutral so the colour belongs to the light and not
+        // to the ground -- a tinted base plus a tinted bloom compounds into a wash.
+        background: `${glow(1)}, linear-gradient(160deg, #FCFAF5 0%, #F8F5ED 55%, #F4F0E5 100%)`,
       }} />
       <div className="absolute inset-0 opacity-[0.05]" style={{
         backgroundImage: 'linear-gradient(#0B2942 1px, transparent 1px), linear-gradient(90deg, #0B2942 1px, transparent 1px)',
@@ -93,15 +120,24 @@ export default function Login() {
         maskImage: 'radial-gradient(ellipse 88% 74% at 44% 46%, black, transparent)',
         WebkitMaskImage: 'radial-gradient(ellipse 88% 74% at 44% 46%, black, transparent)',
       }} />
-      {/* The building sits on the floor of the page, spanning the full width and bleeding off
-          the bottom, so it is architecture the content stands on rather than a picture beside
-          it. Behind everything, and faint enough to read as embossed paper. */}
-      {/* The building owns the bottom of the page. Full width and taller than the drawing
-          needed, because a photograph carries detail a silhouette does not and cropping it to
-          a thin band wastes it. Headquarters does its own masking. */}
-      <div className="pointer-events-none absolute bottom-0 left-0 w-full h-[46vh] max-h-[400px] select-none">
+      {/* The building is the whole page now, not a band at the floor of it.
+          It began as a 46vh strip along the bottom, which meant cover threw away more than half
+          the photograph -- the roofline and the dome, the part that makes it read as a state
+          building rather than a wall. Given the full height it crops almost nothing, because a
+          laptop viewport and a 16:9 photograph are within a few percent of the same shape.
+          What stops that from becoming wallpaper is the fade, which lives in Headquarters: a
+          ghost at the top, nearly nothing behind the copy, full weight only at the floor. */}
+      {/* Full page only where there is width for it. Below lg the grid stacks into one
+          column and the page grows tall, and cover on a 16:9 photograph in a tall box
+          crops the sides away -- you get a zoomed slice of one pavilion rather than a
+          building. On narrow screens it stays the band it used to be. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[52vh] lg:inset-0 lg:h-auto select-none">
         <Headquarters className="w-full h-full" />
       </div>
+      {/* The grade. Same light, a third of the weight, painted over the photograph so the
+          building is cool down its left and warm down its right rather than sitting on paper
+          that is. Above the image, below every word: the copy is z-10. */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: glow(0.34) }} />
 
       <div className="relative z-10 min-h-screen grid lg:grid-cols-[1.25fr_452px]">
         {/* ---- Left: the state, the name, the numbers ---- */}

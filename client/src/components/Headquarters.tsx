@@ -18,6 +18,22 @@
 // looking like a mistake, and a photograph can.
 import { useState } from 'react';
 
+// Top-down fade. Values are alphas, not stops of a colour: `transparent` hides the photograph
+// entirely, `black` shows it at full strength, and everything between is partial. Read it as a
+// list of "how much building is allowed at this height of the page".
+const HQ_FADE = 'linear-gradient(180deg,'
+  + ' transparent 0%,'            // the wordmark's air
+  + ' rgba(0,0,0,0.03) 22%,'      // sky: a rumour of a roofline, no more
+  + ' rgba(0,0,0,0.07) 42%,'      // behind the strapline
+  + ' rgba(0,0,0,0.14) 60%,'      // behind the stat block -- deliberately almost nothing
+  + ' rgba(0,0,0,0.32) 75%,'      // below the last line of copy, the facade can arrive
+  + ' rgba(0,0,0,0.62) 88%,'
+  + ' rgba(0,0,0,0.9) 100%)';     // forecourt and lawn, held back a little: bright green at
+                                  // full weight is the loudest thing on a page of ivory
+
+// Side feather, so a full-width photograph has no cut edges against the window frame.
+const HQ_FEATHER = 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)';
+
 export function Headquarters({ className = '', tone = '#0B2942' }: { className?: string; tone?: string }) {
   const [photoFailed, setPhotoFailed] = useState(false);
   const photo = `${import.meta.env.BASE_URL}ksp-hq.jpg`;
@@ -32,26 +48,30 @@ export function Headquarters({ className = '', tone = '#0B2942' }: { className?:
         className={className}
         style={{
           objectFit: 'cover',
-          // Anchored low so a wide panorama crops to the building and its steps rather than to
-          // a band of sky.
-          objectPosition: 'center 68%',
+          // Near-centred. The container is now the full viewport, whose aspect ratio is close
+          // enough to the photograph's own that cover crops almost nothing -- so there is no
+          // band to choose any more, and anchoring low would only shave the roofline.
+          objectPosition: 'center 55%',
           // Colour, lifted slightly. A government building photographed at midday is high-key
           // already; a touch of saturation stops it going chalky against warm paper.
           filter: 'saturate(1.06) contrast(1.02)',
-          // Masked at the top so the sky fades into the page instead of drawing a horizon
-          // across it, and feathered at the sides so the panorama has no cut edges.
-          // The mask does the real work here. At full strength this photograph swallowed the
-          // stat block and the fairness line -- a login page where the copy is harder to read
-          // than the wallpaper has its priorities backwards. It now stays transparent through
-          // the upper half, where the text lives, and only reaches full weight near the floor
-          // of the page where nothing is written.
-          maskImage: 'linear-gradient(180deg, transparent 0%, transparent 22%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.8) 74%, black 100%),'
-            + ' linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, transparent 22%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.8) 74%, black 100%),'
-            + ' linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
+          // THE MASK IS THE WHOLE DESIGN.
+          //
+          // The photograph now runs the full height of the page rather than sitting in a band
+          // at the floor, so it passes behind every word on the screen. What keeps it a
+          // backdrop instead of a wall is this ramp: a ghost at the top where the wordmark is,
+          // barely there through the middle where the copy runs, and only arriving at full
+          // weight in the bottom fifth where nothing is written. Extending the image without
+          // extending the fade would just be the earlier mistake at a larger size.
+          //
+          // The second gradient feathers the left and right edges so a full-bleed photograph
+          // does not butt against the window frame with a cut edge. maskComposite multiplies
+          // the two, which keeps each of them a readable one-dimensional ramp.
+          maskImage: `${HQ_FADE}, ${HQ_FEATHER}`,
+          WebkitMaskImage: `${HQ_FADE}, ${HQ_FEATHER}`,
           maskComposite: 'intersect',
           WebkitMaskComposite: 'source-in',
-          opacity: 0.78,
+          opacity: 0.72,
         }}
       />
     );
