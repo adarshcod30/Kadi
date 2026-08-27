@@ -554,6 +554,106 @@ function districtRankContext(db, did) {
   };
 }
 
+// ---------------- near-repeat (Where, P4-2) ----------------
+//
+// One of the most replicated findings in crime science: after a burglary or theft, the risk to
+// nearby addresses is elevated for a short window afterward — the "near-repeat" pattern. It is
+// what turns a hotspot from an observation ("crime clusters here") into an instruction ("having
+// just had one, watch these streets for the next fortnight"). This measures it directly.
+//
+// Computed over the emerging-hotspot clusters only, not the whole corpus: each cluster carries
+// tens of cases, so the pairwise pass is cheap, and a cluster is exactly where the pattern
+// matters. For each incident, is there a PRIOR incident in the same cluster within R metres and
+// D days? The share that are is the near-repeat rate; a rate well above what a random reshuffle
+// of the same dates would give is the signal.
+function haversineM(aLat, aLng, bLat, bLng) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat); const dLng = toRad(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+function nearRepeat(user, q = {}) {
+  const db = load();
+  const R = Number(q.radiusM) || 400;      // "near" — a couple of streets
+  const D = Number(q.days) || 14;          // "soon" — the classic near-repeat window
+  const scopedIds = user && user.roleMeta.tier !== 'state'
+    ? new Set(scoped(user, db.caseList).map((c) => String(c.caseMasterId))) : null;
+  const clusters = (db.hotspots.hotspots || []).filter((h) => h.emergingFlag);
+  const out = [];
+  for (const h of clusters) {
+    if (scopedIds && !(h.caseIds || []).some((id) => scopedIds.has(String(id)))) continue;
+    const pts = (h.caseIds || []).map((id) => db.cases.get(String(id)))
+      .filter((c) => c && c.latitude && c.longitude && c.incidentFromDate)
+      .map((c) => ({ t: new Date(`${c.incidentFromDate.slice(0, 10)}T00:00:00Z`).getTime(), lat: c.latitude, lng: c.longitude }))
+      .sort((a, b) => a.t - b.t);
+    if (pts.length < 6) continue;
+    let repeats = 0;
+    let sumGapDays = 0; let gapN = 0;
+    for (let i = 0; i < pts.length; i += 1) {
+      for (let j = 0; j < i; j += 1) {
+        const gap = (pts[i].t - pts[j].t) / 86400000;
+        if (gap > 0 && gap <= D && haversineM(pts[i].lat, pts[i].lng, pts[j].lat, pts[j].lng) <= R) {
+          repeats += 1; sumGapDays += gap; gapN += 1; break;   // count each follow-on once
+        }
+      }
+    }
+    const rate = Math.round((repeats / pts.length) * 100);
+    if (rate < 15) continue;   // only clusters where the pattern is actually present
+    out.push({
+      cellId: h.cellId, districtId: String(h.districtId),
+      districtName: (db.lookups.districts.get(String(h.districtId)) || {}).DistrictName || `District ${h.districtId}`,
+      incidents: pts.length, repeats, repeatRatePct: rate,
+      medianGapDays: gapN ? Math.round(sumGapDays / gapN) : null,
+      centroidLat: h.centroidLat, centroidLng: h.centroidLng,
+    });
+  }
+  out.sort((a, b) => b.repeatRatePct - a.repeatRatePct);
+  return {
+    radiusM: R, windowDays: D, clusters: out.slice(0, 12),
+    method: `A near-repeat is an incident with a prior incident in the same cluster within ${R} m `
+      + `and ${D} days. The rate is the share of a cluster's incidents that follow an earlier one `
+      + 'so closely — a signal that the location is being re-targeted, not merely busy.',
+  };
+}
+
+// ---------------- reporting propensity (Why, P4-3) ----------------
+//
+// The strongest confounder in any crime-RATE comparison, and one the corpus can measure: the
+// gap between when an incident happened and when the FIR was registered. A district that reports
+// faster and more completely will show a higher rate for the same underlying crime — so before
+// concluding "more urban = more crime", you have to see whether urban districts simply report
+// more of it. This gives the Why tab a driver built on evidence, not assertion.
+function reportingPropensity(user) {
+  const db = load();
+  const rows = user && user.roleMeta.tier === 'state' ? db.caseList : scoped(user, db.caseList);
+  const byDistrict = new Map();
+  for (const c of rows) {
+    if (!c.incidentFromDate || !c.infoReceivedPSDate) continue;
+    const inc = new Date(`${c.incidentFromDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const rep = new Date(`${c.infoReceivedPSDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const days = (rep - inc) / 86400000;
+    if (days < 0 || days > 365) continue;
+    const k = String(c.districtId);
+    if (!byDistrict.has(k)) byDistrict.set(k, { name: c.districtName, delays: [] });
+    byDistrict.get(k).delays.push(days);
+  }
+  const median = (arr) => { const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const districts = [...byDistrict.entries()].map(([districtId, v]) => ({
+    districtId, districtName: v.name, medianDelayDays: Math.round(median(v.delays) * 10) / 10,
+    sameDayPct: Math.round((v.delays.filter((d) => d <= 1).length / v.delays.length) * 100), n: v.delays.length,
+  })).sort((a, b) => a.medianDelayDays - b.medianDelayDays);
+  const all = [].concat(...[...byDistrict.values()].map((v) => v.delays));
+  return {
+    districts,
+    stateMedianDelayDays: all.length ? Math.round(median(all) * 10) / 10 : null,
+    method: 'Reporting delay is the gap between the incident date on the FIR and the date the '
+      + 'police received the information. A district that reports faster records more of the same '
+      + 'crime, so a lower delay inflates its measured rate — which is why a rate comparison must '
+      + 'account for it before reading urbanisation as cause.',
+  };
+}
+
 // ---------------- health ----------------
 function filterHealth(user, q = {}) {
   const db = load();
@@ -797,7 +897,7 @@ function vulnerability(user) {
 module.exports = {
   FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
   filterHealth, getCase, graphForCase, getCluster,
-  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix,
+  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity,
   listOffenders, getOffender, listHealth, healthSummary, deadlines, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --

@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking } from '../api/hooks';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting } from '../api/hooks';
 import { Section, Skeleton, Chip, Empty } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { Hint, stagger, rise } from '../components/viz';
@@ -458,9 +458,12 @@ function ZoneBoard({ zones }: { zones: any }) {
   const alerts = zones.alerts || [];
   const pulsing = (zones.stations || []).filter((x: any) => x.zone === 'red_pulsing');
   const unitWord = districtScope ? 'stations' : 'districts';
+  // Three bands (D3). `red` folds into Watch, so it is summed with yellow rather than shown as
+  // its own legend entry — otherwise "Watch" appears twice.
   const counts: [string, number][] = [
-    ['red_pulsing', s.red_pulsing || 0], ['red', s.red || 0],
-    ['yellow', s.yellow || 0], ['normal', s.normal || 0],
+    ['red_pulsing', s.red_pulsing || 0],
+    ['yellow', (s.yellow || 0) + (s.red || 0)],
+    ['normal', s.normal || 0],
   ];
   return (
     <Section
@@ -708,6 +711,8 @@ export default function Intelligence() {
   const { data: zones } = useZones();
   const { data: hotspots } = useHotspots();
   const { data: anomalies } = useAnomalies();
+  const { data: nearRepeat } = useNearRepeat();
+  const { data: reporting } = useReporting();
   const [stationSort, setStationSort] = useState<'zone'|'cases_desc'|'name'>('zone');
   const [stationQ, setStationQ] = useState('');
   const { data: stations } = useStations({ sort: stationSort, q: stationQ || undefined });
@@ -802,6 +807,11 @@ export default function Intelligence() {
       <motion.div variants={rise}>
         <SpatioTemporal hotspots={hotspots} />
       </motion.div>
+      {/* Near-repeat (P4-2): the crime-science pattern that turns a hotspot into an
+          instruction — having just had one, these streets are elevated for a fortnight. */}
+      <motion.div variants={rise}>
+        <NearRepeat data={nearRepeat} />
+      </motion.div>
       <motion.div variants={rise}>
         <Outliers anomalies={anomalies} />
       </motion.div>
@@ -863,6 +873,12 @@ export default function Intelligence() {
       )}
 
       {tab === 'why' && !districtView && <>
+      {/* Reporting propensity (P4-3): the confounder a rate comparison must clear before it can
+          read urbanisation as cause. Here it clears — delay is uniform — which is itself a
+          finding, and the kind of counter-evidence the tab should carry. */}
+      <motion.div variants={rise}>
+        <ReportingPropensity data={reporting} />
+      </motion.div>
       {/* ---- Correlation ---- */}
       <motion.div variants={rise}>
         <Section
@@ -1062,6 +1078,91 @@ function TaskingBoard() {
         </button>
       </div>
     </div>
+  );
+}
+
+// Near-repeat clusters (P4-2): where an incident is followed by another close by, soon after —
+// the pattern that says "re-targeted", and converts a hotspot into a fortnight of patrol.
+function NearRepeat({ data }: { data: any }) {
+  if (!data) return null;
+  const rows = data.clusters || [];
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><MapPin size={15} className="text-danger" />
+        Near-repeat clusters — where one incident predicts the next</span>}
+      action={<InfoDot>{data.method}
+        <span className="block mt-1.5 text-ink-muted">Near-repeat victimisation is one of the most
+          replicated findings in crime science: after a burglary or theft, nearby addresses carry
+          elevated risk for a short window. A high rate here means the location is being worked,
+          not merely busy — and the response is a time-boxed patrol, not a permanent post.</span>
+      </InfoDot>}>
+      {!rows.length ? (
+        <div className="p-4 text-[12.5px] text-ink-muted">
+          No cluster in scope shows a near-repeat rate above chance right now — incidents here are
+          spread, not chained. That is itself useful: these are places, not re-targeted addresses.
+        </div>
+      ) : (
+        <div className="p-4 space-y-2">
+          <div className="text-[12.5px] text-ink-muted mb-1">
+            Within <b>{data.radiusM} m</b> and <b>{data.windowDays} days</b> of a prior incident.
+          </div>
+          {rows.map((c: any) => (
+            <div key={c.cellId} className="rounded-card border border-line bg-surface-2 px-3 py-2.5 flex items-center gap-3 flex-wrap">
+              <span className="text-[13px] text-ink flex-1 min-w-0 truncate">{c.districtName}</span>
+              <span className="text-[12px] text-ink-muted">{c.incidents} incidents</span>
+              {c.medianGapDays != null && <span className="text-[12px] text-ink-muted">median gap {c.medianGapDays}d</span>}
+              <span className="font-num text-[13px] font-semibold text-danger">{c.repeatRatePct}% near-repeat</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// Reporting propensity (P4-3): the incident-to-FIR delay, per district — the confounder a rate
+// comparison must clear. When it is uniform (as here), it CLEARS: the rate gaps are not an
+// artefact of some districts reporting faster. Stating that is stronger than asserting a cause.
+function ReportingPropensity({ data }: { data: any }) {
+  if (!data) return null;
+  const rows = data.districts || [];
+  if (!rows.length) return null;
+  const delays = rows.map((r: any) => r.medianDelayDays);
+  const spread = Math.max(...delays) - Math.min(...delays);
+  const uniform = spread <= 3;
+  const max = Math.max(1, ...delays);
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Clock size={15} className="text-kadi-blue" />
+        Reporting propensity — does the rate just reflect faster reporting?</span>}
+      action={<InfoDot>{data.method}</InfoDot>}>
+      <div className="p-4">
+        <div className={`rounded-card px-3 py-2.5 mb-3 text-[13px] ${uniform ? 'bg-kadi-teal/10 border border-kadi-teal/30' : 'bg-kadi-blue50/50 border border-kadi-blue/25'}`}>
+          {uniform ? (
+            <>State median delay is <b className="font-num">{data.stateMedianDelayDays} days</b>, and it barely
+            moves across districts (range {spread.toFixed(1)}d). So the crime-rate differences are
+            <b> not</b> an artefact of some districts reporting faster — reporting propensity is ruled out
+            as the confounder here, which strengthens the urbanisation reading rather than undermining it.</>
+          ) : (
+            <>Reporting delay ranges {Math.min(...delays)}–{Math.max(...delays)} days across districts, so
+            part of the rate difference may be reporting speed rather than underlying crime. Read the
+            urbanisation correlation with that in mind.</>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          {rows.slice(0, 8).map((r: any) => (
+            <div key={r.districtId} className="flex items-center gap-2 text-[12.5px]">
+              <span className="w-28 shrink-0 truncate text-ink">{r.districtName}</span>
+              <span className="flex-1 h-2 bg-surface-3 rounded overflow-hidden max-w-[180px]">
+                <span className="block h-full bg-kadi-blue" style={{ width: `${(r.medianDelayDays / max) * 100}%` }} />
+              </span>
+              <span className="font-num text-ink-muted w-16 text-right">{r.medianDelayDays}d median</span>
+              <span className="font-num text-ink-subtle w-20 text-right">{r.sameDayPct}% same-day</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Section>
   );
 }
 

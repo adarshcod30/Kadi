@@ -795,6 +795,12 @@ function buildApp() {
   // Status × crime-head crosstab for the linked double pie on Home (P2-2).
   r.get('/analytics/mix', handle(async (req) => q.statusHeadMix(req.user)));
 
+  // Near-repeat clusters (Where, P4-2): hotspots that are being re-targeted, not merely busy.
+  r.get('/analytics/near-repeat', handle(async (req) => q.nearRepeat(req.user, req.query)));
+
+  // Reporting propensity (Why, P4-3): the incident-to-FIR delay confounder, per district.
+  r.get('/analytics/reporting', handle(async (req) => q.reportingPropensity(req.user)));
+
   // What Next as a tasking board (D2), tier-shaped. Distinct from Forecast.
   r.get('/analytics/tasking', handle(async (req) => tasking.build(req.user, {
     asOf: q.corpusAsOf(), districtId: req.user.districtId,

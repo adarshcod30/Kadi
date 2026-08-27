@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck, Info } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand, useMix, useStations } from '../api/hooks';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand, useMix, useStations, useHotspots } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { StateCommand, DistrictCommand, StationCommand, CommandInsight } from '../components/CommandViews';
 import { HeatMap, Donut, Legend, VizCard, Hint, DoublePie, stagger, rise } from '../components/viz';
@@ -77,6 +77,7 @@ export default function Dashboard() {
   const { data: command } = useCommand();
   const { data: mix } = useMix();
   const { data: socio } = useSocio();
+  const { data: hotspots } = useHotspots(true);
 
   // The final month in `trend` is the month still in progress, so it carries a
   // fraction of a normal month's FIRs and renders as a cliff. The pipeline already
@@ -199,6 +200,14 @@ export default function Dashboard() {
                   rather than leaving the eye to hunt the darkest cell. */}
               <HeatPeak heat={stats.heat} />
             </>) : <Skeleton rows={4} />}
+          </VizCard>
+
+          {/* WHERE crime happens (P1-6): the spatial companion to the temporal heatmap above.
+              The home had a "when" panel and no "where" — this fills that, and the empty space
+              the brief flagged, with the emerging clusters (a spatial signal, distinct from the
+              volume ladder below it). */}
+          <VizCard title="Where crime happens" hint="Emerging clusters — places where recent activity far exceeds the local baseline. This is the spatial half of the pattern the heatmap shows in time; the two together say where to be, and when." action={<button onClick={() => nav('/map')} className="text-xs link">Map</button>}>
+            <WhereCrime hotspots={hotspots} onOpen={() => nav('/map')} />
           </VizCard>
 
           {/* District standings (P2-4): all 31 ranked, not a top-8 bar chart, with the viewer's
@@ -399,6 +408,41 @@ function StationDrill({ me }: { me: any }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// The spatial companion to the "when" heatmap (P1-6). Emerging clusters, grouped by district,
+// with how far each sits above its local baseline — a "where to be" to the heatmap's "when".
+function WhereCrime({ hotspots, onOpen }: { hotspots: any; onOpen: () => void }) {
+  if (!hotspots) return <Skeleton rows={4} />;
+  const emerging = (hotspots.hotspots || []).filter((h: any) => h.emergingFlag);
+  if (!emerging.length) {
+    return <div className="p-4 text-sm text-ink-muted">No emerging clusters in scope right now — recent activity is within the local baseline everywhere.</div>;
+  }
+  // Group emerging clusters by district and total their recent count.
+  const byDistrict: Record<string, { name: string; count: number; cells: number }> = {};
+  const dName = (id: string) => (hotspots.districtCounts && hotspots.districtNames?.[id]) || `District ${id}`;
+  for (const h of emerging) {
+    const k = String(h.districtId);
+    if (!byDistrict[k]) byDistrict[k] = { name: h.districtName || dName(k), count: 0, cells: 0 };
+    byDistrict[k].count += h.recentCount || h.count || 0;
+    byDistrict[k].cells += 1;
+  }
+  const rows = Object.values(byDistrict).sort((a, b) => b.count - a.count).slice(0, 6);
+  const max = Math.max(1, ...rows.map((r) => r.count));
+  return (
+    <div className="p-3 space-y-1.5">
+      <div className="px-1 text-[12px] text-ink-muted">{emerging.length} emerging cluster{emerging.length === 1 ? '' : 's'} across {rows.length} district{rows.length === 1 ? '' : 's'} — recent activity far above the local baseline.</div>
+      {rows.map((r) => (
+        <button key={r.name} onClick={onOpen} className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-kadi-blue50 text-sm text-left">
+          <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse shrink-0" />
+          <span className="flex-1 truncate text-ink">{r.name}</span>
+          <span className="flex-1 h-2 bg-surface-3 rounded overflow-hidden max-w-[120px]"><span className="block h-full bg-danger" style={{ width: `${(r.count / max) * 100}%` }} /></span>
+          <span className="font-num text-xs text-ink-muted w-16 text-right">{r.count} recent</span>
+          <span className="font-num text-[11px] text-ink-subtle w-14 text-right">{r.cells} spot{r.cells === 1 ? '' : 's'}</span>
+        </button>
+      ))}
     </div>
   );
 }

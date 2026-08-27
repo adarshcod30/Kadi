@@ -77,6 +77,10 @@ export const useTasking = () =>
   useQuery({ queryKey: ['tasking', role()], queryFn: () => api.get<any>('/analytics/tasking') });
 export const useMix = () =>
   useQuery({ queryKey: ['mix', role()], queryFn: () => api.get<any>('/analytics/mix') });
+export const useNearRepeat = () =>
+  useQuery({ queryKey: ['nearRepeat', role()], queryFn: () => api.get<any>('/analytics/near-repeat') });
+export const useReporting = () =>
+  useQuery({ queryKey: ['reporting', role()], queryFn: () => api.get<any>('/analytics/reporting') });
 
 export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });
