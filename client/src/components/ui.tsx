@@ -35,19 +35,65 @@ export function RiskBadge({ score, band }: { score?: number; band?: string }) {
   return <Chip color={color} className="font-num">{score != null ? `${score}` : '—'} · {band || '—'}</Chip>;
 }
 
-export function KpiCard({ label, value, delta, hint, accent, onClick }: {
-  label: ReactNode; value: ReactNode; delta?: number; hint?: string; accent?: string; onClick?: () => void;
-}) {
+// A tier badge: blue = state, saffron = district, teal = station. The one visual grammar for
+// "who is this panel for", used wherever a surface is scope-differentiated (D1).
+export function TierChip({ tier, label }: { tier: 'state' | 'district' | 'station'; label?: string }) {
+  const T = { state: { c: '#1A6FC4', t: 'State' }, district: { c: '#E8871E', t: 'District' }, station: { c: '#2FA8A0', t: 'Station' } }[tier];
   return (
-    <button onClick={onClick} className={`card p-4 text-left transition-shadow hover:shadow-hover ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>
+    <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+      style={{ color: T.c, borderColor: T.c, background: `${T.c}14` }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: T.c }} />{label || T.t}
+    </span>
+  );
+}
+
+// A minimal inline sparkline for the KPI row — an area over the last N points with an
+// emphasised endpoint, so a number carries its own recent shape without a full chart.
+export function MiniSpark({ data, color = '#1A6FC4', width = 96, height = 26 }: {
+  data: number[]; color?: string; width?: number; height?: number;
+}) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data), min = Math.min(...data);
+  const span = max - min || 1;
+  const step = width / (data.length - 1);
+  const pts = data.map((v, i) => [i * step, height - 3 - ((v - min) / span) * (height - 6)]);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const area = `${line} L${width},${height} L0,${height} Z`;
+  const end = pts[pts.length - 1];
+  const gid = `sp${Math.round(color.charCodeAt(1) + width + data.length)}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible" aria-hidden="true">
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={color} stopOpacity="0.22" /><stop offset="100%" stopColor={color} stopOpacity="0" />
+      </linearGradient></defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx={end[0]} cy={end[1]} r="2" fill={color} />
+    </svg>
+  );
+}
+
+export function KpiCard({ label, value, delta, hint, accent, onClick, spark, tier }: {
+  label: ReactNode; value: ReactNode; delta?: number; hint?: string; accent?: string; onClick?: () => void;
+  spark?: number[]; tier?: 'state' | 'district' | 'station';
+}) {
+  // A tier-coloured top rule ties the card to whose view it belongs in; the sparkline gives
+  // the number a shape. Both optional, so existing call sites render unchanged.
+  const rule = accent || (tier ? { state: '#1A6FC4', district: '#E8871E', station: '#2FA8A0' }[tier] : '#1A6FC4');
+  return (
+    <button onClick={onClick} className={`card p-4 text-left relative overflow-hidden transition-shadow hover:shadow-hover ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>
+      <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: rule }} />
       <div className="label">{label}</div>
-      <div className="mt-1 flex items-end gap-2">
-        <div className="text-2xl font-semibold font-num text-kadi-navy" style={accent ? { color: accent } : undefined}>{value}</div>
-        {delta != null && (
-          <span className={`text-xs font-medium flex items-center ${delta >= 0 ? 'text-success' : 'text-danger'}`}>
-            {delta >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{Math.abs(delta)}%
-          </span>
-        )}
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="flex items-end gap-2 min-w-0">
+          <div className="text-2xl font-semibold font-num text-kadi-navy" style={accent ? { color: accent } : undefined}>{value}</div>
+          {delta != null && (
+            <span className={`text-xs font-medium flex items-center ${delta >= 0 ? 'text-success' : 'text-danger'}`}>
+              {delta >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{Math.abs(delta)}%
+            </span>
+          )}
+        </div>
+        {spark && spark.length > 1 && <MiniSpark data={spark} color={rule} />}
       </div>
       {hint && <div className="text-xs text-ink-muted mt-1">{hint}</div>}
     </button>

@@ -71,6 +71,12 @@ export const useHealthCases = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['health', role(), params], queryFn: () => api.get<Paged<HealthRow>>(`/health/cases${qs(params)}`) });
 export const useHealthSummary = () =>
   useQuery({ queryKey: ['healthSummary', role()], queryFn: () => api.get<any>('/health/summary') });
+export const useDeadlines = (params: Record<string, unknown>) =>
+  useQuery({ queryKey: ['deadlines', role(), params], queryFn: () => api.get<any>(`/analytics/deadlines${qs(params)}`) });
+export const useTasking = () =>
+  useQuery({ queryKey: ['tasking', role()], queryFn: () => api.get<any>('/analytics/tasking') });
+export const useMix = () =>
+  useQuery({ queryKey: ['mix', role()], queryFn: () => api.get<any>('/analytics/mix') });
 
 export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });

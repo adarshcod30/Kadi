@@ -7,9 +7,11 @@ import {
   ComposedChart, Area, Line, ScatterChart, Scatter, BarChart, Bar, Cell,
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle } from 'lucide-react';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies } from '../api/hooks';
-import { Section, Skeleton, Chip } from '../components/ui';
+import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking } from '../api/hooks';
+import { Section, Skeleton, Chip, Empty } from '../components/ui';
+import { InfoDot } from '../components/InfoDot';
 import { Hint, stagger, rise } from '../components/viz';
 import { Select } from '../components/Select';
 
@@ -56,10 +58,11 @@ function AiNote({ text, kind }: { text?: string; kind: string }) {
   );
 }
 
+// Three bands (D3): Pulsing, Watch, Normal. `red` kept as a Watch alias for stale payloads.
 const ZONE_STYLE: Record<string, { dot: string; label: string; ring?: string }> = {
-  red_pulsing: { dot: '#C0392B', label: 'Pulsing red', ring: 'animate-pulse' },
-  red: { dot: '#C0392B', label: 'Red' },
-  yellow: { dot: '#C9820A', label: 'Yellow' },
+  red_pulsing: { dot: '#C0392B', label: 'Pulsing', ring: 'animate-pulse' },
+  red: { dot: '#C9820A', label: 'Watch' },
+  yellow: { dot: '#C9820A', label: 'Watch' },
   normal: { dot: '#3AA76D', label: 'Normal' },
 };
 
@@ -569,50 +572,126 @@ function ZoneBoard({ zones }: { zones: any }) {
 
 
 function OccasionPanels({ occ }: { occ: any }) {
+  const [view, setView] = useState<'events' | 'rhythm' | 'compare'>('events');
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
   if (!occ) return <div className="card"><Skeleton rows={6} /></div>;
-  const classes = occ.classes || [];
-  const occasions = occ.occasions || [];
-  const tone = (v: number) => (v > 10 ? 'text-danger' : v < -5 ? 'text-kadi-teal' : 'text-ink-muted');
+
+  // events.build shape: occasions carry category, intensity and an evidenced flag; dayClasses
+  // are the pipeline's measured day-type rates.
+  const occasions: any[] = occ.occasions || [];
+  const dayClasses: any[] = occ.dayClasses || [];
+  const cats: Record<string, any> = occ.categories || {};
+  const tone = (v: number) => (v > 8 ? 'text-danger' : v < -5 ? 'text-kadi-teal' : 'text-ink-muted');
+  const INT: Record<string, { label: string; c: string }> = {
+    surge: { label: 'Surge', c: '#C0392B' }, raised: { label: 'Raised', c: '#C9820A' }, quiet: { label: 'Quiet', c: '#2FA8A0' },
+  };
+  const pick = (k: string) => occasions.find((o) => o.key === k);
+  const oa = pick(a); const ob = pick(b);
+
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4">
-      <motion.div variants={rise}>
-        <Section title="Crime by kind of day"
-          action={<Hint text="Rates are cases per day, so classes with very different day counts stay comparable. Baseline is an ordinary weekday." />}>
-          <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {classes.map((c: any) => (
-              <div key={c.dayClass} className="rounded-card border border-line p-3">
-                <div className="text-sm font-semibold text-ink">{c.dayClass}</div>
-                <div className="text-2xl font-num text-kadi-navy mt-1">{c.casesPerDay}</div>
-                <div className="text-[11px] text-ink-muted">cases per day · {c.days} days</div>
-                <div className={`text-[12px] font-medium mt-1 ${tone(c.vsNormalPct)}`}>
-                  {c.vsNormalPct > 0 ? '+' : ''}{c.vsNormalPct}% vs ordinary day
-                </div>
-                {c.peakHour !== null && c.peakHour !== undefined && (
-                  <div className="text-[11px] text-ink-muted mt-1">peaks {String(c.peakHour).padStart(2, '0')}:00</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      </motion.div>
+      {/* Three views, because "when" is three different questions: the ordinary weekly rhythm,
+          the calendar of occasions, and a direct comparison of any two day-types (P4-5). */}
+      <div className="flex flex-wrap gap-2">
+        {([['events', 'Calendar of occasions'], ['rhythm', 'Ordinary rhythm'], ['compare', 'Compare two days']] as const).map(([k, lab]) => (
+          <button key={k} onClick={() => setView(k)}
+            className={`chip ${view === k ? 'bg-kadi-navy text-white' : 'bg-surface-3 text-ink-muted'}`}>{lab}</button>
+        ))}
+        <span className="ml-auto"><InfoDot>
+          <b className="block mb-1 text-kadi-navy">How to read this</b>
+          Festival effects are measured from real registration dates. The wider occasions —
+          political visits, matches, exam days, bandhs, election phases — are indicative for a
+          prototype: the direction each pushes crime, not exact historical counts. Rows measured
+          from data are marked <b>measured</b>; the rest are marked <b>indicative</b>.
+        </InfoDot></span>
+      </div>
 
-      <motion.div variants={rise}>
-        <Section title="By occasion"
-          action={<Hint text="Lunar-calendar dates shift year to year, so each festival is windowed by a day either side. That also picks up eve-of-festival activity." />}>
-          <div className="p-2">
-            {occasions.map((o: any) => (
-              <div key={o.occasion} className="flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0">
-                <span className="text-sm text-ink flex-1 truncate">{o.occasion}</span>
-                <span className="text-[11.5px] text-ink-muted w-28 truncate">{o.topHead}</span>
-                <span className="font-num text-sm text-ink-muted w-20 text-right">{o.casesPerDay}/day</span>
-                <span className={`font-num text-sm w-16 text-right font-medium ${tone(o.vsNormalPct)}`}>
-                  {o.vsNormalPct > 0 ? '+' : ''}{o.vsNormalPct}%
-                </span>
+      {view === 'events' && (
+        <motion.div variants={rise}>
+          <Section title="Occasions, by how far they move crime from an ordinary day"
+            action={<Hint text="Sorted by intensity: surge days first. Each row names the crime type it most affects and carries a note on what to watch — including where a fall in the total hides a rise in the type that matters, as on a bandh." />}>
+            <div className="p-2">
+              {occasions.map((o) => (
+                <div key={o.key} className="px-2 py-2.5 border-b border-line/60 last:border-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: (INT[o.intensity] || INT.raised).c }} />
+                    <span className="text-[13.5px] font-medium text-ink">{o.label}</span>
+                    <span className="chip bg-surface-3 text-ink-muted text-[10.5px]">{o.categoryLabel}</span>
+                    <span className="text-[10.5px] px-1.5 py-0.5 rounded-full" style={{ color: o.evidenced ? '#1E874B' : '#5B6B7E', background: o.evidenced ? '#E4F4EC' : '#EDF1F6' }}>
+                      {o.evidenced ? 'measured' : 'indicative'}
+                    </span>
+                    <span className={`ml-auto font-num text-sm font-medium ${tone(o.vsNormalPct)}`}>
+                      {o.vsNormalPct > 0 ? '+' : ''}{o.vsNormalPct}% vs ordinary day
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[11.5px] text-ink-muted pl-4">
+                    <span className="font-medium text-ink">{(INT[o.intensity] || INT.raised).label}</span>
+                    <span>· drives {o.topHead}</span>
+                    <span>· {o.cadence}</span>
+                  </div>
+                  <p className="text-[12px] text-ink-muted mt-1 pl-4">{o.note}</p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </motion.div>
+      )}
+
+      {view === 'rhythm' && (
+        <motion.div variants={rise}>
+          <Section title="Crime by kind of day"
+            action={<Hint text="Rates are cases per day, so classes with very different day counts stay comparable. Baseline is an ordinary weekday. These are measured from the corpus." />}>
+            <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {dayClasses.map((c: any) => (
+                <div key={c.dayClass} className="rounded-card border border-line p-3">
+                  <div className="text-sm font-semibold text-ink">{c.dayClass}</div>
+                  <div className="text-2xl font-num text-kadi-navy mt-1">{c.casesPerDay}</div>
+                  <div className="text-[11px] text-ink-muted">cases per day · {c.days} days</div>
+                  <div className={`text-[12px] font-medium mt-1 ${tone(c.vsNormalPct)}`}>
+                    {c.vsNormalPct > 0 ? '+' : ''}{c.vsNormalPct}% vs ordinary day
+                  </div>
+                  {c.peakHour != null && (
+                    <div className="text-[11px] text-ink-muted mt-1">peaks {String(c.peakHour).padStart(2, '0')}:00</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        </motion.div>
+      )}
+
+      {view === 'compare' && (
+        <motion.div variants={rise}>
+          <Section title="Compare two occasions"
+            action={<Hint text="Put any two day-types side by side — for example a festival against an ordinary Tuesday — to see how far each moves crime and which type it drives." />}>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <Select value={a} onChange={setA} placeholder="First occasion…"
+                  options={occasions.map((o) => ({ value: o.key, label: o.label }))} />
+                <Select value={b} onChange={setB} placeholder="Second occasion…"
+                  options={occasions.map((o) => ({ value: o.key, label: o.label }))} />
               </div>
-            ))}
-          </div>
-        </Section>
-      </motion.div>
+              {oa && ob ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {[oa, ob].map((o, i) => (
+                    <div key={i} className="rounded-card border border-line p-4">
+                      <div className="text-[13.5px] font-semibold text-ink">{o.label}</div>
+                      <div className="text-[11px] text-ink-muted">{o.categoryLabel} · {o.evidenced ? 'measured' : 'indicative'}</div>
+                      <div className={`text-3xl font-num font-semibold mt-2 ${tone(o.vsNormalPct)}`}>{o.vsNormalPct > 0 ? '+' : ''}{o.vsNormalPct}%</div>
+                      <div className="text-[11px] text-ink-muted">vs an ordinary day</div>
+                      <div className="mt-2 text-[12px] text-ink">Drives <b>{o.topHead}</b></div>
+                      <p className="text-[11.5px] text-ink-muted mt-1">{o.note}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-ink-muted text-center py-6">Pick two occasions to compare.</div>
+              )}
+            </div>
+          </Section>
+        </motion.div>
+      )}
 
       <div className="text-[11.5px] text-ink-muted px-1">{occ.method}</div>
     </motion.div>
@@ -907,113 +986,82 @@ export default function Intelligence() {
       {tab === 'when' && <OccasionPanels occ={occ} />}
 
       {tab === 'next' && <>
-      {/* The Sparkles icon promises intelligence, so the tab has to lead with a reading of
-          the projection rather than a chart the viewer must interpret unaided. */}
-      {tab === 'next' && <AiNote kind="forecast" text={fc?.insight} />}
-      <motion.div variants={rise}>
-        <WhatNextBrief fc={fc} districtView={districtView} />
-      </motion.div>
-      {/* ---- Forecast ---- */}
-      <motion.div variants={rise}>
-        <Section
-          title={<span className="flex items-center gap-2"><Target size={15} className="text-kadi-blue" />{fc?.scope === 'district' && fc?.focus ? `${fc.focus.districtName} forecast` : 'State-wide forecast'} — next {fc?.horizonMonths || 3} months</span>}
-          action={<Hint text="Linear trend plus month-of-year seasonality. The shaded band is the 95% interval. Accuracy is a hold-out backtest: the last 3 months were hidden from the model, then predicted and scored." />}
-        >
-          <div className="p-4">
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%" key={stateSeries.length}>
-                <ComposedChart data={stateSeries} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id="fcBand" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#E8871E" stopOpacity={0.28} />
-                      <stop offset="100%" stopColor="#E8871E" stopOpacity={0.06} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
-                  <Area dataKey="band" stroke="none" fill="url(#fcBand)" isAnimationActive={false}
-                    name="95% interval" connectNulls />
-                  <Line type="monotone" dataKey="actual" stroke="#1A6FC4" strokeWidth={2} dot={false}
-                    isAnimationActive={false} name="Actual" connectNulls />
-                  <Line type="monotone" dataKey="predicted" stroke="#E8871E" strokeWidth={2}
-                    strokeDasharray="5 4" dot={{ r: 2.5, fill: '#E8871E' }} isAnimationActive={false}
-                    name="Forecast" connectNulls />
-                  <RLegend wrapperStyle={{ fontSize: 11 }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-            {fc?.accuracy && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <Chip className="bg-kadi-blue50 text-kadi-blue">MAPE {fc.accuracy.mape}%</Chip>
-                <Chip className="bg-surface-3 text-ink-muted">MAE {fc.accuracy.mae}</Chip>
-                <span className="text-ink-muted">
-                  measured on {fc.accuracy.holdoutMonths} withheld months —
-                  {fc.accuracy.detail.map((d: any) => ` ${d.month}: predicted ${d.predicted} vs actual ${d.actual}`).join(' ·')}
-                </span>
-              </div>
-            )}
-            <p className="mt-2 text-[12px] text-ink-muted">
-              Last complete month of data: <strong>{fc?.lastCompleteMonth}</strong>. Partial months are
-              excluded from the fit — including them would invent a false downward trend.
-            </p>
-          </div>
-        </Section>
-      </motion.div>
-
-      {/* ---- District projections ---- */}
-      <motion.div variants={rise}>
-        <Section title={`District projections — ${rising.length} district${rising.length === 1 ? '' : 's'} trending up`}
-          action={<Hint text="Next-month projection against each district's own recent 12-month average. Districts are ranked by projected change, so emerging pressure surfaces before it becomes a spike." />}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-ink-muted">
-                <tr className="text-left">
-                  <th className="px-4 py-2 font-medium">District</th>
-                  <th className="px-3 py-2 font-medium text-right">12-mo avg</th>
-                  <th className="px-3 py-2 font-medium text-right">Next month</th>
-                  <th className="px-3 py-2 font-medium text-right">Change</th>
-                  <th className="px-3 py-2 font-medium">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(fc?.districts || []).slice(0, 12).map((d: any) => (
-                  <tr key={d.districtId} className="border-t border-line hover:bg-surface-2">
-                    <td className="px-4 py-2 font-medium text-ink">{d.districtName}</td>
-                    <td className="px-3 py-2 text-right font-num text-ink-muted">{d.recentAvg}</td>
-                    <td className="px-3 py-2 text-right font-num">{d.nextMonth}</td>
-                    <td className={`px-3 py-2 text-right font-num font-medium ${
-                      d.changePct > 5 ? 'text-danger' : d.changePct < -5 ? 'text-kadi-teal' : 'text-ink-muted'}`}>
-                      {d.changePct > 0 ? '+' : ''}{d.changePct}%
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`inline-flex items-center gap-1 text-xs ${
-                        d.direction === 'rising' ? 'text-danger'
-                          : d.direction === 'falling' ? 'text-kadi-teal' : 'text-ink-muted'}`}>
-                        {d.direction === 'rising' ? <TrendingUp size={13} />
-                          : d.direction === 'falling' ? <TrendingDown size={13} /> : <Minus size={13} />}
-                        {d.direction}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-      </motion.div>
-
-      {/* Method + fairness */}
-      <motion.div variants={rise} className="card p-4 text-[12px] text-ink-muted leading-relaxed">
-        <strong className="text-ink">Method &amp; limits.</strong> Denominator: {socio?.method?.denominator}.
-        Forecast: {fc?.method?.model}, {fc?.method?.interval}, {fc?.method?.trendWindowMonths}-month trend window.
-        {' '}Every indicator here is an <strong>area-level aggregate</strong> — population, literacy and
-        urbanisation are never joined to an individual and never used as a feature in any person-level
-        score. Caste, religion and occupation are excluded from every model by construction.
-      </motion.div>
+      {/* WHAT NEXT IS A TASKING BOARD, NOT A SECOND FORECAST (D2). This tab used to render the
+          forecast chart again — the exact duplication the brief flagged. Forecast answers
+          "what will the numbers do?"; this answers "what should we do about it?" Every task
+          traces to a computed trigger (a zone, a forecast direction, an emerging hotspot, a
+          statutory deadline) shown on the card, and the projection it responds to is a link
+          away in Forecast rather than repeated here. */}
+      <motion.div variants={rise}><TaskingBoard /></motion.div>
       </>}
 
     </motion.div>
+  );
+}
+
+// The tasking board (D2 / P4-6). Tier-shaped: state gets a quarterly control strategy,
+// district a two-week deployment plan, station this week's list. Each task is a card that
+// names its trigger, the action, the area, the review date and the measure of success.
+const PRIORITY: Record<string, { dot: string; label: string }> = {
+  high: { dot: '#C0392B', label: 'High' }, medium: { dot: '#C9820A', label: 'Medium' }, low: { dot: '#3AA76D', label: 'Low' },
+};
+function TaskingBoard() {
+  const nav = useNavigate();
+  const { data, isLoading } = useTasking();
+  if (isLoading) return <div className="card"><Skeleton rows={6} /></div>;
+  if (!data) return <Empty title="No tasking available" />;
+  const tone = data.tier === 'state' ? '#1A6FC4' : data.tier === 'district' ? '#E8871E' : '#2FA8A0';
+  return (
+    <div className="space-y-4">
+      <div className="rounded-card border px-4 py-3 flex items-start gap-3" style={{ borderColor: `${tone}55`, background: `${tone}0f` }}>
+        <Sparkles size={16} style={{ color: tone }} className="shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: tone }}>
+            {data.horizonLabel}
+            <span className="ml-2"><InfoDot>What Next is a tasking product, distinct from Forecast.
+              Forecast projects the numbers; this turns the projection into action — areas, hours,
+              units and a review date. Every task shows the computed trigger it came from, so
+              nothing here is the model editorialising.</InfoDot></span>
+          </div>
+          <p className="text-[13px] text-ink leading-relaxed">{data.note}</p>
+        </div>
+      </div>
+
+      {!data.tasks.length && <Empty title="Nothing needs tasking right now" hint="No zone, forecast, hotspot or deadline crossed a threshold in this scope." />}
+
+      <div className="grid md:grid-cols-2 gap-3">
+        {data.tasks.map((t: any) => {
+          const p = PRIORITY[t.priority] || PRIORITY.medium;
+          return (
+            <div key={t.id} className="card p-4 relative overflow-hidden flex flex-col">
+              <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: tone }} />
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: p.dot }} />
+                <span className="text-[10.5px] uppercase tracking-wide font-semibold text-ink-muted">{t.horizon} · {p.label} priority</span>
+              </div>
+              <h3 className="text-[15px] font-semibold text-kadi-navy leading-snug">{t.title}</h3>
+              <div className="mt-2 space-y-1.5 text-[12.5px]">
+                <div className="flex gap-2"><span className="text-ink-muted w-16 shrink-0">Trigger</span><span className="text-ink">{t.trigger}</span></div>
+                <div className="flex gap-2"><span className="text-ink-muted w-16 shrink-0">Action</span><span className="text-ink">{t.action}</span></div>
+                <div className="flex gap-2"><span className="text-ink-muted w-16 shrink-0">Area</span><span className="text-ink">{t.area}</span></div>
+                <div className="flex gap-2"><span className="text-ink-muted w-16 shrink-0">Success</span><span className="text-ink">{t.measure}</span></div>
+                <div className="flex gap-2"><span className="text-ink-muted w-16 shrink-0">Review by</span><span className="text-ink font-num">{t.reviewBy}</span></div>
+              </div>
+              {t.link && (
+                <button onClick={() => nav(t.link.to)} className="btn-outline text-xs mt-3 self-start inline-flex items-center gap-1.5">
+                  {t.link.label} <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-center">
+        <button onClick={() => nav('/forecast')} className="text-xs link inline-flex items-center gap-1">
+          The projections these respond to live in Forecast <ArrowRight size={12} />
+        </button>
+      </div>
+    </div>
   );
 }
 

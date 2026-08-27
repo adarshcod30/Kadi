@@ -642,7 +642,7 @@ export default function MapPage() {
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-3 items-stretch">
         <div className="card overflow-hidden relative" style={{ height: 'calc(100vh - 14rem)', minHeight: 420 }}>
           <div ref={ref} className="w-full h-full" />
           {layer === 'density' && (
@@ -691,7 +691,9 @@ export default function MapPage() {
           {selDistrict && <button onClick={resetView} className="absolute top-3 left-3 btn-outline text-xs bg-white/95">← All Karnataka</button>}
         </div>
 
-        <div className="space-y-3">
+        {/* The panel now matches the map's height and scrolls inside itself, so the two read
+            as one instrument rather than a tall column beside a short map (P3-8). */}
+        <div className="space-y-3 overflow-auto pr-0.5" style={{ height: 'calc(100vh - 14rem)', minHeight: 420 }}>
           {selData ? (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               <Section title="District drill-down" action={<button onClick={resetView}><X size={14} className="text-ink-muted" /></button>}>
@@ -752,21 +754,56 @@ export default function MapPage() {
             </div>
           </Section>
 
-          {national && (
-            <Section title={<span className="flex items-center gap-2"><TrendingUp size={14} /> India context</span>}>
-              <div className="p-3 text-sm">
-                <p className="text-xs text-ink-muted mb-2">Karnataka ranks <b className="text-kadi-navy">#{national.focusRank}</b> of {national.states.length} states ({national.focusRatePerLakh}/lakh).</p>
-                {national.states.slice(0, 6).map((s: any) => (
-                  <div key={s.state} className={`flex items-center gap-2 text-xs py-0.5 ${s.isFocus ? 'font-semibold text-kadi-navy' : ''}`}>
-                    <span className="w-4 text-ink-muted">{s.rank}</span><span className="flex-1 truncate">{s.state}{s.isFocus ? ' ★' : ''}</span>
-                    <span className="font-num">{s.crimesThousands}k</span>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
+          {/* India context removed from the map for every role (P3-9): it is a state-wide
+              framing that belongs on the state Home, not beside an operational map. */}
         </div>
       </div>
+
+      {/* Three cards beneath the map and its panel (P3-10), tier-shaped: the most important
+          reading of the current view for whoever is looking. */}
+      <MapCards me={me} districts={districts} hotspots={hotspots} points={filteredPoints} grid={grid} />
+    </div>
+  );
+}
+
+// The three cards beneath the map (P3-10). Tier-shaped, because what matters about a map
+// differs by altitude: a DGP wants the districts crossing threshold and the biggest mover; an
+// SP wants the busiest window and cross-boundary reach; an SHO wants their own beat.
+function MapCard({ tone, title, children }: { tone: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="card p-4 relative overflow-hidden">
+      <span className="absolute inset-x-0 top-0 h-0.5" style={{ background: tone }} />
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1.5">{title}</div>
+      {children}
+    </div>
+  );
+}
+function MapCards({ me, districts, hotspots, points, grid }: any) {
+  const tier = me?.capabilities?.effectiveScope === 'unit' ? 'station'
+    : me?.capabilities?.effectiveScope === 'district' ? 'district' : 'state';
+  const tone = { state: '#1A6FC4', district: '#E8871E', station: '#2FA8A0' }[tier];
+  const emerging = (hotspots?.hotspots || []).filter((h: any) => h.emergingFlag);
+  // Busiest hour across whatever is plotted.
+  const byHour = new Array(24).fill(0);
+  for (const p of points || []) if (p.hour != null) byHour[p.hour] += 1;
+  let peak = 0; for (let h = 1; h < 24; h += 1) if (byHour[h] > byHour[peak]) peak = h;
+  const win = `${String(peak).padStart(2, '0')}:00–${String((peak + 3) % 24).padStart(2, '0')}:00`;
+  const top = (districts?.districts || [])[0];
+  const total = (points || []).length;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+      <MapCard tone={tone} title="Concentration">
+        <div className="text-2xl font-semibold font-num text-kadi-navy">{grid?.total?.toLocaleString() ?? total.toLocaleString()}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">incidents in view · {emerging.length} emerging hotspot{emerging.length === 1 ? '' : 's'} where recent activity far exceeds the local baseline.</p>
+      </MapCard>
+      <MapCard tone={tone} title="Busiest window">
+        <div className="text-2xl font-semibold font-num text-kadi-navy">{win}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">peak hours in the current view — the window to weight patrol cover toward.</p>
+      </MapCard>
+      <MapCard tone={tone} title={tier === 'station' ? 'Your beat' : tier === 'district' ? 'Leading station area' : 'Biggest load'}>
+        <div className="text-lg font-semibold text-kadi-navy truncate">{top?.district || '—'}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">{top ? `${top.total.toLocaleString()} cases — ${tier === 'state' ? 'the district carrying the most volume right now.' : 'the heaviest area in your scope.'}` : 'No area data in view.'}</p>
+      </MapCard>
     </div>
   );
 }

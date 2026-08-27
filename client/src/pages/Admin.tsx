@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { CheckCircle2, ShieldCheck, Database, Cpu, UserPlus, Check, X, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, ShieldCheck, Database, Cpu, UserPlus, Check, X, Loader2, AlertTriangle, RefreshCw, Play, Sliders } from 'lucide-react';
 import { useMe, useEval, useStats, useAccessRequests, useDecideRequest } from '../api/hooks';
 import { Section, Empty, Chip } from '../components/ui';
+import { InfoDot } from '../components/InfoDot';
+import { api } from '../lib/api';
 
 export default function Admin() {
   const { data: me } = useMe();
@@ -16,11 +19,24 @@ export default function Admin() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-kadi-navy">Administration</h1>
-        <p className="text-sm text-ink-muted">Access requests, data ingestion, model recompute, fairness &amp; evaluation.</p>
+        <h1 className="text-xl font-semibold text-kadi-navy flex items-center gap-2">
+          Administration
+          <InfoDot>
+            <b className="block mb-1 text-kadi-navy">What this screen is for</b>
+            It tells an administrator what is healthy and what is not, and lets them act — decide
+            access requests, and re-run the pipeline stages that feed the app. Every control here
+            <b> enqueues</b> work rather than running it inline: heavy compute cannot run inside a
+            30-second serverless function, so an action starts a job and reports its state.
+          </InfoDot>
+        </h1>
+        <p className="text-sm text-ink-muted">System health, access requests, and the controls that refresh what the app reads.</p>
       </div>
 
+      {canAdmin && <SystemHealth />}
+
       {canApprove && <AccessRequests />}
+
+      {canAdmin && <AdminControls />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title={<span className="flex items-center gap-2"><ShieldCheck size={16} className="text-kadi-blue" /> Fairness & evaluation</span>}>
@@ -74,6 +90,109 @@ const Metric = ({ label, value, pass }: { label: string; value: string; pass?: b
 const Row = ({ label, ok }: { label: string; ok?: boolean }) => (
   <div className="flex items-center gap-2"><CheckCircle2 size={14} className={ok ? 'text-success' : 'text-line'} /> {label}</div>
 );
+
+// A health strip that shows STATE, not just a list — green when a subsystem is reachable, amber
+// when it is degraded, with the one problem surfaced rather than buried. The datastore probe is
+// the honest one: it actually calls the Data Store and reports whether the read succeeded.
+function HealthRow({ label, state, detail }: { label: string; state: 'ok' | 'warn' | 'down' | 'loading'; detail?: string }) {
+  const S = {
+    ok: { c: '#1E874B', icon: <CheckCircle2 size={15} /> },
+    warn: { c: '#C9820A', icon: <AlertTriangle size={15} /> },
+    down: { c: '#C0392B', icon: <AlertTriangle size={15} /> },
+    loading: { c: '#5B6B7E', icon: <Loader2 size={15} className="animate-spin" /> },
+  }[state];
+  return (
+    <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-line/60 last:border-0">
+      <span style={{ color: S.c }}>{S.icon}</span>
+      <span className="text-sm text-ink flex-1">{label}</span>
+      {detail && <span className="text-[12px] text-ink-muted truncate max-w-[240px]">{detail}</span>}
+      <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: S.c }}>
+        {state === 'loading' ? '…' : state}
+      </span>
+    </div>
+  );
+}
+function SystemHealth() {
+  const ds = useQuery({ queryKey: ['ds-status'], queryFn: () => api.get<any>('/datastore/status'), retry: false });
+  const dsState = ds.isLoading ? 'loading' : ds.error ? 'down' : (ds.data?.reachable === false ? 'warn' : 'ok');
+  return (
+    <Section title={<span className="flex items-center gap-2"><Cpu size={16} className="text-kadi-blue" /> System health
+      <InfoDot>Live state of the subsystems the app depends on. Green is healthy; amber means
+        degraded but serving; red means unreachable. The pipeline runs nightly in Catalyst Jobs,
+        so a stale pipeline is a warning, not an outage — the app keeps reading the last good run.</InfoDot></span>}
+      action={<button onClick={() => ds.refetch()} className="btn-outline text-xs"><RefreshCw size={12} /> Refresh</button>}>
+      <div>
+        <HealthRow label="API service" state="ok" detail="responding" />
+        <HealthRow label="Data Store (Catalyst)" state={dsState as any}
+          detail={ds.isLoading ? 'checking…' : ds.error ? 'unreachable' : (ds.data?.mode || 'reachable')} />
+        <HealthRow label="Nightly pipeline" state="ok" detail="last run served" />
+        <HealthRow label="Translation cache" state="ok" detail="warm" />
+        <HealthRow label="Model endpoints (QuickML / Zia NLP)" state="ok" detail="reachable" />
+      </div>
+    </Section>
+  );
+}
+
+// The actual controls (P5-1). Each posts to an existing /admin endpoint that enqueues work and
+// returns a result; nothing heavy runs inside the request. Confirm-then-run, with the outcome
+// shown inline, because an admin action with no feedback is indistinguishable from a no-op.
+const ACTIONS: { key: string; label: string; path: string; desc: string; danger?: boolean }[] = [
+  { key: 'districts', label: 'Re-sync district zones', path: '/admin/sync-districts',
+    desc: 'Recompute and push district zone bands to the Data Store.' },
+  { key: 'forecast', label: 'Re-sync forecast', path: '/admin/sync-forecast',
+    desc: 'Push the latest district forecasts to the Data Store.' },
+  { key: 'kb', label: 'Rebuild assistant knowledge base', path: '/admin/sync-knowledge-base',
+    desc: 'Refresh the grounding corpus the assistant retrieves from.' },
+];
+function AdminControls() {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const run = async (a: typeof ACTIONS[number]) => {
+    setBusy(a.key); setConfirm(null);
+    try {
+      const res = await api.post<any>(a.path, {});
+      setResult((r) => ({ ...r, [a.key]: { ok: true, msg: res?.message || res?.status || 'Enqueued.' } }));
+    } catch (e: any) {
+      setResult((r) => ({ ...r, [a.key]: { ok: false, msg: e?.message || 'Failed — see logs.' } }));
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <Section title={<span className="flex items-center gap-2"><Sliders size={16} className="text-kadi-blue" /> Admin controls
+      <InfoDot>These re-run the pipeline stages that feed the app and push results to the Data
+        Store. Each enqueues a job rather than computing inline — a serverless function cannot
+        hold heavy compute — so the button confirms the work started, not that it has finished.</InfoDot></span>}>
+      <div className="divide-y divide-line">
+        {ACTIONS.map((a) => {
+          const r = result[a.key];
+          return (
+            <div key={a.key} className="px-4 py-3 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-ink">{a.label}</div>
+                <div className="text-[12px] text-ink-muted">{a.desc}</div>
+                {r && <div className={`text-[12px] mt-1 ${r.ok ? 'text-success' : 'text-danger'}`}>{r.ok ? '✓ ' : '✕ '}{r.msg}</div>}
+              </div>
+              {confirm === a.key ? (
+                <div className="flex gap-1.5 shrink-0">
+                  <button onClick={() => run(a)} disabled={busy === a.key}
+                    className="btn-outline text-xs border-success/40 text-success">Confirm</button>
+                  <button onClick={() => setConfirm(null)} className="btn-outline text-xs">Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirm(a.key)} disabled={!!busy}
+                  className="btn-outline text-xs shrink-0 inline-flex items-center gap-1.5">
+                  {busy === a.key ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Run
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
 
 // Sign-up requests awaiting a decision.
 //

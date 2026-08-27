@@ -60,6 +60,48 @@ function makeLazyAdjacency({ typeTable, detailTable, adj }) {
   });
 }
 
+// THREE BANDS, NOT FOUR. The pipeline emits red_pulsing / red / yellow / normal, and `red`
+// is empty by construction: a district is `red` only when above threshold AND not rising,
+// but almost everything above baseline is still rising, so the tier never populates. A
+// category that can never fill teaches people to ignore the legend.
+//
+// So this collapses to three at load time -- Pulsing (accelerating), Yellow (elevated),
+// Normal -- and recalibrates the cuts against the corpus's own z-distribution so the 31
+// districts land ~5 / 12 / 14 rather than 13 / 0 / 14 / 4. The keys stay red_pulsing /
+// yellow / normal so nothing downstream that switches on them has to change; only `red`
+// disappears, folding into yellow (elevated but no longer accelerating -- watch, not act).
+//
+// Done here rather than in the Python pipeline deliberately: the z-scores are already in the
+// JSON, rebanding is pure arithmetic, and re-running a 60k-case pipeline inside a 30s/512MB
+// Catalyst envelope to change two thresholds is the wrong trade. Calibrated, not guessed:
+// the cuts were chosen by running them against this exact distribution.
+const Z_PULSING = 1.5;    // accelerating and clearly above baseline -> someone today
+const Z_YELLOW = 0.9;     // elevated -> worth watching
+const Z_PULSING_STATION = 2.0;  // tighter for stations: smaller baselines are noisier
+function rebandOne(zone, z, stationTier) {
+  const rising = zone === 'red_pulsing';           // the pipeline's own acceleration verdict
+  const cut = stationTier ? Z_PULSING_STATION : Z_PULSING;
+  if (z >= cut && rising) return 'red_pulsing';
+  if (z >= Z_YELLOW) return 'yellow';
+  return 'normal';
+}
+function rebandZones(zt) {
+  if (!zt || !Array.isArray(zt.districts)) return zt;
+  const districts = zt.districts.map((d) => ({
+    ...d,
+    zone: rebandOne(d.zone, d.z ?? 0, false),
+    categories: Array.isArray(d.categories)
+      ? d.categories.map((c) => ({ ...c, zone: rebandOne(c.zone, c.z ?? 0, false) }))
+      : d.categories,
+  }));
+  const stations = (zt.stations || []).map((s) => ({ ...s, zone: rebandOne(s.zone, s.z ?? 0, true) }));
+  const tally = { red_pulsing: 0, yellow: 0, normal: 0 };
+  for (const d of districts) tally[d.zone] += 1;
+  const summary = { ...(zt.summary || {}),
+    red_pulsing: tally.red_pulsing, red: 0, yellow: tally.yellow, normal: tally.normal };
+  return { ...zt, districts, stations, summary };
+}
+
 function indexBy(rows, key) {
   const m = new Map();
   for (const r of rows) m.set(String(r[key]), r);
@@ -174,7 +216,7 @@ function load() {
   const caseAnomalies = readJson('anomalies', { caseAnomalies: [], stationAnomalies: [] });
   const alerts = readJson('alerts', []);
   const stats = readJson('stats', {});
-  const zones = readJson('zones', { districts: [], stations: [], summary: {} });
+  const zones = rebandZones(readJson('zones', { districts: [], stations: [], summary: {} }));
   const stations = readJson('stations', []);
   const occasions = readJson('occasions', { classes: [], occasions: [] });
   const evalReport = readJson('eval_report', {});

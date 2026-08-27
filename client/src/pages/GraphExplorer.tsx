@@ -4,14 +4,44 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch, Sparkles, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch, Sparkles, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Maximize2, Minimize2 } from 'lucide-react';
 import { useGraphCase, useGraphCluster, useFeaturedNetworks } from '../api/hooks';
 import { GraphCanvas, EDGE_COLOR, HEAD_COLOR, GraphFilters } from '../features/graph/GraphCanvas';
 import { WhyPanel } from '../features/graph/WhyPanel';
 import { Empty, Mono, Chip } from '../components/ui';
 import type { GraphNode, GraphEdge } from '../lib/types';
 import { Select } from '../components/Select';
-import { FairnessInfo } from '../components/InfoDot';
+import { FairnessInfo, InfoDot } from '../components/InfoDot';
+
+// The permanent symbol key. The canvas was legible only to whoever built it — a square, a
+// circle and three kinds of line with nothing saying what they mean. This sits in the controls
+// column so the reader can decode the graph without guessing.
+function GraphLegend() {
+  return (
+    <div className="space-y-2 text-[12px]">
+      <div className="flex items-center gap-2">
+        <span className="w-3.5 h-3.5 rounded-[3px] bg-kadi-blue shrink-0" />
+        <span className="text-ink">FIR / case <span className="text-ink-muted">— coloured by crime type</span></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-3.5 h-3.5 rounded-full bg-danger shrink-0" />
+        <span className="text-ink">Offender <span className="text-ink-muted">— size = cases</span></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-4 h-[3px] rounded bg-kadi-navy shrink-0" />
+        <span className="text-ink">Confirmed link <span className="text-ink-muted">— shared evidence</span></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-4 border-t-2 border-dashed border-saffron shrink-0" />
+        <span className="text-ink">Offender membership <span className="text-ink-muted">— appears in</span></span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-3.5 h-3.5 rounded-[3px] border-2 border-dashed border-warning shrink-0" />
+        <span className="text-ink">Outside your district <span className="text-ink-muted">— reaches in</span></span>
+      </div>
+    </div>
+  );
+}
 
 const EDGE_TYPES: [string, string][] = [
   ['shared_offender', 'Shared offender'], ['co_accused', 'Co-accused'], ['mo_similarity', 'Similar MO'],
@@ -30,6 +60,15 @@ export default function GraphExplorer() {
   const [edgeTypes, setEdgeTypes] = useState<Set<string>>(new Set(EDGE_TYPES.map((e) => e[0])));
   const [minEvidence, setMinEvidence] = useState(1);
   const [layout, setLayout] = useState('fcose');
+  const [maximized, setMaximized] = useState(false);
+
+  // Escape leaves full-screen — the standard exit, so the control is not the only way out.
+  useEffect(() => {
+    if (!maximized) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMaximized(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [maximized]);
 
   const caseQ = useGraphCase(clusterId ? undefined : caseId);
   const clusterQ = useGraphCluster(clusterId);
@@ -75,6 +114,12 @@ export default function GraphExplorer() {
             || 'Assembling the network…'} Each node is an FIR or an offender; each line is a proven link. Click a line to see <b>why two cases connect</b>. Drag nodes, switch layout, filter link types.</p>
         </div>
         <div className="flex gap-2 shrink-0 items-center">
+          {/* A real Back. There was none — only a case switcher and two forward links — so a
+              viewer who arrived here from an alert or a drill had no in-app way out and had to
+              reach for the browser chrome. nav(-1) returns to wherever they came from, and
+              falls back to Home when the graph was opened directly with no history behind it. */}
+          <button onClick={() => (window.history.length > 1 ? nav(-1) : nav('/'))}
+            className="btn-outline text-sm" title="Back"><ArrowLeft size={14} /> Back</button>
           <CaseSwitcher current={caseId} />
           {caseId && <button onClick={() => nav(`/cases/${caseId}`)} className="btn-outline text-sm"><FileText size={14} /> Case</button>}
           <button onClick={() => {
@@ -106,6 +151,10 @@ export default function GraphExplorer() {
       <div className="h-[calc((100vh-8.5rem)*0.9)] grid grid-cols-1 xl:grid-cols-[210px_1fr_320px] xl:grid-rows-1 gap-3 min-h-0">
         {/* Controls */}
         <div className="card overflow-auto p-3 space-y-4 xl:max-h-none max-h-72">
+          <Control title="Legend" icon={<Info size={13} />}>
+            <GraphLegend />
+          </Control>
+
           <Control title="Layout" icon={<GitBranch size={13} />}>
             <div className="grid grid-cols-2 gap-1">
               {LAYOUTS.map(([k, label]) => (
@@ -120,7 +169,7 @@ export default function GraphExplorer() {
               {EDGE_TYPES.map(([k, label]) => (
                 <label key={k} className={`flex items-center gap-2 text-xs cursor-pointer ${!edgeCounts[k] ? 'opacity-40' : ''}`}>
                   <input type="checkbox" checked={edgeTypes.has(k)} onChange={() => toggle(k)} className="accent-kadi-blue" />
-                  <span className="w-4 h-0.5 rounded shrink-0" style={{ background: EDGE_COLOR[k] }} />
+                  <span className="w-4 h-[3px] rounded shrink-0" style={{ background: EDGE_COLOR[k] }} />
                   <span className="flex-1">{label}</span>
                   <span className="text-ink-muted font-num">{edgeCounts[k] || 0}</span>
                 </label>
@@ -128,20 +177,30 @@ export default function GraphExplorer() {
             </div>
           </Control>
 
-          <Control title={`Corroborating evidence · ${minEvidence}+ kind${minEvidence > 1 ? 's' : ''}`}>
-            {/* Max is 3, not 4. Since shared_section stopped counting between cases of the
-                same sub-head — where the section is implied by the crime type — no edge
-                carries four independent kinds. A slider position nothing can satisfy reads
-                as a broken filter. */}
+          {/* The long explanation moved into the (i) on the title, as asked, so the control is a
+              control and not a paragraph. The scale now names its stops: 1st / 2nd / 3rd. */}
+          <Control title={<span className="flex items-center gap-1.5">Corroborating evidence
+            <InfoDot>
+              <b className="block mb-1 text-kadi-navy">How many independent kinds of evidence back each link</b>
+              Two cases sharing an offender <em>and</em> a modus operandi is a stronger claim than
+              either alone. Raw match scores cannot separate these — 86% of edges score exactly
+              1.0 — so this filters on corroboration instead. Across the state 3,860 links carry
+              two kinds or more; those are the ones that survive a defence lawyer.
+              <span className="block mt-1.5 text-ink-muted">Max is 3: no edge carries four
+              independent kinds once a shared section between same-sub-head cases stops counting.</span>
+            </InfoDot></span>}>
             <input type="range" min={1} max={3} step={1} value={minEvidence}
               onChange={(e) => setMinEvidence(Number(e.target.value))}
+              aria-label="Minimum corroborating kinds"
               className="w-full accent-kadi-blue" />
+            <div className="flex justify-between text-[10.5px] text-ink-muted mt-0.5 px-0.5 font-medium">
+              {['1st', '2nd', '3rd'].map((lab, i) => (
+                <button key={lab} onClick={() => setMinEvidence(i + 1)}
+                  className={minEvidence === i + 1 ? 'text-kadi-blue' : 'hover:text-ink'}>{lab}</button>
+              ))}
+            </div>
             <p className="text-[11px] text-ink-muted mt-1">
-              How many <em>independent</em> kinds of evidence back each link. Two cases sharing
-              an offender <em>and</em> a modus operandi is a stronger claim than either alone.
-              Raw match scores cannot separate these — 86% of edges score exactly 1.0 — so this
-              filters on corroboration instead. Across the state 3,860 links carry two kinds or
-              more; those are the ones that survive a defence lawyer.
+              Showing links with <b className="text-ink">{minEvidence}+</b> independent kind{minEvidence > 1 ? 's' : ''}.
             </p>
           </Control>
 
@@ -161,18 +220,36 @@ export default function GraphExplorer() {
           )}
         </div>
 
-        {/* Canvas */}
-        <div className="card relative overflow-hidden min-h-0 h-[60vh] xl:h-auto">
-          <AnimatePresence>
-            {loading && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 grid place-items-center text-ink-muted text-sm z-10 bg-surface/60">
-                <div className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-kadi-blue border-t-transparent rounded-full animate-spin" /> Assembling network…</div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {data && <GraphCanvas data={data} filters={filters} reducedMotion={reducedMotion}
-            onSelectNode={(n) => setSel({ node: n })} onSelectEdge={(e) => setSel({ edge: e })} />}
+        {/* Canvas. Maximise lifts it out of the workbench grid to a full-screen overlay so the
+            network gets the whole viewport — the "big view" the brief asked for — with the
+            controls floating over it and Escape or the control to exit. */}
+        <div className={maximized
+          ? 'fixed inset-0 z-[9500] bg-surface p-3 flex flex-col'
+          : 'card relative overflow-hidden min-h-0 h-[60vh] xl:h-auto'}>
+          <div className="absolute top-2 right-2 z-20">
+            <button onClick={() => setMaximized((m) => !m)}
+              className="btn-outline text-xs bg-surface/90" title={maximized ? 'Exit full screen (Esc)' : 'Full screen'}>
+              {maximized ? <><Minimize2 size={13} /> Exit</> : <><Maximize2 size={13} /> Full screen</>}
+            </button>
+          </div>
+          <div className={maximized ? 'relative flex-1 min-h-0 rounded-card border border-line overflow-hidden' : 'contents'}>
+            <AnimatePresence>
+              {loading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute inset-0 grid place-items-center text-ink-muted text-sm z-10 bg-surface/60">
+                  <div className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-kadi-blue border-t-transparent rounded-full animate-spin" /> Assembling network…</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {data && <GraphCanvas key={maximized ? 'max' : 'inline'} data={data} filters={filters} reducedMotion={reducedMotion}
+              onSelectNode={(n) => setSel({ node: n })} onSelectEdge={(e) => setSel({ edge: e })} />}
+          </div>
+          {maximized && (
+            <div className="absolute bottom-3 left-3 card px-3 py-2 shadow-lg max-w-[260px]">
+              <div className="text-[11px] font-semibold text-kadi-navy mb-1.5">Legend</div>
+              <GraphLegend />
+            </div>
+          )}
         </div>
 
         {/* Why panel */}
@@ -266,7 +343,7 @@ function StatPill({ label, value, tone }: { label: string; value: number; tone?:
   );
 }
 
-function Control({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Control({ title, icon, children }: { title: React.ReactNode; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <div className="label mb-1.5 flex items-center gap-1.5">{icon}{title}</div>

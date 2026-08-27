@@ -81,6 +81,75 @@ export function Donut({ data, centerLabel, centerValue }: {
   );
 }
 
+// The linked double pie (P2-2). Two rings that read each other: the outer is case status, the
+// inner is crime mix. Select a status and the inner ring re-renders to the crime mix WITHIN
+// that status; select a crime head and the outer ring re-renders to the status mix within that
+// head. It answers a real question the two independent donuts could not — "which crime types
+// are driving the undetected pile?" — from a true crosstab, not a proportional guess.
+const STATUS_COLOR: Record<string, string> = {
+  'Under Investigation': '#1A6FC4', 'Charge-sheeted': '#1E874B', Undetected: '#C9820A', Closed: '#8A94A3',
+};
+export function DoublePie({ mix, headColor }: { mix: any; headColor: (name: string) => string }) {
+  const [selStatus, setSelStatus] = useState<string | null>(null);
+  const [selHead, setSelHead] = useState<string | null>(null);
+  if (!mix) return null;
+
+  const statuses = mix.statuses as { id: string; name: string; count: number }[];
+  const heads = (mix.heads as { name: string; count: number }[]).slice(0, 7);
+
+  // Outer ring: status counts, filtered to the selected head if one is picked.
+  const outer = statuses.map((s) => {
+    const v = selHead
+      ? (mix.matrix[s.id]?.[selHead] || 0)
+      : s.count;
+    return { name: s.name, value: v, color: STATUS_COLOR[s.name] || '#8A94A3' };
+  }).filter((d) => d.value > 0);
+
+  // Inner ring: crime-head counts, filtered to the selected status if one is picked.
+  const inner = heads.map((h) => {
+    const v = selStatus
+      ? (mix.matrix[selStatus]?.[h.name] || 0)
+      : h.count;
+    return { name: h.name, value: v, color: headColor(h.name) };
+  }).filter((d) => d.value > 0);
+
+  const total = selHead ? outer.reduce((a, b) => a + b.value, 0)
+    : selStatus ? inner.reduce((a, b) => a + b.value, 0) : mix.total;
+
+  return (
+    <div className="p-3">
+      <div className="relative h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={inner} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={2} stroke="none"
+              onClick={(d: any) => setSelHead((cur) => (cur === d.name ? null : d.name))}>
+              {inner.map((d, i) => <Cell key={i} fill={d.color} cursor="pointer" opacity={selHead && selHead !== d.name ? 0.35 : 1} />)}
+            </Pie>
+            <Pie data={outer} dataKey="value" nameKey="name" innerRadius={70} outerRadius={92} paddingAngle={2} stroke="none"
+              onClick={(d: any) => setSelStatus((cur) => { const id = statuses.find((s) => s.name === d.name)?.id || null; return cur === id ? null : id; })}>
+              {outer.map((d, i) => <Cell key={i} fill={d.color} cursor="pointer" opacity={selStatus && statuses.find((s) => s.id === selStatus)?.name !== d.name ? 0.35 : 1} />)}
+            </Pie>
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="text-center">
+            <div className="text-lg font-semibold font-num text-kadi-navy">{total?.toLocaleString()}</div>
+            <div className="text-[10px] text-ink-muted uppercase">
+              {selStatus ? statuses.find((s) => s.id === selStatus)?.name : selHead || 'all cases'}
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="text-[11.5px] text-ink-muted text-center mt-1">
+        Outer ring: status. Inner ring: crime type. {selStatus || selHead
+          ? <button onClick={() => { setSelStatus(null); setSelHead(null); }} className="link">Reset</button>
+          : 'Click a slice to cross-filter the other ring.'}
+      </p>
+    </div>
+  );
+}
+
 export function Legend({ items }: { items: { name: string; color: string; value?: ReactNode }[] }) {
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 pb-3 text-xs">

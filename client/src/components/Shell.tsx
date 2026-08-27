@@ -1,6 +1,6 @@
 // Shell — top bar (brand, global search, language, alerts, role), sidebar nav,
 // persistent fairness banner. Light, government-grade layout (docs/04 §3).
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
@@ -21,12 +21,13 @@ const NAV = [
   { to: '/offenders', icon: Users, key: 'offenders' },
   { to: '/health', icon: Activity, key: 'health' },
   { to: '/map', icon: Map, key: 'map' },
-  { to: '/intelligence', icon: Brain, key: 'intelligence' },
+  { to: '/intelligence', icon: Brain, key: 'insights' },
   { to: '/react', icon: Zap, key: 'react' },
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
-  { to: '/about', icon: Info, key: 'about' },
+  // About left the sidebar (P1-4): it is orientation material, reached from the Home hero and
+  // the top bar, not a daily destination. The /about ROUTE stays registered so those links work.
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -410,10 +411,32 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
   );
 }
 
+// The notifications panel, enhanced (P5-2): grouped by kind with counts and a severity filter,
+// and a per-viewer read state so an alert seen once stops drawing the eye. The read set lives
+// in localStorage — a lightweight per-viewer convenience, not shared state — and is wrapped so
+// a private window that throws on access degrades to "nothing read yet" rather than breaking.
+const KIND_LABEL: Record<string, string> = {
+  new_link: 'Cross-district links', offender: 'Offenders', health: 'Slipping cases',
+  hotspot: 'Emerging hotspots', anomaly: 'Station anomalies', network: 'Networks',
+};
+function readSet(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem('kadi.alerts.read') || '[]')); } catch { return new Set(); }
+}
+function markRead(ids: string[]) {
+  try {
+    const s = readSet(); ids.forEach((i) => s.add(i));
+    localStorage.setItem('kadi.alerts.read', JSON.stringify([...s]));
+  } catch { /* private window: read state is a convenience, not a requirement */ }
+}
 function AlertsPanel({ onClose }: { onClose: () => void }) {
   const t = useT();
   const { data: alerts } = useAlerts();
   const nav = useNavigate();
+  const [onlyHigh, setOnlyHigh] = useState(false);
+  const read = useState(() => readSet())[0];
+  // Mark everything currently shown as read when the panel opens, so the badge clears.
+  useEffect(() => { if (alerts?.length) markRead(alerts.map((a: any) => a.alertId)); }, [alerts]);
+
   const go = (a: any) => {
     onClose();
     if (a.caseMasterId) nav(`/graph?case=${a.caseMasterId}`);
@@ -422,24 +445,53 @@ function AlertsPanel({ onClose }: { onClose: () => void }) {
     else if (a.kind === 'hotspot') nav('/map');
     else if (a.kind === 'health') nav('/health');
   };
+
+  const filtered = (alerts || []).filter((a: any) => !onlyHigh || a.severity === 'high');
+  // Group by kind, kinds ordered by their most-severe member. A plain object, not a Map:
+  // `Map` is the lucide icon in this file's imports, so the global constructor is shadowed.
+  const SEV: any = { high: 0, medium: 1, low: 2, info: 3 };
+  const groups: Record<string, any[]> = {};
+  for (const a of filtered) { const k = a.kind || 'other'; (groups[k] = groups[k] || []).push(a); }
+  const ordered = Object.entries(groups).sort((x, y) =>
+    Math.min(...x[1].map((a: any) => SEV[a.severity] ?? 3)) - Math.min(...y[1].map((a: any) => SEV[a.severity] ?? 3)));
+
   return (
-    // No positioning here any more: the panel is placed and clipped by Popover, which puts it
-    // in a portal so the header's stacking context cannot cap it.
     <div>
-      <div className="px-4 py-2 border-b border-line flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-line flex items-center justify-between gap-2">
         <span className="text-sm font-semibold">{t('alerts')}</span>
-        <button onClick={onClose}><X size={14} className="text-ink-muted" /></button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setOnlyHigh((v) => !v)}
+            className={`text-[11px] px-2 py-0.5 rounded-full border ${onlyHigh ? 'bg-danger text-white border-danger' : 'border-line text-ink-muted hover:bg-surface-3'}`}>
+            High only
+          </button>
+          <button onClick={onClose}><X size={14} className="text-ink-muted" /></button>
+        </div>
       </div>
-      {(alerts || []).slice(0, 12).map((a) => (
-        <button key={a.alertId} onClick={() => go(a)} className="w-full text-left px-4 py-2.5 hover:bg-surface-3 border-b border-line/60 flex gap-2">
-          <SeverityDot severity={a.severity} />
-          <div className="min-w-0">
-            <div className="text-sm font-medium truncate">{a.title}</div>
-            <div className="text-xs text-ink-muted truncate">{a.reason}</div>
+      <div className="max-h-[60vh] overflow-auto">
+        {ordered.map(([kind, list]) => (
+          <div key={kind}>
+            <div className="px-4 pt-2.5 pb-1 flex items-center gap-2 sticky top-0 bg-surface">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-muted">{KIND_LABEL[kind] || kind.replace(/_/g, ' ')}</span>
+              <span className="text-[10.5px] text-ink-muted">{list.length}</span>
+            </div>
+            {list.slice(0, 6).map((a: any) => {
+              const unseen = !read.has(a.alertId);
+              return (
+                <button key={a.alertId} onClick={() => go(a)} className="w-full text-left px-4 py-2.5 hover:bg-surface-3 border-b border-line/60 flex gap-2">
+                  <SeverityDot severity={a.severity} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                      {unseen && <span className="w-1.5 h-1.5 rounded-full bg-kadi-blue shrink-0" />}{a.title}
+                    </div>
+                    <div className="text-xs text-ink-muted truncate">{a.reason}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        </button>
-      ))}
-      {(!alerts || alerts.length === 0) && <div className="p-4 text-sm text-ink-muted">No alerts.</div>}
+        ))}
+        {!filtered.length && <div className="p-4 text-sm text-ink-muted">{onlyHigh ? 'No high-severity alerts.' : 'No alerts.'}</div>}
+      </div>
     </div>
   );
 }

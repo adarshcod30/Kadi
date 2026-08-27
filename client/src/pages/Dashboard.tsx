@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
-import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck } from 'lucide-react';
-import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand } from '../api/hooks';
+import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck, Info } from 'lucide-react';
+import { useStats, useAlerts, useMe, useEval, useDistricts, useNational, useSocio, useForecast, useCommand, useMix } from '../api/hooks';
 import { KpiCard, SeverityDot, Skeleton } from '../components/ui';
 import { StateCommand, DistrictCommand, StationCommand, CommandInsight } from '../components/CommandViews';
-import { HeatMap, Donut, Legend, VizCard, Hint, stagger, rise } from '../components/viz';
+import { HeatMap, Donut, Legend, VizCard, Hint, DoublePie, stagger, rise } from '../components/viz';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
 import {
   SiloToGraph, NetworkCluster, HealthPulse, MapHotspot, AssistantArt,
@@ -28,13 +28,13 @@ const DISPOSAL = (s: any, t: (k: string) => string) => {
 
 function RankShift() {
   const { data: socio } = useSocio();
+  // All 31 districts now (P2-5), sorted by how far they move, scrollable — not the top 7.
   const rows = [...(socio?.districts || [])]
-    .sort((a: any, b: any) => Math.abs(b.rankShift) - Math.abs(a.rankShift))
-    .slice(0, 7);
+    .sort((a: any, b: any) => Math.abs(b.rankShift) - Math.abs(a.rankShift));
   if (!rows.length) return <Skeleton rows={4} />;
   const max = Math.max(...rows.map((r: any) => Math.abs(r.rankShift)), 1);
   return (
-    <div className="p-4 space-y-2">
+    <div className="p-4 space-y-2 max-h-[360px] overflow-auto">
       {rows.map((d: any) => {
         const pct = (Math.abs(d.rankShift) / max) * 50;
         const up = d.rankShift > 0;
@@ -74,6 +74,7 @@ export default function Dashboard() {
   const { data: national } = useNational();
   const { data: fc } = useForecast();
   const { data: command } = useCommand();
+  const { data: mix } = useMix();
 
   // The final month in `trend` is the month still in progress, so it carries a
   // fraction of a normal month's FIRs and renders as a cliff. The pipeline already
@@ -92,6 +93,10 @@ export default function Dashboard() {
     { name: 'Closed', value: stats.statusBreakdown.closed, color: '#8A94A3' },
   ];
   const headData = stats?.topCrimeHeads.slice(0, 6).map((h) => ({ name: h.name, value: h.count, color: HEAD_COLOR[h.name] || '#5B6B7E' }));
+  // Tier drives the KPI rule colour; the last 12 months of the trend gives the headline a spark.
+  const homeTier: 'state' | 'district' | 'station' = command?.view === 'station' ? 'station'
+    : command?.view === 'district' ? 'district' : 'state';
+  const trendSpark = (trend || []).slice(-12).map((r: any) => r.count);
 
   return (
     <div className="space-y-5">
@@ -117,10 +122,13 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* KPIs — animated entrance */}
-      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* KPIs — auto-fit so the row reflows 2/3/5 without a stranded middle card (the uneven
+          spacing the brief flagged), each with a tier-coloured rule. The headline card carries
+          a sparkline of the last 12 months so the number shows its own recent shape. */}
+      <motion.div variants={stagger} initial="hidden" animate="show"
+        className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         {[
-          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation, state-wide.', to: '/cases?status=1' },
+          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation.', to: '/cases?status=1', spark: trendSpark },
           { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases carrying a high-severity health flag — ageing, pendency or undetected-risk. The Health cockpit shows the subset within your rank scope.', accent: '#C9820A', to: '/health' },
           { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offenders who operate with co-offenders — genuine groups, not just cases with a similar modus operandi.', accent: '#1A6FC4', to: '/offenders' },
           { label: 'Resolved offenders', value: stats?.resolvedOffenders, hint: 'Distinct repeat offenders after name-variant entity resolution.', to: '/offenders' },
@@ -128,7 +136,8 @@ export default function Dashboard() {
         ].map((k) => (
           <motion.div key={k.label} variants={rise}>
             <KpiCard label={<span className="flex items-center gap-1">{k.label}<Hint text={k.hint} /></span>}
-              value={k.value?.toLocaleString() ?? '—'} accent={k.accent} onClick={() => nav(k.to)} />
+              value={k.value?.toLocaleString() ?? '—'} accent={k.accent} tier={homeTier} spark={k.spark}
+              onClick={() => nav(k.to)} />
           </motion.div>
         ))}
       </motion.div>
@@ -244,46 +253,72 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          <VizCard title={t('caseStatusMix')} hint="Disposition of all FIRs. A high undetected share highlights where investigations stall.">
-            {stats && statusData ? (<>
-              <Donut data={statusData} centerLabel="cases" centerValue={stats.totalCases.toLocaleString()} />
-              <Legend items={statusData.map((s) => ({ name: s.name, color: s.color, value: s.value.toLocaleString() }))} />
-            </>) : <Skeleton rows={4} />}
+          {/* One linked pair, not two separate donuts (P2-2): status outside, crime type inside,
+              each cross-filtering the other from a true crosstab. */}
+          <VizCard title="Status × crime mix" hint="Two rings that read each other. Click a status to see the crime types driving it — for example, which heads make up the undetected pile — or click a crime type to see how its cases are disposed. Computed from a true status-by-head crosstab, not a proportional estimate.">
+            {mix ? <DoublePie mix={mix} headColor={(n: string) => HEAD_COLOR[n] || '#5B6B7E'} /> : <Skeleton rows={4} />}
           </VizCard>
 
-          <VizCard title={t('crimeMix')} hint="Share of FIRs by major crime head — property and cyber crime dominate real volume.">
-            {stats && headData ? (<>
-              <Donut data={headData} centerLabel="heads" centerValue={String(stats.topCrimeHeads.length)} />
-              <Legend items={headData.map((h) => ({ name: h.name, color: h.color }))} />
-            </>) : <Skeleton rows={4} />}
-          </VizCard>
-
-          <VizCard title={t('alerts')} hint="Live signals: new cross-district networks, slipping cases, emerging hotspots, station anomalies." action={<button onClick={() => nav('/health')} className="text-xs link">All</button>}>
-            <div className="divide-y divide-line max-h-[320px] overflow-auto">
-              {(alerts || []).slice(0, 8).map((a) => (
-                <motion.button key={a.alertId} whileHover={{ x: 3 }}
-                  onClick={() => a.caseMasterId ? nav(`/graph?case=${a.caseMasterId}`) : a.offenderIdentityId ? nav(`/offenders/${a.offenderIdentityId}`) : a.clusterId ? nav(`/graph?cluster=${a.clusterId}`) : nav('/health')}
-                  className="w-full text-left px-4 py-2.5 hover:bg-surface-3 flex gap-2">
-                  <SeverityDot severity={a.severity} />
-                  <div className="min-w-0"><div className="text-sm font-medium truncate">{a.title}</div><div className="text-xs text-ink-muted truncate">{a.reason}</div></div>
-                  <ArrowRight size={14} className="ml-auto text-ink-muted mt-0.5 shrink-0" />
-                </motion.button>
-              ))}
-              {!alerts && <Skeleton rows={5} />}
+          {/* Combined across kinds (P2-3): the highest-severity alert from each signal type, up
+              to five, so the panel is not filled by whichever kind happens to be loudest. Each
+              row names its kind and how many more of that kind wait behind it. */}
+          <VizCard title={t('alerts')} hint="The most urgent alert from each live signal — new cross-district networks, slipping cases, emerging hotspots, station anomalies — combined, so every kind is represented rather than just the loudest." action={<button onClick={() => nav('/health')} className="text-xs link">All</button>}>
+            <div className="divide-y divide-line max-h-[340px] overflow-auto">
+              {(() => {
+                if (!alerts) return <Skeleton rows={5} />;
+                const SEV = { high: 0, medium: 1, low: 2, info: 3 } as any;
+                const byKind = new Map<string, any[]>();
+                for (const a of alerts) {
+                  const k = a.kind || 'other';
+                  if (!byKind.has(k)) byKind.set(k, []);
+                  byKind.get(k)!.push(a);
+                }
+                // One representative per kind (highest severity), the five kinds themselves
+                // ranked by their top severity.
+                const reps = [...byKind.entries()].map(([kind, list]) => {
+                  const sorted = [...list].sort((a, b) => (SEV[a.severity] ?? 3) - (SEV[b.severity] ?? 3));
+                  return { kind, top: sorted[0], more: list.length - 1 };
+                }).sort((a, b) => (SEV[a.top.severity] ?? 3) - (SEV[b.top.severity] ?? 3)).slice(0, 5);
+                if (!reps.length) return <div className="p-4 text-sm text-ink-muted">No live alerts.</div>;
+                return reps.map(({ kind, top: a, more }) => (
+                  <motion.button key={a.alertId} whileHover={{ x: 3 }}
+                    onClick={() => a.caseMasterId ? nav(`/graph?case=${a.caseMasterId}`) : a.offenderIdentityId ? nav(`/offenders/${a.offenderIdentityId}`) : a.clusterId ? nav(`/graph?cluster=${a.clusterId}`) : nav('/health')}
+                    className="w-full text-left px-4 py-2.5 hover:bg-surface-3 flex gap-2">
+                    <SeverityDot severity={a.severity} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">{kind.replace(/_/g, ' ')}</span>
+                        {more > 0 && <span className="text-[10px] text-ink-muted">+{more} more</span>}
+                      </div>
+                      <div className="text-sm font-medium truncate">{a.title}</div>
+                      <div className="text-xs text-ink-muted truncate">{a.reason}</div>
+                    </div>
+                    <ArrowRight size={14} className="text-ink-muted mt-0.5 shrink-0" />
+                  </motion.button>
+                ));
+              })()}
             </div>
           </VizCard>
 
           {national && (
-            <VizCard title={t('indiaContext')} hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context).">
+            <VizCard title={t('indiaContext')} hint="Karnataka's position among Indian states by crime volume (realistic-magnitude context). Karnataka stays pinned in view even when its rank falls outside the top 15.">
               <div className="p-3 text-sm">
                 <p className="text-xs text-ink-muted mb-2">Karnataka ranks <b className="text-kadi-navy">#{national.focusRank}</b> of {national.states.length} · {national.focusRatePerLakh}/lakh</p>
-                {national.states.slice(0, 5).map((s: any) => (
-                  <div key={s.state} className={`flex items-center gap-2 py-0.5 text-xs ${s.isFocus ? 'font-semibold text-kadi-navy' : ''}`}>
-                    <span className="w-4 text-ink-muted">{s.rank}</span><span className="flex-1 truncate">{s.state}{s.isFocus ? ' ★' : ''}</span>
-                    <div className="w-14 h-1.5 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-kadi-blue" style={{ width: `${(s.crimesThousands / national.states[0].crimesThousands) * 100}%` }} /></div>
-                    <span className="font-num w-9 text-right">{s.crimesThousands}k</span>
-                  </div>
-                ))}
+                {(() => {
+                  // Top 15, and if Karnataka sits below the cut, pin it to the foot so it is
+                  // always visible (P1-4).
+                  const top = national.states.slice(0, 15);
+                  const rows = top.some((s: any) => s.isFocus)
+                    ? top
+                    : [...top, national.states.find((s: any) => s.isFocus)].filter(Boolean);
+                  return rows.map((s: any, i: number) => (
+                    <div key={s.state} className={`flex items-center gap-2 py-0.5 text-xs ${s.isFocus ? 'font-semibold text-kadi-navy' : ''} ${!top.includes(s) ? 'border-t border-line mt-0.5 pt-1' : ''}`}>
+                      <span className="w-5 text-ink-muted font-num">{s.rank}</span><span className="flex-1 truncate">{s.state}{s.isFocus ? ' ★' : ''}</span>
+                      <div className="w-14 h-1.5 bg-surface-3 rounded overflow-hidden"><div className="h-full" style={{ width: `${(s.crimesThousands / national.states[0].crimesThousands) * 100}%`, background: s.isFocus ? '#E8871E' : '#1A6FC4' }} /></div>
+                      <span className="font-num w-9 text-right">{s.crimesThousands}k</span>
+                    </div>
+                  ));
+                })()}
               </div>
             </VizCard>
           )}
@@ -299,48 +334,17 @@ export default function Dashboard() {
         <HomeAnalytics stats={stats} />
       </motion.div>
 
-      {/* ---- Illustrated capabilities: what you can actually do from here ---- */}
-      <motion.div variants={stagger} initial="hidden" animate="show">
-        <div className="flex items-baseline gap-2 mb-3">
-          <h2 className="text-lg font-semibold text-kadi-navy">{t('exploreIntel')}</h2>
-          <p className="text-sm text-ink-muted">— four ways KADI turns these records into action.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <CapCard onClick={() => nav('/graph')} icon={<Share2 size={16} />} title="Case-Linkage Graph"
-            art={<NetworkCluster className="w-full h-32" />}
-            desc="Open a case and its network assembles — related FIRs, shared offenders and serial chains across stations. Every link opens a 'Why linked' trail of matched attributes and source FIRs." />
-          <CapCard onClick={() => nav('/health')} icon={<Activity size={16} />} title="Investigation Health"
-            art={<HealthPulse className="w-full h-32" />}
-            desc="Early warning for cases slipping past detection timelines — ageing vs peer median, pendency, undetected-risk — each with a reason and a recommended next action." />
-          <CapCard onClick={() => nav('/map')} icon={<Layers size={16} />} title="Spatiotemporal Map"
-            art={<MapHotspot className="w-full h-32" />}
-            desc="District crime density, a live heatmap and incident points over satellite imagery. Layer time-of-day over location to find patrol windows; red zones pulse where trends emerge." />
-          <CapCard onClick={() => nav('/assistant')} icon={<MessageSquare size={16} />} title="Ask KADI"
-            art={<AssistantArt className="w-full h-32" />}
-            desc="Ask in English or ಕನ್ನಡ, by text or voice. Answers are grounded in the records, always cite FIR numbers, deep-link into the graph, and export as a print-ready briefing." />
-        </div>
-      </motion.div>
-
-      {/* ---- Fairness + how it works ---- */}
-      <motion.div variants={stagger} initial="hidden" animate="show"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <VizCard title="Fair by design" hint="Protected attributes are excluded from every model and the exclusion is enforced by a unit test that fails if any protected column reaches a feature set.">
-          <div className="p-4 flex items-center gap-4">
-            <FairnessShield className="w-24 shrink-0" />
-            <p className="text-sm text-ink-muted">Links and risk scores use <b className="text-ink">evidence and behaviour only</b> — never caste, religion or occupation. Every offender profile states <b className="text-ink">"protected attributes used: none"</b>.</p>
-          </div>
-        </VizCard>
-        <VizCard title="From Excel to live intelligence" hint="KADI replaces static per-station sheets with one continuously-recomputed relational picture of state-wide crime.">
-          <div className="p-4"><SheetToDashboard className="w-full h-28" />
-            <p className="text-sm text-ink-muted mt-2">Fragmented station sheets become one queryable graph — refreshed by a nightly pipeline, not manual collation.</p>
-          </div>
-        </VizCard>
-        <VizCard title="How an insight is made" hint="Heavy compute (entity resolution, graph build, community detection, risk, health, spatial) runs asynchronously; the app only reads precomputed results, so every screen loads instantly.">
-          <div className="p-4"><PipelineFlow className="w-full h-20" />
-            <p className="text-sm text-ink-muted mt-2">FIR → offender identities resolved → graph + communities → ranked insight. Each stage writes its own explanation, so nothing is a black box.</p>
-          </div>
-        </VizCard>
-      </motion.div>
+      {/* The capability tour, the fairness panel and the how-it-works trio all moved to About
+          (P1-5 / P2-9). They are orientation material — what the product is — not part of the
+          screen an officer opens every morning. A single quiet link points there for anyone
+          who wants the tour, so nothing became unreachable. */}
+      <div className="pt-1">
+        <button onClick={() => nav('/about')}
+          className="text-sm link inline-flex items-center gap-1.5">
+          <Info size={14} /> New here? See everything KADI can do, how it works, and how fairness is enforced
+          <ArrowRight size={14} />
+        </button>
+      </div>
     </div>
   );
 }

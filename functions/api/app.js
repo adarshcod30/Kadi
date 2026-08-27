@@ -23,6 +23,8 @@ const mlforecast = require('./services/mlforecast');
 const translate = require('./services/translate');
 const zianlp = require('./services/zianlp');
 const smartbrowz = require('./services/smartbrowz');
+const events = require('./services/events');
+const tasking = require('./services/tasking');
 
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
 // it must already be language. Shared by /command and /zones.
@@ -784,15 +786,28 @@ function buildApp() {
 
   // How crime behaves on festivals and holidays versus ordinary days. The brief asks for
   // temporal pattern discovery, and in India the calendar is where the structure is.
+  // The statutory deadline board (D4): every open, arrested case in scope, soonest first.
+  r.get('/analytics/deadlines', handle(async (req) => q.deadlines(req.user, req.query)));
+
+  // Status × crime-head crosstab for the linked double pie on Home (P2-2).
+  r.get('/analytics/mix', handle(async (req) => q.statusHeadMix(req.user)));
+
+  // What Next as a tasking board (D2), tier-shaped. Distinct from Forecast.
+  r.get('/analytics/tasking', handle(async (req) => tasking.build(req.user, {
+    asOf: q.corpusAsOf(), districtId: req.user.districtId,
+  })));
+
   r.get('/analytics/occasions', handle(async (req) => {
-    const o = q.occasions();
+    // Festivals come from the pipeline; the wider event taxonomy (political, sport, exam,
+    // bandh, election) is curated and indicative for a prototype. events.build folds the two.
+    const o = events.build(q.occasions());
     if (String(req.query.explain) !== 'true') return o;
-    const { text, source } = await insight.generate(req, 'crime on festivals and holidays vs ordinary days', {
+    const { text, source } = await insight.generate(req, 'crime on festivals, events and ordinary days', {
       baselineCasesPerDay: o.baselineCasesPerDay,
-      byDayClass: (o.classes || []).map((c) => ({ dayClass: c.dayClass, perDay: c.casesPerDay,
+      byDayClass: (o.dayClasses || []).map((c) => ({ dayClass: c.dayClass, perDay: c.casesPerDay,
         vsNormal: `${c.vsNormalPct}%`, peakHour: c.peakHour })),
-      topOccasions: (o.occasions || []).slice(0, 4).map((x) => ({ occasion: x.occasion,
-        perDay: x.casesPerDay, vsNormal: `${x.vsNormalPct}%`, topHead: x.topHead })),
+      topOccasions: (o.occasions || []).slice(0, 6).map((x) => ({ occasion: x.label,
+        category: x.categoryLabel, intensity: x.intensity, vsNormal: `${x.vsNormalPct}%`, topHead: x.topHead })),
     });
     return { ...o, insight: text, insightSource: source };
   }));

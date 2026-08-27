@@ -12,10 +12,13 @@ import { Sparkles, MapPin, Building2, Share2, ArrowRight, AlertTriangle } from '
 import { Section, Skeleton } from './ui';
 import { Hint, stagger, rise } from './viz';
 
+// Three bands now (D3): Red is retired — it was empty by construction — and the survivors are
+// Pulsing (accelerating), Watch (elevated) and Normal. `red` is kept as an alias so a stale
+// cached payload degrades gracefully rather than rendering an unknown zone.
 const ZONE: Record<string, { dot: string; label: string; pulse?: boolean }> = {
   red_pulsing: { dot: '#C0392B', label: 'Pulsing', pulse: true },
-  red: { dot: '#C0392B', label: 'Red' },
-  yellow: { dot: '#C9820A', label: 'Yellow' },
+  red: { dot: '#C9820A', label: 'Watch' },
+  yellow: { dot: '#C9820A', label: 'Watch' },
   normal: { dot: '#3AA76D', label: 'Normal' },
 };
 
@@ -48,7 +51,7 @@ export function StateCommand({ data }: { data: any }) {
           action={<Hint text="Ordered by zone severity first, then by how far the district sits above its own baseline — not by volume, which would just re-rank by population." />}>
           <div className="p-2">
             <div className="flex flex-wrap gap-2 px-2 pb-2">
-              {(['red_pulsing', 'red', 'yellow', 'normal'] as const).map((k) => (
+              {(['red_pulsing', 'yellow', 'normal'] as const).map((k) => (
                 <span key={k} className="flex items-center gap-1.5 text-[12px] text-ink-muted">
                   <span className={`w-2 h-2 rounded-full ${ZONE[k].pulse ? 'animate-pulse' : ''}`}
                     style={{ background: ZONE[k].dot }} />
@@ -102,18 +105,27 @@ export function DistrictCommand({ data }: { data: any }) {
         <Section
           title={<span className="flex items-center gap-2"><Building2 size={15} className="text-kadi-blue" />
             Stations in {data.districtName}</span>}
-          action={<Hint text="Ordered by zone status, then volume. Zone compares each station with its own trailing baseline." />}>
-          <div className="p-2 max-h-[420px] overflow-auto">
+          action={<Hint text="Ordered by zone status, then volume. Zone compares each station with its own trailing baseline. Click a row to open that station's register." />}>
+          {/* A real table with a header row, not three bare numbers behind tooltips (P1-9). The
+              column meanings are stated once, at the top, where a reader looks for them. */}
+          <div className="max-h-[420px] overflow-auto">
+            <div className="grid grid-cols-[16px_1fr_auto_auto_auto] gap-3 px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-ink-muted font-semibold sticky top-0 bg-surface border-b border-line">
+              <span />
+              <span>Station</span>
+              <span className="w-14 text-right">Cases</span>
+              <span className="w-12 text-right">Open</span>
+              <span className="w-12 text-right">Flagged</span>
+            </div>
             {(data.stations || []).map((s: any) => (
               <button key={s.unitId}
                 onClick={() => nav(`/cases?unit=${s.unitId}`)}
-                className="w-full flex items-center gap-3 px-2 py-2 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
+                className="w-full grid grid-cols-[16px_1fr_auto_auto_auto] gap-3 items-center px-3 py-2 border-b border-line/60 last:border-0 hover:bg-kadi-blue50/50 text-left">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE[s.zone]?.pulse ? 'animate-pulse' : ''}`}
-                  style={{ background: ZONE[s.zone]?.dot || '#3AA76D' }} />
-                <span className="text-[13px] text-ink flex-1 truncate">{s.unitName}</span>
-                <span className="font-num text-[12.5px] text-ink-muted w-16 text-right">{s.total}</span>
-                <span className="font-num text-[12.5px] text-ink-muted w-14 text-right" title="open">{s.open}</span>
-                <span className="font-num text-[12.5px] text-saffron w-14 text-right" title="flagged">{s.flagged}</span>
+                  style={{ background: ZONE[s.zone]?.dot || '#3AA76D' }} title={ZONE[s.zone]?.label} />
+                <span className="text-[13px] text-ink truncate">{s.unitName}</span>
+                <span className="font-num text-[12.5px] text-ink w-14 text-right">{s.total}</span>
+                <span className="font-num text-[12.5px] text-ink-muted w-12 text-right">{s.open}</span>
+                <span className="font-num text-[12.5px] text-saffron w-12 text-right">{s.flagged}</span>
               </button>
             ))}
           </div>

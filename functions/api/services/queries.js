@@ -412,6 +412,148 @@ function getOffender(user, id) {
   return { ...o, cases, fairness: FAIRNESS_STATEMENT };
 }
 
+// ---------------- statutory deadline clock ----------------
+//
+// Health measures a case against its PEER MEDIAN -- useful, but a comparison, not a deadline.
+// Nothing on screen tells an officer what the law actually requires. This computes that.
+//
+// Under the BNSS the chargesheet clock is tied to custody: 90 days for offences punishable
+// with death, life, or over ten years, and 60 days otherwise, counted from the date of
+// arrest. The corpus carries no punishment field on a section, so GRAVITY is used as a
+// documented PROXY -- Heinous stands in for the ten-year test. That inference is stated on
+// screen wherever the number appears; it is an indicator, not legal advice, and the exact
+// mapping is flagged for KSP confirmation.
+//
+// Only open cases with a recorded arrest have a running clock -- the custody deadline starts
+// at arrest, and a chargesheeted or closed case has already stopped it.
+const HEINOUS_DAYS = 90;
+const OTHER_DAYS = 60;
+function dayDiff(fromIso, toIso) {
+  const a = new Date(`${fromIso}T00:00:00Z`).getTime();
+  const b = new Date(`${toIso}T00:00:00Z`).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+function addDays(iso, n) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+// The band a countdown falls in. Kept separate from health severity: a case can be perfectly
+// healthy by peer comparison and still be four days from a statutory breach.
+function deadlineBand(daysRemaining) {
+  if (daysRemaining == null) return null;
+  if (daysRemaining < 0) return 'breached';
+  if (daysRemaining <= 7) return 'critical';
+  if (daysRemaining <= 21) return 'soon';
+  return 'ok';
+}
+// Returns the clock for one case, or null when no clock runs (already disposed).
+//
+// THE ANCHOR. In the ideal case the clock runs from arrest — that is the custody deadline. But
+// this corpus never models "arrested, chargesheet pending": an arrest only ever appears on a
+// case that has already moved to chargesheeted or closed, so no open case carries one. The
+// clock that actually matters for an open case is therefore the INVESTIGATION timeline, run
+// from the registration date — which BNSS s.193 also governs (investigation concluded and the
+// informant updated within the window). So: anchor on the earliest arrest when one exists
+// (custody basis), otherwise on registration (investigation basis), and say which on screen.
+function caseDeadline(db, c) {
+  if (!c) return null;
+  if (String(c.statusId) !== '1') return null;            // only Under Investigation
+  const arrests = db.children.arrests.get(String(c.caseMasterId)) || [];
+  let arrestDate = null;
+  for (const a of arrests) {
+    const d = a.ArrestSurrenderDate;
+    if (d && (!arrestDate || d < arrestDate)) arrestDate = d;
+  }
+  const basis = arrestDate ? 'custody' : 'investigation';
+  const anchor = arrestDate || c.crimeRegisteredDate;
+  if (!anchor) return null;
+  const heinous = c.gravity === 'Heinous';
+  const allowed = heinous ? HEINOUS_DAYS : OTHER_DAYS;
+  const dueDate = addDays(anchor, allowed);
+  const asOf = corpusAsOf(db);
+  const daysRemaining = asOf ? dayDiff(asOf, dueDate) : null;
+  return {
+    hasClock: true, basis, anchorDate: anchor, arrestDate, dueDate, allowedDays: allowed,
+    gravity: c.gravity, heinous, daysRemaining, band: deadlineBand(daysRemaining),
+  };
+}
+// The station deadline board: every open, arrested case in scope, soonest first. This is the
+// single most actionable list in the product -- it is a queue of legal obligations with dates.
+function deadlines(user, q = {}) {
+  const db = load();
+  const rows = [];
+  for (const c of scoped(user, db.caseList)) {
+    const dl = caseDeadline(db, c);
+    if (!dl) continue;
+    if (q.band && q.band !== 'all' && dl.band !== q.band) continue;
+    rows.push({
+      caseMasterId: c.caseMasterId, crimeNo: c.crimeNo, crimeSubHead: c.crimeSubHead,
+      crimeHead: c.crimeHead, district: c.districtName, unit: c.unitName, ioName: c.ioName,
+      status: c.status, ...dl,
+    });
+  }
+  rows.sort((a, b) => (a.daysRemaining ?? 1e9) - (b.daysRemaining ?? 1e9));
+  const tally = { breached: 0, critical: 0, soon: 0, ok: 0 };
+  for (const r of rows) tally[r.band] += 1;
+  const page = pageOf(q);
+  const pageSize = pageSizeOf(q, 30);
+  return {
+    items: rows.slice((page - 1) * pageSize, page * pageSize),
+    total: rows.length, page, pageSize, tally,
+    method: 'Chargesheet deadline inferred from recorded gravity (Heinous → 90 days, '
+      + 'otherwise → 60), counted from the earliest arrest. A proxy for the BNSS custody test, '
+      + 'which turns on the punishment the offence carries — an indicator, not legal advice.',
+  };
+}
+
+// Status × crime-head crosstab over the scoped universe, for the linked double pie on Home.
+// Independent status and head distributions cannot answer "which crime types are driving the
+// undetected pile" — that needs the joint counts, so this computes them at request time.
+function statusHeadMix(user) {
+  const db = load();
+  const STATUS = { 1: 'Under Investigation', 2: 'Charge-sheeted', 3: 'Closed', 4: 'Undetected' };
+  const statusTotals = {};
+  const headTotals = {};
+  const matrix = {};      // matrix[statusId][head] = count
+  for (const c of scoped(user, universe(user))) {
+    const sid = String(c.statusId);
+    const head = c.crimeHead || 'Other';
+    statusTotals[sid] = (statusTotals[sid] || 0) + 1;
+    headTotals[head] = (headTotals[head] || 0) + 1;
+    (matrix[sid] = matrix[sid] || {})[head] = (matrix[sid][head] || 0) + 1;
+  }
+  const heads = Object.entries(headTotals).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+  const statuses = Object.keys(STATUS).map((sid) => ({ id: sid, name: STATUS[sid], count: statusTotals[sid] || 0 }))
+    .filter((s) => s.count > 0);
+  return { statuses, heads, matrix, total: scoped(user, universe(user)).length };
+}
+
+// Where a district stands among the 31, by both raw count and rate per 100k. Returned to
+// district-scoped callers so a chart can say "7th of 31, and 3rd per capita" instead of
+// handing over a state total the officer has to place themselves.
+let _rankCache;
+function districtRankContext(db, did) {
+  if (!_rankCache) {
+    const stats = (db.districtStats && db.districtStats.districts) || [];
+    const byCount = [...stats].sort((a, b) => (b.total || b.count || 0) - (a.total || a.count || 0));
+    const socio = (db.socio && db.socio.districts) || [];
+    const byRate = [...socio].sort((a, b) => (b.ratePer100k || 0) - (a.ratePer100k || 0));
+    const countRank = new Map(); byCount.forEach((d, i) => countRank.set(String(d.districtId), i + 1));
+    const rateRank = new Map(); byRate.forEach((d, i) => rateRank.set(String(d.districtId), i + 1));
+    const rateById = new Map(socio.map((d) => [String(d.districtId), d.ratePer100k]));
+    _rankCache = { countRank, rateRank, rateById, total: Math.max(byCount.length, byRate.length, 31) };
+  }
+  const r = _rankCache;
+  return {
+    rankByCount: r.countRank.get(String(did)) || null,
+    rankByRate: r.rateRank.get(String(did)) || null,
+    ratePer100k: r.rateById.get(String(did)) ?? null,
+    ofDistricts: r.total,
+  };
+}
+
 // ---------------- health ----------------
 function filterHealth(user, q = {}) {
   const db = load();
@@ -429,13 +571,29 @@ function listHealth(user, q = {}) {
   const rows = filterHealth(user, q);
   const enrich = (h) => {
     const c = db.cases.get(String(h.caseMasterId));
+    const dl = caseDeadline(db, c);
     return { ...h, crimeSubHead: c ? c.crimeSubHead : '', district: c ? c.districtName : '',
-      unit: c ? c.unitName : '', ioName: c ? c.ioName : '', gravity: c ? c.gravity : '' };
+      unit: c ? c.unitName : '', ioName: c ? c.ioName : '', gravity: c ? c.gravity : '',
+      // The statutory clock rides along on every health row, so the worklist can sort or
+      // colour by it without a second request. Null when no clock runs.
+      deadline: dl };
   };
-  const total = rows.length;
+  let all = rows.map(enrich);
+  // Deadline-first ordering, opt-in via ?sort=deadline. Cases with a running clock rise to the
+  // top, soonest due first; everything without a clock keeps the pipeline's health order below.
+  if (q.sort === 'deadline') {
+    all = all.sort((a, b) => {
+      const ax = a.deadline ? (a.deadline.daysRemaining ?? 1e9) : 1e9 + 1;
+      const bx = b.deadline ? (b.deadline.daysRemaining ?? 1e9) : 1e9 + 1;
+      return ax - bx;
+    });
+  } else if (q.sort === 'age') {
+    all = all.sort((a, b) => (b.investigationAgeDays || 0) - (a.investigationAgeDays || 0));
+  }
+  const total = all.length;
   const page = pageOf(q);
   const pageSize = pageSizeOf(q, 30);
-  return { items: rows.slice((page - 1) * pageSize, page * pageSize).map(enrich), total, page, pageSize };
+  return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize };
 }
 
 function healthSummary(user) {
@@ -448,6 +606,17 @@ function healthSummary(user) {
     for (const f of h.flagKeys) byFlag[f] = (byFlag[f] || 0) + 1;
     if (h.investigationAgeDays) { ageSum += h.investigationAgeDays; ageN += 1; }
   }
+  // Deadline tally across the whole scope (not just flagged cases): a case can be perfectly
+  // healthy and still be days from a statutory breach, so this counts every open arrested case.
+  const dlTally = { breached: 0, critical: 0, soon: 0, running: 0 };
+  for (const c of scoped(user, db.caseList)) {
+    const dl = caseDeadline(db, c);
+    if (!dl) continue;
+    dlTally.running += 1;
+    if (dl.band === 'breached') dlTally.breached += 1;
+    else if (dl.band === 'critical') dlTally.critical += 1;
+    else if (dl.band === 'soon') dlTally.soon += 1;
+  }
   return {
     flaggedTotal: rows.length,
     high: rows.filter((h) => h.severity === 'high').length,
@@ -455,6 +624,7 @@ function healthSummary(user) {
     byFlag,
     avgInvestigationAge: ageN ? Math.round(ageSum / ageN) : 0,
     anomalies: db.caseAnomalies.stationAnomalies || [],
+    deadlines: dlTally,
   };
 }
 
@@ -627,7 +797,8 @@ function vulnerability(user) {
 module.exports = {
   FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
   filterHealth, getCase, graphForCase, getCluster,
-  listOffenders, getOffender, listHealth, healthSummary, geoPoints, geoGrid, hotspots, vulnerability,
+  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix,
+  listOffenders, getOffender, listHealth, healthSummary, deadlines, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --
   // which made the whole role model look decorative. State tier still gets the precomputed
@@ -671,6 +842,7 @@ module.exports = {
   stats: (user) => {
     const db = load();
     if (!user || (user.roleMeta.tier === 'state' && !user.drilledFromState)) return { ...db.stats, scope: 'state' };
+    // (districtRankContext defined below, hoisted)
 
     const rows = scoped(user, universe(user));
     const ids = new Set(rows.map((c) => String(c.caseMasterId)));
@@ -700,10 +872,16 @@ module.exports = {
     const offs = db.offenders.filter((o) => (o.districts || []).map(String).includes(did));
     const zones = (db.zones && db.zones.stations) || [];
 
+    // RANK IN CONTEXT (D5). A district officer does not want Karnataka's totals — they want
+    // their own number and where it stands. Rank by raw count and, separately, by rate per
+    // 100k, because the two disagree and that disagreement is the product's headline finding.
+    const rank = districtRankContext(db, did);
+
     return {
       scope: 'district',
       districtId: did,
       districtName: (rows[0] && rows[0].districtName) || '',
+      rankContext: rank,
       totalCases: rows.length,
       openCases: status.open,
       chargeSheeted: status.chargeSheeted,
