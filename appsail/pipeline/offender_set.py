@@ -68,6 +68,23 @@ FEATURES = [
 ]
 LABELS = ["row_key", "offender_id", "as_of"]
 TARGET = "target_reoffend_180"
+# Additional horizons, written alongside the served target.
+#
+# Measured after the first sweep and they are not the same model four times: the Spearman
+# correlation between the 30-day and 365-day scorings of the SAME offenders is 0.277, and
+# their top-20 shortlists overlap 9 of 20. "Who is back this month" and "who is back this
+# year" are genuinely different lists, which makes them different operational products --
+# a station wants the first, a state watchlist review wants the second.
+#
+#     horizon   model   recency   margin
+#      30 days  0.644    0.514    +0.130
+#      90 days  0.648    0.516    +0.132
+#     180 days  0.650    0.536    +0.114   <- the one currently served
+#     365 days  0.760    0.510    +0.250
+#
+# They ship in the file so each is one console cycle from being trained; only the 180-day
+# column is wired to an endpoint today.
+EXTRA_HORIZONS = [30, 90, 365]
 
 
 def _d(iso: str):
@@ -137,7 +154,8 @@ def build(tables, unit_district, identities, today: date):
             prior = [(d, c) for d, c in paired if d <= t]
             if len(prior) < MIN_PRIOR:
                 continue
-            future = [d for d, _ in paired if 0 < (d - t).days <= HORIZON_DAYS]
+            future_all = [d for d, _ in paired if (d - t).days > 0]
+            future = [d for d in future_all if (d - t).days <= HORIZON_DAYS]
             first = prior[0][0]
             span = (t - first).days
             ids = [c for _, c in prior]
@@ -153,6 +171,8 @@ def build(tables, unit_district, identities, today: date):
                 "n_heads": len({head_of.get(c) for c in ids if head_of.get(c)}),
                 "heinous": sum(1 for c in ids if grav_of.get(c) == "1"),
                 TARGET: 1 if future else 0,
+                **{f"target_reoffend_{h}": 1 if any((d - t).days <= h for d in future_all) else 0
+                   for h in EXTRA_HORIZONS},
             })
 
     common.assert_no_protected(FEATURES)
@@ -206,7 +226,7 @@ def write_csv(data_dir: str, rows, name: str = "training_set_offender.csv") -> s
     absent -- an identity column in a training file is an invitation for a model to memorise a
     person rather than learn a behaviour.
     """
-    header = FEATURES + [TARGET]
+    header = FEATURES + [TARGET] + [f"target_reoffend_{h}" for h in EXTRA_HORIZONS]
     path = os.path.join(common.derived_dir(data_dir), name)
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")

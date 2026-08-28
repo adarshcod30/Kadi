@@ -241,10 +241,23 @@ def compute(tables, unit_district, today: date):
     state_series = _series_for(overall, months)
     state_fc, state_slope, _ = _fit_predict(months, state_series, HORIZON)
     recent = state_series[-12:]
+    # The month-of-year index, published rather than left inside the fit.
+    #
+    # It is half of what the projection is made of -- the level and trend are the other half --
+    # and until now the page could show the answer but not the seasonality that shaped it. A
+    # reader who can see that March runs 8% hot and September 6% cold can sanity-check a
+    # forecast against their own experience of the year, which is the whole point of choosing a
+    # decomposition an investigator can challenge.
+    idx = _seasonal_index(state_series[-TREND_WINDOW:], months[-TREND_WINDOW:])
     state = {
         "history": [{"month": m, "count": overall[m]} for m in months[-24:]],
         "forecast": state_fc,
         "monthlyTrendPct": round(100 * state_slope / (sum(recent) / len(recent)), 2) if recent else 0.0,
+        "seasonality": [
+            {"month": m, "index": round(idx.get(m, 1.0), 4),
+             "pct": round((idx.get(m, 1.0) - 1.0) * 100, 1)}
+            for m in range(1, 13)
+        ],
     }
 
     # --- per-district ---

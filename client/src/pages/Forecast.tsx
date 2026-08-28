@@ -22,8 +22,12 @@
 //   STATION   the few things a station can act on: which way the register is going, the patrol
 //             window, and who on this register is likely back. Not a projection of its own
 //             monthly count, for the reason above.
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import {
+  ComposedChart, Area, Line, BarChart, Bar, Cell, ResponsiveContainer,
+  XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, ReferenceArea,
+} from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Flame, Clock, Network, AlertTriangle,
@@ -32,6 +36,8 @@ import {
 import { useOutlook, useForecast, useAnomalies, useOffenderRisk, useMe } from '../api/hooks';
 import { Skeleton, Empty, Section, TierChip } from '../components/ui';
 import { InfoDot, AiProvenanceInfo } from '../components/InfoDot';
+
+const AXIS = { fontSize: 10, fill: '#5B6B7E' };
 
 const DIR = {
   rising: { icon: TrendingUp, tint: 'text-danger', word: 'Rising' },
@@ -42,6 +48,15 @@ const DIR = {
 // The measurement behind the whole ML head, stated on the page rather than in a commit
 // message. Five of these lost and are shown losing: a reader who only ever sees the winners
 // has no way to judge how hard the winners had to work.
+// Measured in a second sweep, on one common panel so the horizons are comparable to each
+// other. See research/measure_more.py.
+const HORIZONS = [
+  { days: 30, model: 0.644, rule: 0.514, served: false, use: 'this month — a station duty list' },
+  { days: 90, model: 0.648, rule: 0.516, served: false, use: 'this quarter — a district review' },
+  { days: 180, model: 0.650, rule: 0.536, served: true, use: 'six months — the served model' },
+  { days: 365, model: 0.760, rule: 0.510, served: false, use: 'a year — a state watchlist review' },
+];
+
 const CANDIDATES = [
   { task: 'Repeat offending within 180 days', model: 0.769, rule: 0.565, ruleName: 'recency', ship: true },
   { task: 'District × head spike next month', model: 0.677, rule: 0.620, ruleName: 'inverse recent level', ship: true },
@@ -55,6 +70,10 @@ const CANDIDATES = [
     why: 'No signal beyond what the crime type already tells you.' },
   { task: 'Linkage at registration', model: 0.930, rule: 0.929, ruleName: 'sub-head history', ship: false,
     why: 'Scores 0.930 and adds +0.002. The linkage pipeline keys on modus operandi and MO derives from sub-head, so the target is nearly a function of one input column.' },
+  { task: 'Repeat victimisation (person)', model: 0.692, rule: 0.758, ruleName: 'prior count', ship: false,
+    why: 'Loses to counting. It is also near-degenerate on this corpus — 91% of observed victims are victimised again inside six months, so there is almost nothing to separate.' },
+  { task: 'IO caseload surge', model: 0.731, rule: 0.589, ruleName: 'z of last month', ship: false,
+    why: 'Beats the rule on AUC and is still not worth shipping: the event happens to 0.1% of officer-months, so average precision is 0.018. A model that is right about almost nothing ranks well and helps no one.' },
 ];
 
 export default function Forecast() {
@@ -295,6 +314,15 @@ export default function Forecast() {
                 arrival noise alone is larger than any trend a model could find.
               </p>
             )}
+            {/* The projection as a picture. Numbers in brackets cannot show whether the
+                forecast continues the shape of the history or departs from it. */}
+            <ProjectionChart
+              history={(fc.scope === 'district' && fc.focus ? fc.focus.history : fc.state?.history) || []}
+              forecast={(fc.scope === 'district' && fc.focus ? fc.focus.forecast : fc.state?.forecast) || []}
+              label={fc.scope === 'district' && fc.focus
+                ? `${fc.focus.districtName}, last 18 months and the next ${fc.horizonMonths || 3}`
+                : `Karnataka, last 24 months and the next ${fc.horizonMonths || 3}`}
+            />
             {fc.scope === 'district' && fc.focus && (
               <div className="p-3 pb-0">
                 <div className="rounded-ctl border border-kadi-teal/30 bg-teal-50/40 px-3.5 py-3">
@@ -327,12 +355,20 @@ export default function Forecast() {
                 )}
               </div>
             )}
-            {tier !== 'station' && (
+            {/* At state rank, thirty-one cards make a reader compare numbers one at a time.
+                One axis makes the distribution visible and shows where any district sits. */}
+            {tier === 'state' && (
+              <DistrictSpread districts={fc.districts} focusId={fc.focus?.districtId}
+                onPick={(id) => nav(`/cases?district=${id}`)} />
+            )}
+            {tier === 'district' && (
               <div className="p-3 pt-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                 {[...fc.districts]
                   .filter((d: any) => fc.scope !== 'district' || String(d.districtId) !== String(fc.focus?.districtId))
                   .sort((a: any, b: any) => (b.changePct || 0) - (a.changePct || 0))
-                  .slice(0, tier === 'state' ? 31 : 9)
+                  // Inside the district branch, so the count is fixed: nine peers is enough
+                  // to place your own district without turning the panel into a directory.
+                  .slice(0, 9)
                   .map((d: any) => {
                     const nextMonth = (d.forecast || [])[0];
                     const rising = d.direction === 'rising';
@@ -365,6 +401,38 @@ export default function Forecast() {
             )}
           </Section>
         )}
+
+        {/* The two halves of the projection, each drawn: what the fit got wrong on months it
+            never saw, and the month-of-year shape it carries. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {bt?.detail?.length > 0 && (
+            <Section title={<span className="flex items-center gap-2">
+              <BarChart3 size={15} className="text-kadi-blue" /> Backtest — predicted against actual
+              <InfoDot label="Why this is here" align="left">
+                The MAPE figure beside the projection is a summary of exactly this chart. The
+                chart says something the summary cannot: which direction the misses go. Three
+                misses on the same side is a bias; three that scatter are noise, and they mean
+                different things when you read the forecast.
+              </InfoDot>
+            </span>}>
+              <BacktestChart bt={bt} />
+            </Section>
+          )}
+          {fc?.state?.seasonality?.length > 0 && (
+            <Section title={<span className="flex items-center gap-2">
+              <Clock size={15} className="text-kadi-saffron" /> The shape of the year
+              <InfoDot label="What a seasonal index is" align="left">
+                Every projection here is a trend multiplied by a month-of-year index. This is
+                that index: how much each calendar month runs above or below an average one once
+                the trend is removed. It is shown because an officer who has policed the state
+                for a decade can check it against their own experience — which is the point of
+                choosing a decomposition rather than a black box.
+              </InfoDot>
+            </span>}>
+              <SeasonalityChart seasonality={fc.state.seasonality} />
+            </Section>
+          )}
+        </div>
 
         {tier !== 'station' && anom?.cases?.length && (
           <Section title={<span className="flex items-center gap-2">
@@ -490,6 +558,10 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
         ) : (
           <>
             <p className="px-4 pt-3 text-[12.5px] text-ink-muted">{risk.note}</p>
+            {risk.rankedBy === 'model' && (
+              <ScoreSpread items={risk.items} field="modelScore"
+                label="Model scores across the shortlist" />
+            )}
             <div className="divide-y divide-line mt-2">
               {risk.items.map((o: any, i: number) => (
                 <button key={o.offenderIdentityId} onClick={() => nav(`/offenders/${o.offenderIdentityId}`)}
@@ -542,6 +614,10 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
           </InfoDot>
         </span>}>
           <p className="px-4 pt-3 text-[12.5px] text-ink-muted">{spike.note}</p>
+          {spike.rankedBy === 'model' && (
+            <ScoreSpread items={spike.items} field="modelScore"
+              label="Model scores across the candidates" />
+          )}
           <div className="divide-y divide-line mt-2">
             {spike.items.map((s: any, i: number) => (
               <button key={`${s.districtId}-${s.crimeHeadId}`}
@@ -568,9 +644,49 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
         </Section>
       )}
 
+      {/* The horizon family. Added after a second sweep, because "seven tasks measured" was
+          where the first pass stopped rather than where the space ended — and the obvious
+          question, whether the offender model works at other horizons, had not been asked. */}
+      <Section title={<span className="flex items-center gap-2">
+        <Users2 size={15} className="text-kadi-teal" /> The same question at four horizons
+      </span>}>
+        <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
+          The repeat-offending model is trained at 180 days. Asked at other horizons it keeps
+          beating recency — and, more usefully, it names <b>different people</b>. The Spearman
+          correlation between the 30-day and 365-day scorings of the same offenders is 0.277,
+          and their top-20 shortlists overlap 9 of 20. "Who is back this month" and "who is back
+          this year" are different lists for different posts, not one model shown four times.
+        </p>
+        <div className="p-3 space-y-1.5">
+          {HORIZONS.map((h) => (
+            <div key={h.days} className={`rounded-ctl border px-3 py-2 flex items-center gap-2 flex-wrap ${
+              h.served ? 'border-kadi-teal/40 bg-teal-50/30' : 'border-line bg-surface-2'}`}>
+              {h.served
+                ? <CheckCircle2 size={14} className="text-kadi-teal shrink-0" />
+                : <Clock size={14} className="text-ink-subtle shrink-0" />}
+              <span className="text-[13px] font-medium text-ink">Back within {h.days} days</span>
+              <span className="text-[11.5px] text-ink-muted">{h.use}</span>
+              <span className="ml-auto font-num text-[12px]">
+                <span className={h.served ? 'text-kadi-teal font-semibold' : 'text-ink'}>{h.model.toFixed(3)}</span>
+                <span className="text-ink-subtle"> vs {h.rule.toFixed(3)} recency</span>
+                <span className="text-ink-muted"> · {h.served ? 'serving' : 'trainable'}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="px-4 pb-3 text-[11.5px] text-ink-subtle leading-relaxed">
+          All four target columns ship in the training file, so each is one console cycle from an
+          endpoint; only the 180-day column is wired to one today. These figures come from a
+          common panel observed to a full year before the corpus ends, which is why the 180-day
+          number here (0.650) is lower than the 0.769 measured on the served file — that one
+          observes to 180 days before the end and sees a different, easier sample. Comparing the
+          two would be comparing different questions.
+        </p>
+      </Section>
+
       {/* The losers. This is the panel that makes the two winners mean something. */}
       <Section title={<span className="flex items-center gap-2">
-        <Cpu size={15} className="text-ink-muted" /> Seven tasks were measured. Two shipped.
+        <Cpu size={15} className="text-ink-muted" /> Eleven tasks were measured. Two are serving.
       </span>}>
         <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
           Every candidate was scored on a time-ordered hold-out against the <b>best</b> simple
@@ -645,6 +761,257 @@ function ModelCard({ title, question, model, rule, ruleName, serving, lastError 
           Falling back to the rule: {lastError}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------
+// The projection, drawn.
+//
+// The page used to state the projection as three numbers and a range in brackets. That is the
+// same information and a worse instrument: a reader cannot see whether the forecast continues
+// the shape of the history or departs from it, and the interval — the part that says how much
+// to trust the middle — reads as punctuation rather than as width.
+//
+// History and forecast share one axis so the join is visible, and the 95% band is drawn as an
+// area rather than as text. Where the fit restarted after a level shift, that month is marked:
+// a forecast built on six months after a break is a weaker statement than one built on
+// twenty-four, and the chart should say which it is looking at.
+// ---------------------------------------------------------------------------------------
+function ProjectionChart({ history, forecast, label }: {
+  history: { month: string; count: number }[];
+  forecast: any[]; label: string;
+}) {
+  const data = useMemo(() => {
+    const h = (history || []).map((p) => ({ month: p.month, actual: p.count }));
+    const last = h[h.length - 1];
+    // The forecast must start where the history ends, or the two lines float apart with a gap
+    // that reads as a data problem rather than as a handover.
+    const f = (forecast || []).map((p: any) => ({
+      month: p.month,
+      predicted: p.predicted,
+      band: [p.lower, p.upper] as [number, number],
+      fittedFrom: p.fittedFrom,
+    }));
+    const bridge = last ? [{ month: last.month, actual: last.actual, predicted: last.actual,
+      band: [last.actual, last.actual] as [number, number] }] : [];
+    return [...h.slice(0, -1), ...bridge, ...f];
+  }, [history, forecast]);
+  const shiftAt = (forecast || []).find((p: any) => p.fittedFrom)?.fittedFrom;
+  if (!data.length) return null;
+  return (
+    <div className="px-3 pt-3">
+      <div style={{ height: 240 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <CartesianGrid stroke="#E6ECF4" vertical={false} />
+            <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }}
+              interval={Math.max(0, Math.floor(data.length / 8))} />
+            <YAxis tick={AXIS} tickLine={false} axisLine={false} width={46}
+              label={{ value: 'FIRs per month', angle: -90, position: 'insideLeft',
+                offset: 8, style: { ...AXIS, textAnchor: 'middle' } }} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
+              formatter={(v: any, n: any) => {
+                if (n === 'band') return [`${Math.round(v[0])} – ${Math.round(v[1])}`, '95% interval'];
+                return [Math.round(v), n === 'actual' ? 'Registered' : 'Projected'];
+              }} />
+            {/* The band first, so the lines sit on top of it rather than under it. */}
+            <Area dataKey="band" stroke="none" fill="#2FA8A0" fillOpacity={0.16} isAnimationActive={false} />
+            <Line dataKey="actual" stroke="#1A6FC4" strokeWidth={1.8} dot={false}
+              isAnimationActive={false} connectNulls={false} />
+            <Line dataKey="predicted" stroke="#2FA8A0" strokeWidth={2} strokeDasharray="5 3"
+              dot={{ r: 2.5, fill: '#2FA8A0' }} isAnimationActive={false} connectNulls={false} />
+            {shiftAt && (
+              <ReferenceLine x={shiftAt} stroke="#E8871E" strokeDasharray="3 3"
+                label={{ value: 'fit restarts', position: 'insideTopRight', style: { ...AXIS, fill: '#B4690E' } }} />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-[11.5px] text-ink-subtle pb-1">
+        {label}. Solid blue is registered; dashed teal is the projection; the shaded band is the
+        95% interval — ±1.96σ of the residuals the fit left behind on its own history.
+        {shiftAt && <> The marker at {shiftAt} is where the fit restarts: a level shift was
+          detected there, and extrapolating a line drawn across it would under-forecast for ever.</>}
+      </p>
+    </div>
+  );
+}
+
+// Predicted against actual on months the model never saw. The MAPE figure is a summary of
+// exactly this picture, and the picture says something the summary cannot: which direction the
+// misses go. Three misses all on the same side is a different problem from three that scatter.
+function BacktestChart({ bt }: { bt: any }) {
+  if (!bt?.detail?.length) return null;
+  const data = bt.detail.map((d: any) => ({
+    month: d.month, actual: d.actual, predicted: d.predicted,
+    err: Math.round(((d.predicted - d.actual) / d.actual) * 1000) / 10,
+  }));
+  const allUnder = data.every((d: any) => d.err < 0);
+  return (
+    <div className="px-3 pt-3">
+      <div style={{ height: 180 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <CartesianGrid stroke="#E6ECF4" vertical={false} />
+            <XAxis dataKey="month" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }} />
+            <YAxis tick={AXIS} tickLine={false} axisLine={false} width={46} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }} />
+            <Bar dataKey="actual" fill="#1A6FC4" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="predicted" fill="#2FA8A0" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-[11.5px] text-ink-subtle pb-1">
+        Blue is what happened; teal is what the model said before it happened, on {bt.holdoutMonths} months
+        withheld from the fit. Mean absolute error {bt.mae} cases, {bt.mape}%.
+        {allUnder && <> Every miss is on the same side — the projection runs low here, which is
+          worth knowing when reading the forecast above as a floor rather than a midpoint.</>}
+      </p>
+    </div>
+  );
+}
+
+// The month-of-year index: half of what the projection is made of, and previously invisible.
+function SeasonalityChart({ seasonality }: { seasonality: any[] }) {
+  if (!seasonality?.length) return null;
+  const NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const data = seasonality.map((s) => ({ name: NAMES[s.month - 1], pct: s.pct }));
+  const hottest = [...data].sort((a, b) => b.pct - a.pct)[0];
+  const coldest = [...data].sort((a, b) => a.pct - b.pct)[0];
+  return (
+    <div className="px-3 pt-3">
+      <div style={{ height: 150 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
+            <CartesianGrid stroke="#E6ECF4" vertical={false} />
+            <XAxis dataKey="name" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }} />
+            <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40}
+              tickFormatter={(v: number) => `${v > 0 ? '+' : ''}${v}%`} />
+            <ReferenceLine y={0} stroke="#9AA8B8" />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
+              formatter={(v: any) => [`${v > 0 ? '+' : ''}${v}% against an average month`, 'Seasonal index']} />
+            <Bar dataKey="pct" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.pct >= 0 ? '#C0392B' : '#2FA8A0'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-[11.5px] text-ink-subtle pb-1">
+        How much each calendar month runs above or below an average one, after the trend is
+        removed. {hottest.name} is the heaviest at {hottest.pct > 0 ? '+' : ''}{hottest.pct}%,
+        {' '}{coldest.name} the lightest at {coldest.pct}%. The index is shrunk toward zero where
+        a month has few observations, so a single unusual year cannot move it far.
+      </p>
+    </div>
+  );
+}
+
+// Every district's projected change on one axis. Thirty-one cards make a reader compare
+// numbers; one chart makes them see the distribution and where their own district sits in it.
+function DistrictSpread({ districts, focusId, onPick }: {
+  districts: any[]; focusId?: string; onPick: (id: string) => void;
+}) {
+  const data = useMemo(() => [...(districts || [])]
+    .sort((a, b) => (b.changePct || 0) - (a.changePct || 0))
+    .map((d) => ({ name: d.districtName, pct: d.changePct, id: String(d.districtId) })),
+  [districts]);
+  if (!data.length) return null;
+  const rising = data.filter((d) => d.pct > 5).length;
+  const falling = data.filter((d) => d.pct < -5).length;
+  const max = Math.max(...data.map((d) => Math.abs(d.pct))) || 1;
+  // Colour by MAGNITUDE, not by a three-way threshold.
+  //
+  // Nearly every district is projected to rise here, so a rising/flat/falling palette paints
+  // the whole chart one colour and discriminates nothing — it reads as a rendering fault
+  // rather than as a finding. Ramping opacity with the size of the move puts the steepest
+  // districts forward while still showing that the direction is shared.
+  const shade = (pct: number) => {
+    const t = Math.min(1, Math.abs(pct) / max);
+    return { fill: pct >= 0 ? '#C0392B' : '#2FA8A0', fillOpacity: 0.35 + 0.65 * t };
+  };
+  return (
+    <div className="px-3 pt-3">
+      <div style={{ height: Math.max(220, data.length * 17 + 30) }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 16 }}>
+            <CartesianGrid stroke="#E6ECF4" horizontal={false} />
+            <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false}
+              tickFormatter={(v: number) => `${v > 0 ? '+' : ''}${v}%`}
+              label={{ value: 'Projected change against the last 12-month average',
+                position: 'insideBottom', offset: -6, style: AXIS }} />
+            <YAxis type="category" dataKey="name" width={118} tick={AXIS} tickLine={false} axisLine={false} />
+            <ReferenceLine x={0} stroke="#9AA8B8" />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
+              formatter={(v: any) => [`${v > 0 ? '+' : ''}${v}%`, 'Projected change']} />
+            <Bar dataKey="pct" radius={[0, 3, 3, 0]} isAnimationActive={false}
+              onClick={(d: any) => onPick(d.id)} cursor="pointer">
+              {data.map((d) => {
+                const sh = shade(d.pct);
+                return d.id === String(focusId)
+                  ? <Cell key={d.id} fill="#1A6FC4" />
+                  : <Cell key={d.id} fill={sh.fill} fillOpacity={sh.fillOpacity} />;
+              })}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="px-1 pb-1 text-[11.5px] text-ink-subtle leading-relaxed">
+        {rising} of {data.length} districts are projected to rise and {falling} to fall, against
+        each district's own last twelve months. That the direction is almost unanimous is itself
+        the reading: the state stepped up by roughly a thousand registrations a month in January
+        2026, and a step that size lifts nearly every district at once. Read the ORDER here —
+        who is moving fastest — rather than the sign, which mostly reflects one state-wide event.
+        Deeper colour is a larger move; click a bar to open that district's register.
+      </p>
+    </div>
+  );
+}
+
+// What a working ranker looks like.
+//
+// This chart exists because of a specific failure it would have caught immediately: the
+// classifier endpoint returned the same hard label for every candidate, and the surface could
+// only report that as a sentence in an error field. A distribution makes it obvious — a model
+// that ranks produces spread, and one that does not produces a single bar.
+function ScoreSpread({ items, field, label }: { items: any[]; field: string; label: string }) {
+  const scores = (items || []).map((i) => i[field]).filter((v) => v !== null && v !== undefined);
+  const data = useMemo(() => {
+    if (scores.length < 3) return [];
+    const bins = 10;
+    const lo = Math.min(...scores); const hi = Math.max(...scores);
+    const w = (hi - lo) / bins || 1;
+    const out = Array.from({ length: bins }, (_, i) => ({
+      band: `${(lo + i * w).toFixed(2)}`, n: 0,
+    }));
+    scores.forEach((v: number) => {
+      const k = Math.min(bins - 1, Math.floor((v - lo) / w));
+      out[k].n += 1;
+    });
+    return out;
+  }, [items, field]);
+  if (!data.length) return null;
+  const distinct = new Set(scores).size;
+  return (
+    <div className="px-3 pt-3">
+      <div style={{ height: 120 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 4, right: 12, left: 4, bottom: 4 }}>
+            <XAxis dataKey="band" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }} />
+            <YAxis tick={AXIS} tickLine={false} axisLine={false} width={28} allowDecimals={false} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
+              formatter={(v: any) => [v, 'candidates']} />
+            <Bar dataKey="n" fill="#1A6FC4" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-[11.5px] text-ink-subtle pb-1">
+        {label}: {distinct} distinct scores across {scores.length} candidates. Spread is the
+        point — a ranker that returns one value for everything has not ranked anything, which
+        is precisely what the classifier this replaced was doing.
+      </p>
     </div>
   );
 }
