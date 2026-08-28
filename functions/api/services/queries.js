@@ -758,6 +758,74 @@ function scopeProfile(user) {
   };
 }
 
+// ---------------- concentration (the state "Where", read strategically) ----------------
+//
+// "Which district is worst" is the question a count map answers and it is the wrong one, because
+// the answer is always the most populous district. The strategic question underneath it is
+// WHERE THE CONCENTRATION ACTUALLY LIVES — because that decides whether the lever is moving
+// resources between areas or working differently inside them.
+//
+// Measured at three grains, which disagree in a way that is itself the finding:
+//   districts  heavily skewed — but that skew is population, and per-capita erases most of it
+//   stations   near-uniform once you are inside the administrative layer
+//   clusters   skewed again, tightly, at sub-station geography
+//
+// A DGP reading that should conclude: do not reallocate between stations on volume; the
+// actionable concentration is below them.
+function concentrationCurve(values) {
+  const v = [...values].filter((x) => x > 0).sort((a, b) => b - a);
+  const total = v.reduce((a, b) => a + b, 0);
+  if (!total || v.length < 4) return null;
+  const at = (pct) => {
+    const n = Math.max(1, Math.round(v.length * pct));
+    return { topPct: Math.round(pct * 100), units: n,
+      sharePct: Math.round((v.slice(0, n).reduce((a, b) => a + b, 0) / total) * 1000) / 10 };
+  };
+  // Gini over the units, as a single summary of how uneven the load is.
+  const asc = [...v].sort((a, b) => a - b);
+  let cum = 0; let weighted = 0;
+  for (let i = 0; i < asc.length; i += 1) { cum += asc[i]; weighted += cum; }
+  const gini = Math.round((1 - (2 * weighted) / (asc.length * total) + 1 / asc.length) * 1000) / 1000;
+  return { units: v.length, total, gini, points: [0.05, 0.1, 0.2, 0.5].map(at) };
+}
+function concentration(user) {
+  const db = load();
+  const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
+
+  const districts = narrowed ? null
+    : concentrationCurve((db.districtStats.districts || []).map((d) => d.total || d.count || 0));
+  const stationRows = (db.stations || []).filter((s) => !narrowed || String(s.districtId) === String(user.districtId));
+  const stations = concentrationCurve(stationRows.map((s) => s.cases || 0));
+  const clusterRows = (db.hotspots.hotspots || [])
+    .filter((h) => !narrowed || String(h.districtId) === String(user.districtId));
+  const clusters = concentrationCurve(clusterRows.map((h) => h.count || 0));
+
+  // The reading. Stated from the numbers rather than asserted, so it stays true if the corpus
+  // changes: if stations ARE concentrated the sentence flips on its own.
+  let reading = null;
+  if (stations && clusters) {
+    const stTop = stations.points.find((p) => p.topPct === 10);
+    const clTop = clusters.points.find((p) => p.topPct === 10);
+    const evenStations = stTop && stTop.sharePct < stTop.topPct * 1.5;
+    reading = evenStations
+      ? `The busiest ${stTop.topPct}% of stations carry only ${stTop.sharePct}% of the load — `
+        + 'across the administrative layer the caseload is close to even, so moving resource '
+        + `between stations on volume alone buys little. The concentration is below them: the top `
+        + `${clTop.topPct}% of spatial clusters hold ${clTop.sharePct}% of clustered incidents.`
+      : `The busiest ${stTop.topPct}% of stations carry ${stTop.sharePct}% of the load — the `
+        + 'administrative layer is genuinely uneven, so station-level reallocation is a real lever.';
+  }
+
+  return {
+    scope: scopeLabel(user, narrowed),
+    districts, stations, clusters, reading,
+    method: 'Each curve is the share of recorded crime held by the busiest N% of units at that '
+      + 'grain, plus a Gini coefficient: 0 is perfectly even, 1 is all load in one unit. District '
+      + 'volume is not corrected for population here — the per-capita ranking on this tab is what '
+      + 'separates size from risk.',
+  };
+}
+
 // ---------------- health ----------------
 function filterHealth(user, q = {}) {
   const db = load();
@@ -1012,7 +1080,7 @@ function vulnerability(user) {
 module.exports = {
   FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
   filterHealth, getCase, graphForCase, getCluster,
-  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity, scopeProfile,
+  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity, scopeProfile, concentration,
   listOffenders, getOffender, listHealth, healthSummary, deadlines, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --

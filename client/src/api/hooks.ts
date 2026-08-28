@@ -83,6 +83,8 @@ export const useReporting = () =>
   useQuery({ queryKey: ['reporting', role()], queryFn: () => api.get<any>('/analytics/reporting') });
 export const useScopeProfile = () =>
   useQuery({ queryKey: ['scopeProfile', role()], queryFn: () => api.get<any>('/analytics/profile') });
+export const useConcentration = () =>
+  useQuery({ queryKey: ['concentration', role()], queryFn: () => api.get<any>('/analytics/concentration') });
 
 export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });

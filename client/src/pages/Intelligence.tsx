@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting, useScopeProfile, useStats } from '../api/hooks';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting, useScopeProfile, useStats, useConcentration } from '../api/hooks';
 import { Section, Skeleton, Chip, Empty } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { Hint, stagger, rise } from '../components/viz';
@@ -27,7 +27,7 @@ const DISTRICT_TABS: { key: TabKey; label: string; icon: any; blurb: string }[] 
   { key: 'when', label: 'When', icon: CalendarDays,
     blurb: 'How offending here moves through the calendar — festivals and holidays are not ordinary days.' },
   { key: 'next', label: 'What next', icon: Sparkles,
-    blurb: 'Where this district is heading over the next three months, against a measured error.' },
+    blurb: 'The two-week deployment plan: which station, which window, whose name against it, and when it is reviewed.' },
 ];
 
 // A station officer was never given tabs of their own — they fell through to the state view and
@@ -52,7 +52,7 @@ const TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
   { key: 'when', label: 'When', icon: CalendarDays,
     blurb: 'How offending moves through the calendar — festivals, national holidays and ordinary days are not the same.' },
   { key: 'next', label: 'What next', icon: Sparkles,
-    blurb: 'Three-month projections with a measured error, and the districts trending against their own history.' },
+    blurb: 'The quarterly control strategy — which districts become priorities, and what each is tasked with. The projections behind it live in Forecast.' },
 ];
 
 // The narrative sits above the charts, not instead of them. Every number in it was computed
@@ -735,6 +735,7 @@ export default function Intelligence() {
   const { data: profile } = useScopeProfile();
   // scope-aware heat (hour x weekday), which the shift plan folds into reliefs.
   const { data: stats } = useStats();
+  const { data: concentration } = useConcentration();
   // THREE tiers, not two. `districtView` was the only branch, so a station officer fell through
   // to the state page and was handed all 31 districts — the exact opposite of what one desk
   // needs. Kept as a derived flag so the existing district branches still read the same.
@@ -851,6 +852,13 @@ export default function Intelligence() {
       <motion.div variants={rise}>
         <ZoneBoard zones={zones} />
       </motion.div>
+      {/* Strategic reading: at which grain is the load actually uneven. A state commander
+          allocating on district volume alone is allocating on population. */}
+      {tier === 'state' && (
+        <motion.div variants={rise}>
+          <Concentration data={concentration} />
+        </motion.div>
+      )}
       {/* "Spatiotemporal Clusters: identification of hotspots by layering time of day with
           location, enabling proactive resource deployment" -- this is that panel. */}
       <motion.div variants={rise}>
@@ -1108,6 +1116,69 @@ function TaskingBoard() {
 
       {!data.tasks.length && <Empty title="Nothing needs tasking right now" hint="No zone, forecast, hotspot or deadline crossed a threshold in this scope." />}
 
+      {/* A DISTRICT GETS A PLANNER, NOT A PILE. A tactical assessment becomes deployment only
+          when it says which station, which week, which day and which window — and a fortnight's
+          cover cannot start everywhere at once, so the weeks are separated rather than left for
+          the reader to sequence. Each row carries the OWNER, because a task with no name against
+          it is a wish. */}
+      {data.tier === 'district' && data.tasks.some((t: any) => t.week) ? (
+        <div className="space-y-4">
+          {[1, 2].map((wk) => {
+            const rows = data.tasks.filter((t: any) => t.week === wk);
+            if (!rows.length) return null;
+            return (
+              <Section key={wk}
+                title={<span className="flex items-center gap-2">
+                  <CalendarDays size={15} style={{ color: tone }} /> Week {wk}
+                  <span className="text-[11.5px] font-normal text-ink-muted">
+                    {wk === 1 ? 'starts now — the stations furthest above their own baseline' : 'follows on — the remainder of the elevated stations'}
+                  </span>
+                </span>}>
+                <div className="divide-y divide-line">
+                  {/* Column headings, so the planner reads as a roster rather than prose. */}
+                  <div className="hidden md:grid grid-cols-[minmax(0,1.4fr)_150px_140px_110px] gap-3 px-4 py-1.5
+                    bg-surface-2 text-[10.5px] uppercase tracking-wide text-ink-muted font-semibold">
+                    <span>Task &amp; trigger</span><span>Window</span><span>Owner</span><span className="text-right">Review by</span>
+                  </div>
+                  {rows.map((t: any) => (
+                    <div key={t.id} className="grid md:grid-cols-[minmax(0,1.4fr)_150px_140px_110px] gap-3 px-4 py-3 items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: (PRIORITY[t.priority] || PRIORITY.medium).dot }} />
+                          <span className="text-[14px] font-semibold text-kadi-navy truncate">{t.title}</span>
+                        </div>
+                        <div className="text-[12.5px] text-ink-muted mt-0.5">{t.trigger}</div>
+                        <div className="text-[12.5px] text-ink mt-1">{t.action}</div>
+                        <div className="text-[11.5px] text-ink-subtle mt-1">Success: {t.measure}</div>
+                        {t.link && (
+                          <button onClick={() => nav(t.link.to)} className="btn-outline text-xs mt-2 inline-flex items-center gap-1.5">
+                            {t.link.label} <ArrowRight size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-[12.5px]">
+                        <div className="md:hidden text-[10.5px] uppercase tracking-wide text-ink-muted">Window</div>
+                        <b className="text-ink">{t.window || '—'}</b>
+                        {t.windowShare != null && (
+                          <div className="text-[11px] text-ink-muted">{t.windowShare}% of its incidents</div>
+                        )}
+                      </div>
+                      <div className="text-[12.5px] text-ink">
+                        <div className="md:hidden text-[10.5px] uppercase tracking-wide text-ink-muted">Owner</div>
+                        {t.owner || '—'}
+                      </div>
+                      <div className="text-[12.5px] font-num text-ink-muted md:text-right">
+                        <div className="md:hidden text-[10.5px] uppercase tracking-wide">Review by</div>
+                        {t.reviewBy}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            );
+          })}
+        </div>
+      ) : (
       <div className="grid md:grid-cols-2 gap-3">
         {data.tasks.map((t: any) => {
           const p = PRIORITY[t.priority] || PRIORITY.medium;
@@ -1135,6 +1206,7 @@ function TaskingBoard() {
           );
         })}
       </div>
+      )}
       <div className="text-center">
         <button onClick={() => nav('/forecast')} className="text-xs link inline-flex items-center gap-1">
           The projections these respond to live in Forecast <ArrowRight size={12} />
@@ -1464,6 +1536,84 @@ function ShiftPlan({ heat, scopeName }: { heat?: any[]; scopeName: string }) {
             <span className="w-14 text-right font-num text-[11.5px] text-ink-muted">{r.pct}%</span>
           </div>
         ))}
+      </div>
+    </Section>
+  );
+}
+
+// WHERE THE CONCENTRATION ACTUALLY LIVES. "Which district is worst" is the question a count map
+// answers, and it is the wrong one — the answer is always the most populous district. The
+// strategic question underneath is at WHICH GRAIN the load is uneven, because that decides
+// whether the lever is moving resources between areas or working differently inside them.
+//
+// The three curves disagree, and the disagreement is the finding.
+function Concentration({ data }: { data: any }) {
+  if (!data) return <div className="card"><Skeleton rows={5} /></div>;
+  const grains = [
+    { key: 'districts', label: 'Between districts', c: data.districts, unit: 'districts',
+      note: 'Volume, uncorrected for population.' },
+    { key: 'stations', label: 'Between stations', c: data.stations, unit: 'stations',
+      note: 'Inside the administrative layer.' },
+    { key: 'clusters', label: 'Within stations', c: data.clusters, unit: 'clusters',
+      note: 'Spatial clusters, below station geography.' },
+  ].filter((g) => g.c);
+  if (!grains.length) return null;
+
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Target size={15} className="text-kadi-blue" />
+        Where the concentration actually lives</span>}
+      action={<InfoDot width="w-80">
+        <b className="block mb-1 text-kadi-navy">How to read the Gini</b>
+        0 means every unit at that grain carries the same load; 1 means one unit carries all of
+        it. Each bar shows the share of recorded crime held by the busiest 10% of units.
+        <b className="block mt-1.5 text-kadi-navy">Why three grains</b>
+        Because they disagree, and that is the point. If districts look uneven but stations do
+        not, the district-level skew is population rather than risk — and reallocating between
+        stations on volume buys nothing. The lever is wherever the load is genuinely stacked.
+        <span className="block mt-1.5 text-ink-muted">
+          District volume is not population-corrected here; the per-capita ranking further down
+          this tab is what separates size from risk.
+        </span>
+      </InfoDot>}>
+      <div className="p-4 space-y-4">
+        {data.reading && (
+          <div className="rounded-card border border-kadi-blue/25 bg-kadi-blue50/40 px-3 py-2.5 text-[13px] text-ink leading-relaxed">
+            {data.reading}
+          </div>
+        )}
+        <div className="grid sm:grid-cols-3 gap-3">
+          {grains.map((g) => {
+            const p10 = g.c.points.find((x: any) => x.topPct === 10);
+            // An even grain is one where the busiest tenth carries roughly a tenth.
+            const even = p10 && p10.sharePct < 15;
+            const tone = even ? '#2FA8A0' : p10 && p10.sharePct > 30 ? '#C0392B' : '#C9820A';
+            return (
+              <div key={g.key} className="rounded-card border border-line p-3">
+                <div className="text-[11px] uppercase tracking-wide text-ink-muted">{g.label}</div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-num font-semibold" style={{ color: tone }}>{p10?.sharePct}%</span>
+                  <span className="text-[11.5px] text-ink-muted">held by the busiest 10%</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {g.c.points.map((pt: any) => (
+                    <div key={pt.topPct} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-10 text-ink-muted font-num">top {pt.topPct}%</span>
+                      <span className="flex-1 h-1.5 rounded-full bg-surface-3 overflow-hidden">
+                        <span className="block h-full rounded-full" style={{ width: `${pt.sharePct}%`, background: tone }} />
+                      </span>
+                      <span className="w-10 text-right font-num text-ink">{pt.sharePct}%</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-ink-subtle mt-2">
+                  Gini <b className="font-num text-ink-muted">{g.c.gini}</b> over {g.c.units} {g.unit} · {g.note}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11.5px] text-ink-muted">{data.method}</p>
       </div>
     </Section>
   );

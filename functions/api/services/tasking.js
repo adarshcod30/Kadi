@@ -39,6 +39,39 @@ function peakWindow(heat) {
   return { from: fmt(best), to: fmt((best + 4) % 24), day: DOW[topDow] };
 }
 
+// The peak window for ONE area, from its own incidents. The state grid gives a single answer
+// for all of Karnataka, and a deployment plan that hands every station the same window is not a
+// plan — it is the state average wearing a station's name. Each task now carries the window its
+// own ground actually peaks in.
+function windowForCases(rows) {
+  if (!rows || rows.length < 12) return null;   // too thin to claim a pattern
+  const byHour = new Array(24).fill(0);
+  const byDow = new Array(7).fill(0);
+  let n = 0;
+  for (const c of rows) {
+    const ts = c.incidentFromDate || '';
+    if (ts.length < 13) continue;
+    const hour = parseInt(ts.slice(11, 13), 10);
+    const d = new Date(`${ts.slice(0, 10)}T00:00:00Z`);
+    const day = d.getUTCDay();
+    if (!Number.isFinite(hour) || Number.isNaN(day)) continue;
+    byHour[hour] += 1;
+    byDow[(day + 6) % 7] += 1;   // Mon-first, matching the pipeline
+    n += 1;
+  }
+  if (n < 12) return null;
+  let best = 0; let bestSum = -1;
+  for (let h = 0; h < 24; h += 1) {
+    let sum = 0;
+    for (let k = 0; k < 4; k += 1) sum += byHour[(h + k) % 24];
+    if (sum > bestSum) { bestSum = sum; best = h; }
+  }
+  const fmt = (h) => `${String(h).padStart(2, '0')}:00`;
+  const topDow = byDow.indexOf(Math.max(...byDow));
+  return { from: fmt(best), to: fmt((best + 4) % 24), day: DOW[topDow],
+    sharePct: Math.round((bestSum / n) * 100), n };
+}
+
 function reviewDate(asOf, days) {
   const d = new Date(`${asOf}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -91,23 +124,55 @@ function build(user, ctx) {
     const did = String(ctx.districtId || user.districtId || '');
     const stations = (zones.stations || []).filter((s) => String(s.districtId) === did && s.zone !== 'normal')
       .sort((a, b) => (b.z || 0) - (a.z || 0)).slice(0, 6);
+    // A TWO-WEEK PLANNER, NOT A PILE OF CARDS. A tactical assessment turns into deployment only
+    // once it says which station, in which week, on which day and in which window — that is what
+    // a tasking meeting actually produces. The worst stations take week 1; the rest take week 2,
+    // because a fortnight's cover cannot start everywhere at once and pretending otherwise is how
+    // a plan becomes a wish list.
     stations.forEach((s, i) => {
       const u = db.lookups.units.get(String(s.unitId));
       const name = u ? u.UnitName : `Unit ${s.unitId}`;
+      const week = i < 3 ? 1 : 2;
+      const pulsing = s.zone === 'red_pulsing';
+      // This station's own peak, falling back to the district-wide window only when the
+      // station's own history is too thin to support a claim.
+      const sw = windowForCases(db.caseList.filter((c) => String(c.unitId) === String(s.unitId))) || win;
       tasks.push(task({
-        id: `D${i + 1}`, horizon: 'Next two weeks', priority: s.zone === 'red_pulsing' ? 'high' : 'medium',
+        id: `D${i + 1}`, horizon: `Week ${week}`, week,
+        priority: pulsing ? 'high' : 'medium',
         title: `Deploy to ${name}`,
         area: name,
-        trigger: `${s.zone === 'red_pulsing' ? 'Pulsing' : 'Elevated'}: ${s.z != null ? `${s.z.toFixed(1)}σ` : ''} above baseline`
+        window: sw ? `${sw.day} ${sw.from}–${sw.to}` : null,
+        windowShare: sw && sw.sharePct != null ? sw.sharePct : null,
+        owner: `SHO ${name}`,
+        trigger: `${pulsing ? 'Pulsing' : 'Elevated'}: ${s.z != null ? `${s.z.toFixed(1)}σ` : ''} above baseline`
           + (s.changePct != null ? `, ${s.changePct > 0 ? '+' : ''}${s.changePct}% vs baseline` : ''),
-        action: win
-          ? `Add patrol cover ${win.day} ${win.from}–${win.to}; brief the SHO on the driver and set daily follow-up.`
+        action: sw
+          ? `Add patrol cover ${sw.day} ${sw.from}–${sw.to} — this station's own busiest block, `
+            + `carrying ${sw.sharePct}% of its incidents. Brief the SHO on the driver and set daily follow-up.`
           : 'Add patrol cover on the station’s peak window; brief the SHO and set daily follow-up.',
         measure: 'Station returns to Normal band within the fortnight',
-        reviewBy: reviewDate(asOf, 14),
+        reviewBy: reviewDate(asOf, week === 1 ? 7 : 14),
         link: { to: `/cases?unit=${s.unitId}`, label: 'Station register' },
       }));
     });
+    // The supervision rung the district actually owns: KSP practice is a DCP visiting one
+    // station a day and an ACP two, reviewing cases under investigation. The plan names it
+    // rather than leaving it implicit.
+    if (stations.length) {
+      tasks.push(task({
+        id: 'D0', horizon: 'Week 1', week: 1, priority: 'medium',
+        title: 'Station visits on the pulsing stations',
+        area: stations.slice(0, 3).map((s) => (db.lookups.units.get(String(s.unitId)) || {}).UnitName).filter(Boolean).join(', ') || 'Top stations',
+        window: 'Daily',
+        owner: 'DySP / ACP',
+        trigger: `${stations.filter((s) => s.zone === 'red_pulsing').length} station(s) pulsing against their own baseline`,
+        action: 'Visit each, review cases under investigation on the spot, and report upward daily.',
+        measure: 'Every pulsing station visited and its open pendency reviewed within the week',
+        reviewBy: reviewDate(asOf, 7),
+        link: { to: '/health', label: 'Health worklist' },
+      }));
+    }
     if (!stations.length && win) tasks.push(task({
       id: 'D0', horizon: 'Next two weeks', priority: 'low',
       title: 'Hold the line — no station is pulsing',

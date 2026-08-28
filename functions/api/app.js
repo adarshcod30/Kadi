@@ -831,6 +831,9 @@ function buildApp() {
   // the tier above them, because a number with nothing beside it explains nothing.
   r.get('/analytics/profile', handle(async (req) => q.scopeProfile(req.user)));
 
+  // Where the concentration actually lives, at three grains (state "Where", read strategically).
+  r.get('/analytics/concentration', handle(async (req) => q.concentration(req.user)));
+
   // What Next as a tasking board (D2), tier-shaped. Distinct from Forecast.
   r.get('/analytics/tasking', handle(async (req) => tasking.build(req.user, {
     asOf: q.corpusAsOf(), districtId: req.user.districtId,
