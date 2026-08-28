@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting } from '../api/hooks';
+import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting, useScopeProfile, useStats } from '../api/hooks';
 import { Section, Skeleton, Chip, Empty } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { Hint, stagger, rise } from '../components/viz';
@@ -28,6 +28,20 @@ const DISTRICT_TABS: { key: TabKey; label: string; icon: any; blurb: string }[] 
     blurb: 'How offending here moves through the calendar — festivals and holidays are not ordinary days.' },
   { key: 'next', label: 'What next', icon: Sparkles,
     blurb: 'Where this district is heading over the next three months, against a measured error.' },
+];
+
+// A station officer was never given tabs of their own — they fell through to the state view and
+// were shown all 31 districts. These are the four questions an SHO can actually act on, in the
+// vocabulary of the ground they hold: a beat, a relief roster, a register.
+const STATION_TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
+  { key: 'where', label: 'My beat', icon: MapPin,
+    blurb: 'Where offending concentrates inside this station\u2019s ground, and how far the register sits above its own normal month.' },
+  { key: 'why', label: 'Why here', icon: HelpCircle,
+    blurb: 'What makes this register different from the rest of the district — in composition, and in how it performs.' },
+  { key: 'when', label: 'When', icon: CalendarDays,
+    blurb: 'Which relief carries the load, and which occasions move it — the shift plan behind the roster.' },
+  { key: 'next', label: 'What next', icon: Sparkles,
+    blurb: 'This week\u2019s list: deadlines that fall due, and the beat work that follows from them.' },
 ];
 
 const TABS: { key: TabKey; label: string; icon: any; blurb: string }[] = [
@@ -718,8 +732,21 @@ export default function Intelligence() {
   const { data: stations } = useStations({ sort: stationSort, q: stationQ || undefined });
   const { data: occ } = useOccasions();
   const { data: me } = useMe();
-  const districtView = me?.capabilities?.effectiveScope === 'district';
-  const tabs = districtView ? DISTRICT_TABS : TABS;
+  const { data: profile } = useScopeProfile();
+  // scope-aware heat (hour x weekday), which the shift plan folds into reliefs.
+  const { data: stats } = useStats();
+  // THREE tiers, not two. `districtView` was the only branch, so a station officer fell through
+  // to the state page and was handed all 31 districts — the exact opposite of what one desk
+  // needs. Kept as a derived flag so the existing district branches still read the same.
+  const tier: 'state' | 'district' | 'station' =
+    me?.capabilities?.effectiveScope === 'unit' ? 'station'
+      : me?.capabilities?.effectiveScope === 'district' ? 'district' : 'state';
+  const stationView = tier === 'station';
+  const districtView = tier === 'district';
+  const myUnitId = me?.capabilities?.unitId || null;
+  const scopeName = stationView ? (me?.capabilities?.unitName || 'this station')
+    : districtView ? (me?.capabilities?.districtName || 'this district') : 'Karnataka';
+  const tabs = stationView ? STATION_TABS : districtView ? DISTRICT_TABS : TABS;
   const { data: socio, isLoading: sLoad } = useSocio();
   const { data: fc, isLoading: fLoad } = useForecast();
   const [indicator, setIndicator] = useState(0);
@@ -764,19 +791,33 @@ export default function Intelligence() {
         <div className="flex items-start gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold">
-              {districtView ? `Intelligence — ${zones?.districts?.[0]?.districtName || 'this district'}` : 'Sociological & Predictive Intelligence'}
+              {stationView ? `Intelligence — ${scopeName}`
+                : districtView ? `Intelligence — ${zones?.districts?.[0]?.districtName || 'this district'}`
+                  : 'Sociological & Predictive Intelligence'}
             </h1>
             <p className="text-white/75 text-sm mt-1 max-w-2xl">
-              {districtView
-                ? 'Station-level status against each station\'s own baseline, how offending here moves through the calendar, and where the next three months are heading.'
-                : 'Raw FIR counts mostly measure population — the biggest district always “looks worst”. Normalising to incidents per 100,000 residents and correlating against socio-economic indicators is what turns a count map into an explanation.'}
+              {stationView
+                ? 'One register, read against its own history: where offending concentrates on this ground, what makes the mix here different from the district, which relief carries the load, and what falls due this week.'
+                : districtView
+                  ? 'Station-level status against each station\'s own baseline, how offending here moves through the calendar, and where the next three months are heading.'
+                  : 'Raw FIR counts mostly measure population — the biggest district always “looks worst”. Normalising to incidents per 100,000 residents and correlating against socio-economic indicators is what turns a count map into an explanation.'}
             </p>
           </div>
+          {/* The hero stats follow the rank too: "31 districts analysed" is not a fact about
+              one station, and a state forecast horizon is not that station's projection. */}
           <div className="flex gap-3">
-            <HeroStat label={districtView ? 'Stations here' : 'Districts analysed'}
-              value={districtView ? (zones?.summary?.totalStations ?? '—') : districts.length} />
-            <HeroStat label="Forecast horizon" value={`${fc?.horizonMonths || 3} mo`} />
-            <HeroStat label="Backtest MAPE" value={fc?.accuracy ? `${fc.accuracy.mape}%` : '—'} good />
+            {stationView ? (<>
+              <HeroStat label="FIRs on this register" value={(stats?.totalCases ?? 0).toLocaleString()} />
+              <HeroStat label="Against baseline"
+                value={profile?.available ? `${profile.totals.shareOfParent}%` : '—'} />
+              <HeroStat label="Charge-sheet rate"
+                value={profile?.available ? `${profile.metrics?.[0]?.mine ?? '—'}%` : '—'} good />
+            </>) : (<>
+              <HeroStat label={districtView ? 'Stations here' : 'Districts analysed'}
+                value={districtView ? (zones?.summary?.totalStations ?? '—') : districts.length} />
+              <HeroStat label="Forecast horizon" value={`${fc?.horizonMonths || 3} mo`} />
+              <HeroStat label="Backtest MAPE" value={fc?.accuracy ? `${fc.accuracy.mape}%` : '—'} good />
+            </>)}
           </div>
         </div>
       </motion.div>
@@ -799,6 +840,14 @@ export default function Intelligence() {
       {tab === 'when' && <AiNote kind="when" text={occ?.insight} />}
 
       {tab === 'where' && <>
+      {/* Below state level, lead with the reader's OWN bar. The pipeline publishes the exact
+          rise this area needs to reach Watch and Pulsing and nothing rendered it — so an
+          officer could see they were not lit up without ever learning what would light them. */}
+      {tier !== 'state' && (
+        <motion.div variants={rise}>
+          <ThresholdReading zones={zones} tier={tier} unitId={myUnitId} />
+        </motion.div>
+      )}
       <motion.div variants={rise}>
         <ZoneBoard zones={zones} />
       </motion.div>
@@ -815,10 +864,13 @@ export default function Intelligence() {
       <motion.div variants={rise}>
         <Outliers anomalies={anomalies} />
       </motion.div>
-      <motion.div variants={rise}>
-        <StationRoster stations={stations} sort={stationSort} setSort={setStationSort}
-          q={stationQ} setQ={setStationQ} />
-      </motion.div>
+      {/* A roster of stations is a supervisor's instrument. An SHO holds exactly one. */}
+      {!stationView && (
+        <motion.div variants={rise}>
+          <StationRoster stations={stations} sort={stationSort} setSort={setStationSort}
+            q={stationQ} setQ={setStationQ} />
+        </motion.div>
+      )}
       {/* Per-capita ranking across districts is a state question. Under "My stations" it
           would answer something the reader did not ask. */}
       {!districtView && (
@@ -868,11 +920,17 @@ export default function Intelligence() {
       )}
       </>}
 
+      {/* The tier above is the only honest yardstick for a district or a station: a share with
+          nothing beside it explains nothing. State has no tier above it, so it keeps the
+          socio-economic correlation instead. */}
+      {tab === 'why' && tier !== 'state' && (
+        <motion.div variants={rise}><ScopeProfile data={profile} /></motion.div>
+      )}
       {tab === 'why' && districtView && (
         <motion.div variants={rise}><WhyHere socio={socio} /></motion.div>
       )}
 
-      {tab === 'why' && !districtView && <>
+      {tab === 'why' && tier === 'state' && <>
       {/* Reporting propensity (P4-3): the confounder a rate comparison must clear before it can
           read urbanisation as cause. Here it clears — delay is uniform — which is itself a
           finding, and the kind of counter-evidence the tab should carry. */}
@@ -999,6 +1057,11 @@ export default function Intelligence() {
 
       </>}
 
+      {/* A heat grid says when crime happens; it does not say which parade to weight. Below
+          state level that translation is the whole value, so the shift plan leads. */}
+      {tab === 'when' && tier !== 'state' && (
+        <motion.div variants={rise}><ShiftPlan heat={stats?.heat} scopeName={scopeName} /></motion.div>
+      )}
       {tab === 'when' && <OccasionPanels occ={occ} />}
 
       {tab === 'next' && <>
@@ -1161,6 +1224,246 @@ function ReportingPropensity({ data }: { data: any }) {
             </div>
           ))}
         </div>
+      </div>
+    </Section>
+  );
+}
+
+// THE THRESHOLD READING. The pipeline publishes, for every district and station, the exact rise
+// that area needs to cross into Watch and into Pulsing — and nothing rendered it. That omission
+// is precisely what zones.py warns about: an officer should be able to read that their own red
+// line sits at +7 while Bengaluru City's sits at +98, instead of wondering why their station
+// never lights up. Same statistical standard, very different absolute bars, and the bar is the
+// thing an SHO actually needs to know.
+function ThresholdReading({ zones, tier, unitId }: { zones: any; tier: string; unitId?: string | null }) {
+  const row = useMemo(() => {
+    if (!zones) return null;
+    if (tier === 'station' && unitId) {
+      return (zones.stations || []).find((r: any) => String(r.unitId) === String(unitId)) || null;
+    }
+    return (zones.districts || [])[0] || null;
+  }, [zones, tier, unitId]);
+  if (!row || !row.thresholds) return null;
+
+  const t = row.thresholds;
+  const name = row.unitName || row.districtName || 'This area';
+  const band = ZONE_STYLE[row.zone] || ZONE_STYLE.normal;
+  // Where the current month sits along its own scale, capped so a huge spike still renders.
+  const span = Math.max(t.redAt * 1.35, (row.current ?? 0) - t.baseline, 1);
+  const pos = (v: number) => `${Math.min(100, Math.max(0, (v / span) * 100))}%`;
+  const rise = (row.current ?? 0) - t.baseline;
+
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Target size={15} style={{ color: band.dot }} />
+        {name} — measured against its own history</span>}
+      action={<InfoDot width="w-80">
+        <b className="block mb-1 text-kadi-navy">Why your line is not someone else&rsquo;s</b>
+        Every area is judged against its OWN twelve-month average and its own natural variation,
+        never a shared cut-off. Monthly FIR counts behave like counts of independent events, so
+        the expected month-to-month wobble is roughly the square root of the baseline. A station
+        averaging 200 needs about +42 to pulse; one averaging 9 needs about +9.
+        <span className="block mt-1.5 text-ink-muted">
+          That is why a busy station does not sit permanently red and a quiet one is not
+          permanently invisible — the standard is identical, the absolute bar is not.
+        </span>
+      </InfoDot>}>
+      <div className="p-4">
+        <div className="flex items-baseline gap-2 flex-wrap mb-3">
+          <span className={`w-2.5 h-2.5 rounded-full ${band.ring || ''}`} style={{ background: band.dot }} />
+          <b className="text-[15px]" style={{ color: band.dot }}>{band.label}</b>
+          <span className="text-[13px] text-ink">
+            <b className="font-num">{row.current}</b> this month against a baseline of{' '}
+            <b className="font-num">{t.baseline}</b>
+            {rise > 0 ? <> — <b className="font-num text-danger">+{Math.round(rise * 10) / 10}</b> above it</> : ' — at or below it'}
+          </span>
+        </div>
+
+        {/* The scale itself: where Watch and Pulsing sit for THIS area, and where it stands now. */}
+        <div className="relative h-9">
+          <div className="absolute inset-x-0 top-3 h-2 rounded-full bg-surface-3 overflow-hidden">
+            <div className="h-full rounded-full transition-all"
+              style={{ width: pos(Math.max(0, rise)), background: band.dot }} />
+          </div>
+          {[['Watch', t.yellowAt, '#C9820A'], ['Pulsing', t.redAt, '#C0392B']].map(([lab, v, c]: any) => (
+            <div key={lab} className="absolute top-0 -translate-x-1/2 text-center" style={{ left: pos(v) }}>
+              <div className="w-px h-8 mx-auto" style={{ background: c }} />
+              <div className="text-[10px] font-medium whitespace-nowrap" style={{ color: c }}>{lab} +{v}</div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[12px] text-ink-muted mt-4">
+          {name} needs <b className="text-ink font-num">+{t.yellowAt}</b> cases over its average to
+          reach Watch and <b className="text-ink font-num">+{t.redAt}</b> to pulse.
+          {row.z != null && <> It currently sits <b className="text-ink font-num">{row.z.toFixed(1)}σ</b> from its own mean.</>}
+        </p>
+      </div>
+    </Section>
+  );
+}
+
+// THE "WHY" FOR A DISTRICT OR A STATION. "Why is crime distributed like this across Karnataka"
+// is a state question. An SP or an SHO asks something narrower and more useful: why does MY
+// register look like this? The only honest answer is a comparison with the tier above, because
+// a share with nothing beside it explains nothing — 60% property crime is unremarkable if the
+// district is 60% too, and a briefing if the district is 40%.
+function ScopeProfile({ data }: { data: any }) {
+  if (!data) return <div className="card"><Skeleton rows={6} /></div>;
+  if (!data.available) {
+    return <div className="card p-4 text-[13px] text-ink-muted">{data.reason}</div>;
+  }
+  const over = data.headMix.filter((h: any) => h.lift && h.lift >= 1.25).slice(0, 3);
+  const under = data.headMix.filter((h: any) => h.lift && h.lift <= 0.75).slice(0, 3);
+
+  return (
+    <div className="space-y-4">
+      <motion.div variants={rise}>
+        <Section
+          title={<span className="flex items-center gap-2"><Building2 size={15} className="text-kadi-blue" />
+            What makes {data.mineName} different from {data.parentName}</span>}
+          action={<InfoDot width="w-80">{data.method}</InfoDot>}>
+          <div className="p-4 space-y-4">
+            <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5 text-[13px] text-ink">
+              {data.mineName} holds <b className="font-num">{data.totals.mine.toLocaleString()}</b> FIRs
+              — <b className="font-num">{data.totals.shareOfParent}%</b> of {data.parentName}&rsquo;s{' '}
+              <span className="font-num">{data.totals.parent.toLocaleString()}</span>.
+              {over.length > 0 && (
+                <> Its register runs <b>heavier on {over.map((h: any) => h.head).join(', ')}</b> than the {data.parentLabel} does
+                  {under.length > 0 && <> and <b>lighter on {under.map((h: any) => h.head).join(', ')}</b></>}.</>
+              )}
+              {!over.length && !under.length && <> Its crime mix closely tracks the {data.parentLabel}&rsquo;s — nothing here is unusual in composition.</>}
+            </div>
+
+            {/* Composition against the parent. Two bars per head, so over- and
+                under-representation is visible rather than asserted. */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="label">Crime mix vs the {data.parentLabel}</div>
+                <div className="flex items-center gap-3 text-[10.5px] text-ink-muted">
+                  <span className="flex items-center gap-1"><span className="w-3 h-2 rounded-sm bg-kadi-blue" />{data.mineLabel}</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-2 rounded-sm bg-line" />{data.parentLabel}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {data.headMix.slice(0, 8).map((h: any) => {
+                  const max = Math.max(...data.headMix.map((x: any) => Math.max(x.minePct, x.parentPct)), 1);
+                  const hot = h.lift && h.lift >= 1.25;
+                  const cold = h.lift && h.lift <= 0.75;
+                  return (
+                    <div key={h.head}>
+                      <div className="flex items-center justify-between text-[12.5px] mb-0.5">
+                        <span className="text-ink truncate">{h.head}</span>
+                        <span className="font-num text-ink-muted shrink-0">
+                          {h.minePct}% <span className="text-ink-subtle">vs {h.parentPct}%</span>
+                          {h.lift != null && (
+                            <b className={`ml-2 ${hot ? 'text-danger' : cold ? 'text-kadi-teal' : 'text-ink-muted'}`}>
+                              {h.lift}×
+                            </b>
+                          )}
+                        </span>
+                      </div>
+                      <div className="relative h-3">
+                        <div className="absolute inset-x-0 top-0 h-1.5 rounded-full bg-surface-3">
+                          <div className="h-full rounded-full" style={{ width: `${(h.minePct / max) * 100}%`, background: hot ? '#C0392B' : cold ? '#2FA8A0' : '#1A6FC4' }} />
+                        </div>
+                        <div className="absolute top-2 h-1 rounded-full bg-line" style={{ width: `${(h.parentPct / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Section>
+      </motion.div>
+
+      {/* The three comparisons an officer is actually judged on. */}
+      <motion.div variants={rise}>
+        <Section title={<span className="flex items-center gap-2"><Target size={15} className="text-kadi-blue" />
+          How {data.mineName} performs against {data.parentName}</span>}
+          action={<InfoDot>Each row is this scope&rsquo;s figure beside the tier above it. Green means
+            better than the parent on that measure, red worse — and the direction of &ldquo;better&rdquo;
+            differs by row, which is why it is stated rather than assumed.</InfoDot>}>
+          <div className="p-4 grid sm:grid-cols-3 gap-3">
+            {data.metrics.map((m: any) => {
+              if (m.mine == null || m.parent == null) return null;
+              const better = m.higherIsBetter ? m.mine > m.parent : m.mine < m.parent;
+              const same = Math.abs(m.mine - m.parent) < 0.05;
+              const tone = same ? '#5B6B7E' : better ? '#1E874B' : '#C0392B';
+              return (
+                <div key={m.key} className="rounded-card border border-line p-3">
+                  <div className="text-[11px] uppercase tracking-wide text-ink-muted">{m.label}</div>
+                  <div className="text-2xl font-num font-semibold mt-1" style={{ color: tone }}>{m.mine}{m.unit}</div>
+                  <div className="text-[12px] text-ink-muted mt-0.5">
+                    {data.parentName}: <b className="font-num text-ink">{m.parent}{m.unit}</b>
+                    {!same && <span style={{ color: tone }}> · {better ? 'better' : 'worse'}</span>}
+                    {same && ' · in line'}
+                  </div>
+                  <p className="text-[11.5px] text-ink-subtle mt-1.5">{m.note}</p>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      </motion.div>
+    </div>
+  );
+}
+
+// THE SHIFT PLAN. A heat grid tells an SHO when crime happens; it does not tell them which
+// parade to weight. Karnataka stations run standard reliefs, so the hours are folded into those
+// shifts and ranked — that is the form the answer has to take before it can be acted on.
+const SHIFT_BANDS: [string, string, number, number][] = [
+  ['First (night)', '00:00–06:00', 0, 5],
+  ['Second (day)', '06:00–14:00', 6, 13],
+  ['Third (evening)', '14:00–22:00', 14, 21],
+  ['Late night', '22:00–24:00', 22, 23],
+];
+function ShiftPlan({ heat, scopeName }: { heat?: any[]; scopeName: string }) {
+  const rows = useMemo(() => {
+    if (!heat?.length) return [];
+    const total = heat.reduce((a, c) => a + c.count, 0) || 1;
+    return SHIFT_BANDS.map(([label, window, from, to]) => {
+      const n = heat.filter((c) => c.hour >= from && c.hour <= to).reduce((a, c) => a + c.count, 0);
+      const hours = to - from + 1;
+      return { label, window, n, pct: Math.round((n / total) * 1000) / 10, perHour: Math.round((n / hours) * 10) / 10 };
+    }).sort((a, b) => b.perHour - a.perHour);
+  }, [heat]);
+  if (!rows.length) return null;
+  const top = rows[0];
+
+  return (
+    <Section
+      title={<span className="flex items-center gap-2"><Clock size={15} className="text-kadi-teal" /> Your shift plan</span>}
+      action={<InfoDot width="w-80">
+        <b className="block mb-1 text-kadi-navy">Ranked per hour, not per shift</b>
+        A shift covering eight hours will always total more than one covering two, so ranking on
+        the raw total would put the longest shift first every time regardless of risk. These are
+        ranked by incidents PER HOUR, which is what decides where an extra pair of feet is worth
+        most.
+        <span className="block mt-1.5 text-ink-muted">
+          Weighting cover toward a peak window is only worth doing if the visit is long enough to
+          register and short enough to repeat — brief, frequent, unpredictable passes deter more
+          than one long static posting.
+        </span>
+      </InfoDot>}>
+      <div className="p-4 space-y-2">
+        <div className="rounded-card border border-kadi-teal/30 bg-kadi-teal/10 px-3 py-2 text-[13px] text-ink mb-1">
+          Weight cover toward <b>{top.label}</b> ({top.window}) — <b className="font-num">{top.perHour}</b> incidents
+          an hour at {scopeName}, against {rows[rows.length - 1].perHour} on the quietest relief.
+        </div>
+        {rows.map((r, i) => (
+          <div key={r.label} className="flex items-center gap-3">
+            <span className="w-5 text-[11px] font-num text-ink-muted">{i + 1}</span>
+            <span className="w-32 text-[13px] text-ink shrink-0">{r.label}</span>
+            <span className="w-24 text-[11.5px] text-ink-muted font-num shrink-0">{r.window}</span>
+            <span className="flex-1 h-2 rounded-full bg-surface-3 overflow-hidden">
+              <span className="block h-full rounded-full" style={{ width: `${(r.perHour / (rows[0].perHour || 1)) * 100}%`, background: i === 0 ? '#C0392B' : i === 1 ? '#C9820A' : '#2FA8A0' }} />
+            </span>
+            <span className="w-24 text-right font-num text-[12px] text-ink">{r.perHour}/hr</span>
+            <span className="w-14 text-right font-num text-[11.5px] text-ink-muted">{r.pct}%</span>
+          </div>
+        ))}
       </div>
     </Section>
   );

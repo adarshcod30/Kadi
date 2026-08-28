@@ -827,6 +827,10 @@ function buildApp() {
   // Reporting propensity (Why, P4-3): the incident-to-FIR delay confounder, per district.
   r.get('/analytics/reporting', handle(async (req) => q.reportingPropensity(req.user)));
 
+  // The "Why" for a district or a station: their own composition and performance set against
+  // the tier above them, because a number with nothing beside it explains nothing.
+  r.get('/analytics/profile', handle(async (req) => q.scopeProfile(req.user)));
+
   // What Next as a tasking board (D2), tier-shaped. Distinct from Forecast.
   r.get('/analytics/tasking', handle(async (req) => tasking.build(req.user, {
     asOf: q.corpusAsOf(), districtId: req.user.districtId,

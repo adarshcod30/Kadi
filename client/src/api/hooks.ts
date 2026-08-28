@@ -81,6 +81,8 @@ export const useNearRepeat = () =>
   useQuery({ queryKey: ['nearRepeat', role()], queryFn: () => api.get<any>('/analytics/near-repeat') });
 export const useReporting = () =>
   useQuery({ queryKey: ['reporting', role()], queryFn: () => api.get<any>('/analytics/reporting') });
+export const useScopeProfile = () =>
+  useQuery({ queryKey: ['scopeProfile', role()], queryFn: () => api.get<any>('/analytics/profile') });
 
 export const useGeoPoints = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['geo', role(), params], queryFn: () => api.get<any>(`/geo/points${qs(params)}`) });

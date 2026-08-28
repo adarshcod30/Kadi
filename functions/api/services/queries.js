@@ -654,6 +654,110 @@ function reportingPropensity(user) {
   };
 }
 
+// ---------------- scope profile (the "Why" for a district or a station) ----------------
+//
+// "Why is crime distributed like this across Karnataka" is a state question, answered by the
+// socio-economic correlation. It is NOT the question an SP or an SHO asks. Theirs is "why does
+// MY register look like this" — and the only honest way to answer it is to compare their own
+// composition against the tier above them, because a number with nothing beside it explains
+// nothing. A station that is 60% property crime is unremarkable if its district is too, and
+// worth a briefing if the district is 30%.
+//
+// So this returns the reader's own mix, clearance and reporting speed set against their parent:
+// a station against its district, a district against the state.
+function scopeProfile(user) {
+  const db = load();
+  const tier = (user.roleMeta && user.roleMeta.tier) || 'state';
+  const drilledUnit = user.drillUnitId;
+  const isStation = tier === 'station' || Boolean(drilledUnit);
+  const unitId = String(drilledUnit || user.unitId || '');
+  const districtId = String(user.districtId || '');
+
+  // The reader's own rows, and the rows of the tier above them.
+  let mine; let parent; let mineName; let parentName; let mineLabel; let parentLabel;
+  if (isStation) {
+    mine = db.caseList.filter((c) => String(c.unitId) === unitId);
+    parent = db.caseList.filter((c) => String(c.districtId) === String(mine[0]?.districtId || districtId));
+    mineName = mine[0]?.unitName || 'This station';
+    parentName = mine[0]?.districtName || 'its district';
+    mineLabel = 'station'; parentLabel = 'district';
+  } else if (tier === 'district' || user.drilledFromState) {
+    mine = db.caseList.filter((c) => String(c.districtId) === districtId);
+    parent = db.caseList;
+    mineName = mine[0]?.districtName || 'This district';
+    parentName = 'Karnataka';
+    mineLabel = 'district'; parentLabel = 'state';
+  } else {
+    return { available: false, reason: 'The state has no tier above it to compare against — read the socio-economic correlation instead.' };
+  }
+  if (!mine.length) return { available: false, reason: 'No cases in this scope.' };
+
+  // Crime-head composition, as SHARES, then the lift of mine over the parent's. Shares rather
+  // than counts because the two populations differ by an order of magnitude.
+  const share = (rows) => {
+    const m = new Map();
+    for (const c of rows) m.set(c.crimeHead || 'Other', (m.get(c.crimeHead || 'Other') || 0) + 1);
+    const total = rows.length || 1;
+    return { map: m, pct: (h) => ((m.get(h) || 0) / total) * 100 };
+  };
+  const a = share(mine); const b = share(parent);
+  const heads = [...new Set([...a.map.keys()])];
+  const headMix = heads.map((h) => {
+    const minePct = a.pct(h); const parentPct = b.pct(h);
+    return {
+      head: h, count: a.map.get(h) || 0,
+      minePct: Math.round(minePct * 10) / 10,
+      parentPct: Math.round(parentPct * 10) / 10,
+      // How many times over-represented. 1.0 means exactly the parent's share.
+      lift: parentPct > 0 ? Math.round((minePct / parentPct) * 100) / 100 : null,
+    };
+  }).sort((x, y) => y.count - x.count);
+
+  const clearance = (rows) => {
+    const cs = rows.filter((c) => String(c.statusId) === '2').length;
+    return rows.length ? Math.round((cs / rows.length) * 1000) / 10 : 0;
+  };
+  const medianDelay = (rows) => {
+    const d = [];
+    for (const c of rows) {
+      if (!c.incidentFromDate || !c.infoReceivedPSDate) continue;
+      const days = (new Date(`${c.infoReceivedPSDate.slice(0, 10)}T00:00:00Z`).getTime()
+        - new Date(`${c.incidentFromDate.slice(0, 10)}T00:00:00Z`).getTime()) / 86400000;
+      if (days >= 0 && days <= 365) d.push(days);
+    }
+    if (!d.length) return null;
+    d.sort((x, y) => x - y);
+    const m = Math.floor(d.length / 2);
+    return Math.round((d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2) * 10) / 10;
+  };
+  const flagged = (rows) => {
+    const ids = new Set(rows.map((c) => String(c.caseMasterId)));
+    const h = db.healthList.filter((x) => ids.has(String(x.caseMasterId)));
+    return rows.length ? Math.round((h.length / rows.length) * 1000) / 10 : 0;
+  };
+
+  return {
+    available: true,
+    mineLabel, parentLabel, mineName, parentName,
+    totals: { mine: mine.length, parent: parent.length,
+      shareOfParent: parent.length ? Math.round((mine.length / parent.length) * 1000) / 10 : 0 },
+    headMix,
+    // Three comparisons an officer is actually judged on.
+    metrics: [
+      { key: 'clearance', label: 'Charge-sheet rate', mine: clearance(mine), parent: clearance(parent), unit: '%', higherIsBetter: true,
+        note: 'Share of registered FIRs that reached a charge sheet.' },
+      { key: 'flagged', label: 'Cases carrying a health flag', mine: flagged(mine), parent: flagged(parent), unit: '%', higherIsBetter: false,
+        note: 'Share flagged by the pipeline for ageing, pendency or undetected-risk.' },
+      { key: 'delay', label: 'Median reporting delay', mine: medianDelay(mine), parent: medianDelay(parent), unit: 'd', higherIsBetter: false,
+        note: 'Gap between the incident date on the FIR and the date police received the information. A longer delay depresses the measured rate.' },
+    ],
+    method: 'Composition is compared as SHARES, not counts, because the two populations differ by '
+      + 'an order of magnitude. Lift is this scope’s share divided by the parent’s: 1.0 means '
+      + 'identical to the tier above, 2.0 means twice as concentrated here. Nothing on this panel '
+      + 'reads caste, religion or occupation.',
+  };
+}
+
 // ---------------- health ----------------
 function filterHealth(user, q = {}) {
   const db = load();
@@ -908,7 +1012,7 @@ function vulnerability(user) {
 module.exports = {
   FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
   filterHealth, getCase, graphForCase, getCluster,
-  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity,
+  corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity, scopeProfile,
   listOffenders, getOffender, listHealth, healthSummary, deadlines, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so
   // a Sub-Inspector and the DGP saw identical KPIs on the first screen of the product --
