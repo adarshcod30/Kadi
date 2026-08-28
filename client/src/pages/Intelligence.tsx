@@ -331,13 +331,18 @@ function StationRoster({ stations, sort, setSort, q, setQ }: any) {
             options={[{ value: '', label: 'All station types' }, ...STATION_TYPE_FILTERS.map(([id, label]) => ({ value: id, label }))]} />
         </div>
 
+        {/* Three bands, and `red` folds into Watch rather than getting its own chip — otherwise
+            the legend reads "Watch 0 · Watch 44", which is what it did here after the band
+            collapse landed in ZoneBoard but not in this roster. */}
         <div className="flex flex-wrap gap-2">
-          {(['red_pulsing', 'red', 'yellow', 'normal'] as const).map((z) => (
+          {([['red_pulsing', s.red_pulsing || 0],
+             ['yellow', (s.yellow || 0) + (s.red || 0)],
+             ['normal', s.normal || 0]] as const).map(([z, n]) => (
             <div key={z} className="flex items-center gap-1.5 rounded-ctl border border-line px-2.5 py-1">
               <span className={`w-2 h-2 rounded-full ${ZONE_STYLE[z].ring || ''}`}
                 style={{ background: ZONE_STYLE[z].dot }} />
               <span className="text-[12px] text-ink-muted">{ZONE_STYLE[z].label}</span>
-              <span className="font-num text-[12.5px] text-ink font-medium">{s[z] || 0}</span>
+              <span className="font-num text-[12.5px] text-ink font-medium">{n}</span>
             </div>
           ))}
         </div>
@@ -755,10 +760,18 @@ export default function Intelligence() {
   // NOTE: every hook must run before the loading early-return, or the hook order changes
   // between renders and React throws.
   const districts = socio?.districts || [];
+  // ALL 31, not the top ten. The panel's whole claim is that raw counts mislead — showing only
+  // the districts that move furthest proves it for the extremes and hides the districts a
+  // commander most needs to check, which are the ones they assumed were fine. Sorted by the size
+  // of the move so the strongest evidence still leads, and the chart grows to fit rather than
+  // squeezing 31 labels into the height that held 10.
   const shifts = useMemo(
-    () => [...districts].sort((a: any, b: any) => Math.abs(b.rankShift) - Math.abs(a.rankShift)).slice(0, 10),
+    () => [...districts].sort((a: any, b: any) => Math.abs(b.rankShift) - Math.abs(a.rankShift)),
     [districts],
   );
+  // Districts whose rank does not move: worth stating, because "nothing changed here" is a
+  // finding too and an empty-looking bar is easy to read as missing data.
+  const steady = useMemo(() => shifts.filter((d: any) => d.rankShift === 0).length, [shifts]);
 
   // History and forecast share one series so the confidence band joins the actual line.
   const stateSeries = useMemo(() => {
@@ -888,7 +901,7 @@ export default function Intelligence() {
           action={<Hint text="Bars show how far a district moves when you divide by population. Green = it is worse per-capita than raw counts suggest; red = it only looked bad because it is populous." />}
         >
           <div className="p-4">
-            <div className="h-[300px]">
+            <div style={{ height: Math.max(300, shifts.length * 22 + 40) }}>
               <ResponsiveContainer width="100%" height="100%" key={shifts.length}>
                 <BarChart data={shifts} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
                   <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false}
@@ -909,6 +922,11 @@ export default function Intelligence() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="mt-2 text-[12px] text-ink-muted">
+              All {shifts.length} districts, ordered by how far they move.
+              {steady > 0 && <> {steady} hold the same rank either way — for those, volume and rate agree.</>}
+              {' '}The three biggest movers are called out below.
+            </p>
             <div className="mt-3 grid sm:grid-cols-3 gap-2 text-[13px]">
               {shifts.slice(0, 3).map((d: any) => (
                 <div key={d.districtId} className="rounded-ctl bg-surface-2 border border-line px-3 py-2">
