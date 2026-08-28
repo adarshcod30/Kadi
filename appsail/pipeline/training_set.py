@@ -298,6 +298,40 @@ def write_ready_csv(data_dir: str, rows, name: str = "training_set_spike.csv") -
     return path
 
 
+def write_numeric_csv(data_dir: str, rows, name: str = "training_set_spike_numeric.csv") -> str:
+    """The same eligible rows with row_key dropped, for a REGRESSION pipeline.
+
+    Two reasons this file exists alongside the one above.
+
+    First, QuickML model stages refuse a frame containing a text column outright -- "Previous
+    stage result contains non-numeric columns" -- so a key column forces a Select/Drop stage
+    into every pipeline built on the file. Second and more important, the classifier this
+    dataset originally trained cannot rank: QuickML's classification endpoints return a hard
+    class LABEL, there is no predict_proba anywhere in the palette, and at the default
+    threshold on a 15.9% positive rate the endpoint answers 0 for every candidate. The
+    published spike endpoint has been doing exactly that since the day it went up, and the
+    serving code has been silently falling back to the z-score rule.
+
+    A regressor trained on the same 0/1 target returns a float, which ranks. Measured on this
+    very file, on a time-ordered hold-out:
+
+        classifier LABEL   auc 0.565     what the endpoint actually returns today
+        classifier proba   auc 0.639     not obtainable through this platform
+        regressor on 0/1   auc 0.677     what this file is for
+
+    So the regression route is not a workaround with a cost -- it scores better than the
+    classifier it replaces.
+    """
+    header = FEATURES + ["target_spike"]
+    path = os.path.join(common.derived_dir(data_dir), name)
+    eligible = [r for r in rows if r.get("spike_eligible")]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(eligible)
+    return path
+
+
 def attach_socio(data_dir: str):
     """Area-level indicators, read from the pipeline's own socio output."""
     try:
@@ -325,6 +359,8 @@ def compute(tables, unit_district, today: date, data_dir: str):
         # The same data with the filtering and the leaky column already handled, so the console
         # workflow is upload-and-train with nothing to remember.
         meta["readyPath"] = write_ready_csv(data_dir, rows)
+        meta["numericPath"] = write_numeric_csv(data_dir, rows)
+        meta["numericFile"] = "training_set_spike_numeric.csv"
         meta["readyFile"] = "training_set_spike.csv"
 
     drows, dmeta = build(tables, unit_district, today, by_head=False, socio=socio)

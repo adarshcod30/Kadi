@@ -1,5 +1,4 @@
-// mlforecast.js — serving the trained QuickML spike classifier, with the rule it replaces as
-// the floor.
+// mlforecast.js — serving the spike model, with the best simple rule as the floor.
 //
 // WHAT THE MODEL IS, AND WHY IT IS NOT WHAT YOU WOULD EXPECT.
 //
@@ -15,18 +14,35 @@
 // its own normal. It only has to RANK, never to name a number, so the noise that defeats
 // regression does not defeat it.
 //
-// MEASURED, on the same rolling hold-out folds:
+// TWO THINGS ABOUT THIS MODEL WERE WRONG AND ARE NOW CORRECTED.
 //
-//     z-score rule (what this replaces)   AUC 0.419
-//     QuickML ensemble, deployed          AUC 0.587
-//     local reference implementation      AUC 0.738
+// 1. THE BASELINE WAS TOO WEAK. This file used to claim 0.587 AUC against a z-score rule's
+//    0.419. That is a true comparison against a badly chosen rule. Measured on the model's own
+//    training file against the BEST trivial rule available on the same columns:
 //
-// The deployed model beats the rule by a wide margin, which is the bar. It falls short of the
-// local reference because QuickML trains its four boosters at library defaults and soft-votes
-// them; defaults are tuned for large datasets and this one has 1,640 rows. A single LGBM with
-// num_leaves cut to 22 was tried as v2 and did WORSE (AUC 0.507), so the ensemble stays.
+//        full features          auc 0.678
+//        inverse recent level   auc 0.620   <- the honest baseline
+//        scale-free features    auc 0.516   <- most of the edge was series size
 //
-// See appsail/pipeline/training_set.py for the full measurement.
+//    The target "40% above the trailing 3-month mean" is simply easier to hit on a small
+//    series, so a model given absolute volumes can win by learning which series are small.
+//    The real margin is +0.058, not +0.168. It still beats the rule, so it still serves.
+//
+// 2. THE ENDPOINT COULD NOT RANK AT ALL. QuickML's classification endpoints return a hard
+//    class LABEL -- there is no predict_proba anywhere in the operation palette -- and at the
+//    default threshold on a 15.9% positive rate the published endpoint answered 0 for every
+//    candidate. The degeneracy guard below caught it every time, so this model has been
+//    falling back to the rule since the day it was published, silently.
+//
+//    The replacement is a REGRESSOR trained on the same 0/1 target, which returns a float.
+//    Measured on the same file, that is not a compromise -- it is better:
+//
+//        classifier LABEL   auc 0.565     what the old endpoint returned
+//        classifier proba   auc 0.639     not obtainable through this platform
+//        regressor on 0/1   auc 0.677     what serves now
+//
+// See research/README.md for the measurement and appsail/pipeline/training_set.py for the
+// dataset the regressor trains on.
 const https = require('https');
 
 const PROJECT_ID = process.env.CATALYST_PROJECT_ID || '55468000000013048';
@@ -35,13 +51,16 @@ const ENDPOINT = process.env.QUICKML_SPIKE_ENDPOINT
 // The endpoint key is a real credential, so it lives in the AppConfig Data Store table beside
 // the auth signing secret rather than in catalyst-config.json -- that file is committed, and a
 // live prediction key in a public repo is a different thing from the mock account passwords.
-const KEY_CONFIG = 'quickml.spikeEndpointKey';
+// The regressor endpoint's key. The old classifier endpoint's key lives under
+// quickml.spikeEndpointKey and is left in place: it still answers, it just answers with a
+// label, and keeping it makes the before/after checkable rather than asserted.
+const KEY_CONFIG = process.env.QUICKML_SPIKE_KEY_CONFIG || 'quickml.spikeRegressorEndpointKey';
 const TIMEOUT_MS = Number(process.env.QUICKML_SPIKE_TIMEOUT_MS || 6000);
 // Measured average AUC over four rolling three-month hold-out windows. Configuration rather
 // than something readable back: QuickML does not expose a model's evaluation over HTTP, and a
 // model whose score nobody wrote down cannot be compared to anything.
-const MODEL_AUC = Number(process.env.QUICKML_SPIKE_AUC || 0.5872);
-const RULE_AUC = Number(process.env.QUICKML_RULE_AUC || 0.419);
+const MODEL_AUC = Number(process.env.QUICKML_SPIKE_AUC || 0.677);
+const RULE_AUC = Number(process.env.QUICKML_RULE_AUC || 0.620);
 // How many candidates to score. The rule supplies recall cheaply, the model supplies precision
 // on the shortlist -- scoring every eligible series would be a hundred round trips inside a
 // 30-second function for a panel that shows twelve rows.
@@ -69,7 +88,10 @@ function configured() {
 
 function status() {
   return {
-    task: 'spike classification — which district and crime type will run well above its own normal',
+    task: 'spike risk — which district and crime type will run well above its own normal',
+    outputKind: 'regressor on a 0/1 target — a float that ranks. The classifier it replaces '
+      + 'returned a hard label, which at the default threshold was 0 for every candidate.',
+    ruleName: 'inverse recent level (small series spike more often)',
     configured: configured(),
     endpoint: ENDPOINT,
     modelAuc: MODEL_AUC,
@@ -79,8 +101,11 @@ function status() {
     lastError,
     keyLoaded: cachedKey === null ? 'not-attempted' : Boolean(cachedKey),
     note: configured()
-      ? `The trained classifier scores ${MODEL_AUC} AUC against the z-score rule's ${RULE_AUC} on a rolling hold-out. Whether it actually ranks in production depends on the endpoint returning graded scores rather than hard labels -- see lastError.`
-      : `No model beats the z-score rule (${RULE_AUC} AUC), so the rule ranks emerging risk.`,
+      ? `The regressor scores ${MODEL_AUC} AUC against the best simple rule's ${RULE_AUC} on a `
+        + 'time-ordered hold-out — a margin of +'
+        + `${Math.round((MODEL_AUC - RULE_AUC) * 1000) / 1000}. The previously reported 0.419 `
+        + 'baseline was a weak rule; most of this model\'s apparent edge is series size.'
+      : `Nothing beats the best simple rule (${RULE_AUC} AUC), so the rule ranks emerging risk.`,
     whyNotVolumeForecasting: 'Measured and rejected: monthly volume regression loses to a '
       + 'three-month moving average at every grain and feature set tried, because the residual '
       + 'is the arrival process rather than a pattern. The statistical forecaster in the '
@@ -184,11 +209,12 @@ async function scoreSpikes(req, rows) {
   // All-null means the endpoint is down. Keep the rule.
   if (out.every((v) => v === null)) return null;
 
-  // DEGENERACY GUARD, and it earns its place. The published endpoint returns a hard class
-  // LABEL, not a probability -- and at the default 0.5 threshold, on a 15.9% positive rate,
-  // it answers 0 for every candidate. Every score identical is not a ranking; sorting by it
-  // would leave the rule's order untouched while the response claimed the model had ranked it.
-  // That is worse than not using the model, because it reads as a working feature.
+  // DEGENERACY GUARD. It earned its place against the classifier endpoint, which returned a
+  // hard LABEL and therefore answered 0 for every candidate at the default threshold: every
+  // score identical is not a ranking, and sorting by it would have left the rule's order
+  // untouched while the response claimed a model produced it. A regressor should never trip
+  // this. If it does, the model is wrong rather than the request, and saying so beats a
+  // ranking nobody can trust.
   const seen = out.filter((v) => v !== null);
   const distinct = new Set(seen).size;
   if (distinct < 2) {

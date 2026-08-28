@@ -209,6 +209,14 @@ export const useWorklist = (params: Record<string, unknown> = {}) =>
 // The agenda behind React. `unit` is passed explicitly rather than picked up by the client
 // the way `district` is, because drilling into one station is a deliberate act on this page
 // and not an ambient scope the rest of the product should inherit.
+// The offender-risk model's ranking. Kept separate from useOutlook so a slow model call can
+// never delay the statistical panels, which have nothing to do with it.
+export const useOffenderRisk = () =>
+  useQuery({
+    queryKey: ['offender-risk', role()],
+    queryFn: () => api.get<any>('/analytics/offender-risk'),
+    staleTime: 5 * 60 * 1000,
+  });
 export const useAgenda = (params: Record<string, unknown> = {}) =>
   useQuery({
     queryKey: ['agenda', role(), params],
