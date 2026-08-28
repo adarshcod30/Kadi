@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ComposedChart, Area, Line, ScatterChart, Scatter, BarChart, Bar, Cell,
-  ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, Legend as RLegend,
+  ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, CartesianGrid, Legend as RLegend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -595,6 +595,8 @@ function ZoneBoard({ zones }: { zones: any }) {
 
 function OccasionPanels({ occ }: { occ: any }) {
   const [view, setView] = useState<'events' | 'rhythm' | 'compare'>('events');
+  // Which day class is open in the rhythm view. Null means none — the cards alone.
+  const [dayClass, setDayClass] = useState<string | null>(null);
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   if (!occ) return <div className="card"><Skeleton rows={6} /></div>;
@@ -604,6 +606,8 @@ function OccasionPanels({ occ }: { occ: any }) {
   const occasions: any[] = occ.occasions || [];
   const dayClasses: any[] = occ.dayClasses || [];
   const cats: Record<string, any> = occ.categories || {};
+  const normalClass = dayClasses.find((c: any) => /normal/i.test(c.dayClass)) || dayClasses[0];
+  const selectedClass = dayClass ? dayClasses.find((c: any) => c.dayClass === dayClass) : null;
   const tone = (v: number) => (v > 8 ? 'text-danger' : v < -5 ? 'text-kadi-teal' : 'text-ink-muted');
   const INT: Record<string, { label: string; c: string }> = {
     surge: { label: 'Surge', c: '#C0392B' }, raised: { label: 'Raised', c: '#C9820A' }, quiet: { label: 'Quiet', c: '#2FA8A0' },
@@ -663,21 +667,99 @@ function OccasionPanels({ occ }: { occ: any }) {
       {view === 'rhythm' && (
         <motion.div variants={rise}>
           <Section title="Crime by kind of day"
-            action={<Hint text="Rates are cases per day, so classes with very different day counts stay comparable. Baseline is an ordinary weekday. These are measured from the corpus." />}>
-            <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {dayClasses.map((c: any) => (
-                <div key={c.dayClass} className="rounded-card border border-line p-3">
-                  <div className="text-sm font-semibold text-ink">{c.dayClass}</div>
-                  <div className="text-2xl font-num text-kadi-navy mt-1">{c.casesPerDay}</div>
-                  <div className="text-[11px] text-ink-muted">cases per day · {c.days} days</div>
-                  <div className={`text-[12px] font-medium mt-1 ${tone(c.vsNormalPct)}`}>
-                    {c.vsNormalPct > 0 ? '+' : ''}{c.vsNormalPct}% vs ordinary day
+            action={<InfoDot width="w-80">
+              <b className="block mb-1 text-kadi-navy">Rates, not totals</b>
+              Cases per day, so classes with very different day counts stay comparable — 67 festival
+              days and 861 ordinary ones cannot be compared on raw volume. The baseline is an
+              ordinary weekday.
+              <b className="block mt-1.5 text-kadi-navy">Why the mix matters more than the rate</b>
+              A day class can move the total barely at all and still change WHAT happens: a holiday
+              with the same daily rate but a different composition needs a different deployment, not
+              a bigger one. Select a card to see how its mix differs from an ordinary day.
+            </InfoDot>}>
+            <div className="p-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {dayClasses.map((c: any) => {
+                  const sel = dayClass === c.dayClass;
+                  return (
+                    <button key={c.dayClass} onClick={() => setDayClass(sel ? null : c.dayClass)}
+                      className={`rounded-card border p-3 text-left transition-all ${
+                        sel ? 'border-kadi-blue bg-kadi-blue50/50 ring-1 ring-kadi-blue/30' : 'border-line hover:bg-surface-3/60'}`}>
+                      <div className="text-sm font-semibold text-ink">{c.dayClass}</div>
+                      <div className="text-2xl font-num text-kadi-navy mt-1">{c.casesPerDay}</div>
+                      <div className="text-[11px] text-ink-muted">cases per day · {c.days} days</div>
+                      <div className={`text-[12px] font-medium mt-1 ${tone(c.vsNormalPct)}`}>
+                        {c.vsNormalPct > 0 ? '+' : ''}{c.vsNormalPct}% vs ordinary day
+                      </div>
+                      {c.peakHour != null && (
+                        <div className="text-[11px] text-ink-muted mt-1">peaks {String(c.peakHour).padStart(2, '0')}:00</div>
+                      )}
+                      <div className="text-[11px] text-kadi-blue mt-1.5">{sel ? 'Selected — click to close' : 'See what changes →'}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* THE PART THAT MAKES IT WORTH CLICKING. The four cards said how MUCH; this says
+                  what KIND — the composition of the selected day class against an ordinary one.
+                  A class that barely moves the rate can still shift the mix, and that is a
+                  different deployment rather than a larger one. */}
+              {selectedClass && (() => {
+                const base = new Map<string, number>((normalClass?.mix || []).map((m: any) => [m.head, m.pct]));
+                const rows = [...(selectedClass.mix || [])].sort((a: any, b: any) => b.pct - a.pct);
+                const max = Math.max(...rows.map((m: any) => Math.max(m.pct, base.get(m.head) || 0)), 1);
+                const moved = rows.map((m: any) => ({ ...m, delta: Math.round((m.pct - (base.get(m.head) || 0)) * 10) / 10 }))
+                  .sort((a: any, b: any) => Math.abs(b.delta) - Math.abs(a.delta));
+                const biggest = moved[0];
+                return (
+                  <div className="mt-4 rounded-card border border-line bg-surface-2 p-4">
+                    <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
+                      <div className="text-[13px] text-ink">
+                        <b>{selectedClass.dayClass}</b> — what changes against an ordinary day
+                      </div>
+                      {biggest && Math.abs(biggest.delta) >= 0.5 && (
+                        <div className="text-[12.5px] text-ink-muted">
+                          Biggest shift: <b className="text-ink">{biggest.head}</b>{' '}
+                          <b className={biggest.delta > 0 ? 'text-danger' : 'text-kadi-teal'}>
+                            {biggest.delta > 0 ? '+' : ''}{biggest.delta} pts
+                          </b> of the mix
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-[10.5px] text-ink-muted mb-2">
+                      <span className="flex items-center gap-1"><span className="w-3 h-2 rounded-sm bg-kadi-blue" />{selectedClass.dayClass}</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-2 rounded-sm bg-line" />Ordinary day</span>
+                    </div>
+                    <div className="space-y-2">
+                      {rows.map((m: any) => {
+                        const b = base.get(m.head) || 0;
+                        const delta = Math.round((m.pct - b) * 10) / 10;
+                        return (
+                          <div key={m.head}>
+                            <div className="flex items-center justify-between text-[12.5px] mb-0.5">
+                              <span className="text-ink truncate">{m.head}</span>
+                              <span className="font-num text-ink-muted shrink-0">
+                                {m.pct}% <span className="text-ink-subtle">vs {b}%</span>
+                                {Math.abs(delta) >= 0.1 && (
+                                  <b className={`ml-2 ${delta > 0 ? 'text-danger' : 'text-kadi-teal'}`}>
+                                    {delta > 0 ? '+' : ''}{delta}
+                                  </b>
+                                )}
+                              </span>
+                            </div>
+                            <div className="relative h-3">
+                              <div className="absolute inset-x-0 top-0 h-1.5 rounded-full bg-surface-3">
+                                <div className="h-full rounded-full bg-kadi-blue" style={{ width: `${(m.pct / max) * 100}%` }} />
+                              </div>
+                              <div className="absolute top-2 h-1 rounded-full bg-line" style={{ width: `${(b / max) * 100}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  {c.peakHour != null && (
-                    <div className="text-[11px] text-ink-muted mt-1">peaks {String(c.peakHour).padStart(2, '0')}:00</div>
-                  )}
-                </div>
-              ))}
+                );
+              })()}
             </div>
           </Section>
         </motion.div>
@@ -724,6 +806,14 @@ const BAND_COLOR: Record<string, string> = {
   Urban: '#1A6FC4', Mixed: '#2FA8A0', Rural: '#E8871E',
 };
 const AXIS = { fontSize: 10, fill: '#5B6B7E' };
+// Each indicator is measured in something different, and an axis labelled just "Literacy" or
+// "Population density" leaves the reader to guess whether it is a percentage, a count or a
+// ratio. The unit belongs on the axis.
+const INDICATOR_AXIS: Record<string, { label: string; unit: string; fmt: (v: number) => string }> = {
+  urbanPct: { label: 'Share of population living in urban areas', unit: '%', fmt: (v) => `${v}%` },
+  literacyPct: { label: 'Literacy rate', unit: '%', fmt: (v) => `${v}%` },
+  popDensity: { label: 'Population density', unit: '/km²', fmt: (v) => `${Math.round(v).toLocaleString()}/km²` },
+};
 
 export default function Intelligence() {
   const [tab, setTab] = useState<TabKey>('where');
@@ -793,9 +883,32 @@ export default function Intelligence() {
     });
   }, [fc]);
 
+  // EVERY HOOK MUST SIT ABOVE THE LOADING RETURN. Placed below it, this memo did not run
+  // on the loading render and did on the next, so the hook count changed between renders
+  // and React threw #310 — a blank page.
+  // Least-squares fit over the plotted points, so the correlation the panel reports is also the
+  // line the reader sees rather than a number they must take on trust.
+  const trendSocio = useMemo(() => {
+    const pts = ((socio?.correlations?.[indicator])?.points || []).map((p: any) => ({ x: p.x, y: p.y }));
+    const n = pts.length;
+    if (n < 2) return null;
+    const sx = pts.reduce((a: number, p: any) => a + p.x, 0);
+    const sy = pts.reduce((a: number, p: any) => a + p.y, 0);
+    const sxx = pts.reduce((a: number, p: any) => a + p.x * p.x, 0);
+    const sxy = pts.reduce((a: number, p: any) => a + p.x * p.y, 0);
+    const d = n * sxx - sx * sx;
+    if (!d) return null;
+    const m = (n * sxy - sx * sy) / d;
+    const b = (sy - m * sx) / n;
+    const xs = pts.map((p: any) => p.x);
+    const x0 = Math.min(...xs); const x1 = Math.max(...xs);
+    return [{ x: x0, y: m * x0 + b }, { x: x1, y: m * x1 + b }];
+  }, [socio, indicator]);
+
   if (sLoad || fLoad) return <PageSkeleton />;
 
   const corr = socio?.correlations?.[indicator];
+
   const rising = (fc?.districts || []).filter((d: any) => d.direction === 'rising');
 
   return (
@@ -961,7 +1074,7 @@ export default function Intelligence() {
           read urbanisation as cause. Here it clears — delay is uniform — which is itself a
           finding, and the kind of counter-evidence the tab should carry. */}
       <motion.div variants={rise}>
-        <ReportingPropensity data={reporting} />
+        <ReportingPropensity data={reporting} socio={socio} />
       </motion.div>
       {/* ---- Correlation ---- */}
       <motion.div variants={rise}>
@@ -982,14 +1095,25 @@ export default function Intelligence() {
         >
           {corr && (
             <div className="p-4 grid lg:grid-cols-[1fr_260px] gap-4">
-              <div className="h-[320px]">
+              <div className="h-[340px]">
                 <ResponsiveContainer width="100%" height="100%" key={corr.field}>
-                  <ScatterChart margin={{ top: 8, right: 12, bottom: 24, left: 0 }}>
-                    <XAxis type="number" dataKey="x" name={corr.indicator} tick={AXIS} tickLine={false} axisLine={false}
-                      label={{ value: corr.indicator, position: 'insideBottom', offset: -12, style: AXIS }} />
-                    <YAxis type="number" dataKey="y" name="Rate" tick={AXIS} tickLine={false} axisLine={false} width={42}
-                      label={{ value: 'per 100k', angle: -90, position: 'insideLeft', style: AXIS }} />
+                  <ScatterChart margin={{ top: 8, right: 16, bottom: 44, left: 12 }}>
+                    {/* Gridlines, drawn axis lines, units on both labels and a fitted trend line.
+                        Without them the reader is asked to judge a slope by eye against no
+                        reference, which is exactly what a correlation panel must not do. */}
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EDF1F6" />
+                    <XAxis type="number" dataKey="x" name={corr.indicator} tick={AXIS} tickLine={false}
+                      axisLine={{ stroke: '#D9E1EC' }} domain={['dataMin', 'dataMax']}
+                      tickFormatter={(v: any) => (INDICATOR_AXIS[corr.field] ? INDICATOR_AXIS[corr.field].fmt(v) : v)}
+                      label={{ value: INDICATOR_AXIS[corr.field]?.label || corr.indicator,
+                        position: 'insideBottom', offset: -28, style: { ...AXIS, fontSize: 11 } }} />
+                    <YAxis type="number" dataKey="y" name="Rate" tick={AXIS} tickLine={false}
+                      axisLine={{ stroke: '#D9E1EC' }} width={56}
+                      label={{ value: 'FIRs per 100,000 residents', angle: -90,
+                        position: 'insideLeft', offset: 4, style: { ...AXIS, fontSize: 11 } }} />
                     <ZAxis range={[60, 60]} />
+                    {trendSocio && <ReferenceLine ifOverflow="extendDomain" stroke="#C0392B"
+                      strokeDasharray="5 4" segment={trendSocio as any} />}
                     <Tooltip
                       cursor={{ strokeDasharray: '3 3' }}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #D9E1EC' }}
@@ -1001,7 +1125,7 @@ export default function Intelligence() {
                         return (
                           <div className="bg-surface border border-line rounded-ctl px-2.5 py-1.5 text-xs shadow-card">
                             <div className="font-medium">{p.district}</div>
-                            <div className="text-ink-muted">{corr.indicator}: {p.x}</div>
+                            <div className="text-ink-muted">{corr.indicator}: {INDICATOR_AXIS[corr.field] ? INDICATOR_AXIS[corr.field].fmt(p.x) : p.x}</div>
                             <div className="text-ink-muted">Rate: {p.y}/100k</div>
                           </div>
                         );
@@ -1276,43 +1400,146 @@ function NearRepeat({ data }: { data: any }) {
 // Reporting propensity (P4-3): the incident-to-FIR delay, per district — the confounder a rate
 // comparison must clear. When it is uniform (as here), it CLEARS: the rate gaps are not an
 // artefact of some districts reporting faster. Stating that is stronger than asserting a cause.
-function ReportingPropensity({ data }: { data: any }) {
-  if (!data) return null;
-  const rows = data.districts || [];
+function ReportingPropensity({ data, socio }: { data: any; socio: any }) {
+  const [sort, setSort] = useState<'delay' | 'sameDay' | 'name'>('delay');
+  const rows = data?.districts || [];
+
+  // THE TEST, NOT JUST THE CLAIM. The right half sat empty while the panel asserted that
+  // reporting speed is not what drives the rate. That assertion is checkable: plot each
+  // district's delay against its crime rate and correlate them. If speed explained the rate the
+  // cloud would slope; a flat cloud near r = 0 is the confounder being ruled out in front of the
+  // reader rather than on their behalf.
+  const joined = useMemo(() => {
+    const rate = new Map<string, any>((socio?.districts || []).map((d: any) => [String(d.districtId), d]));
+    return rows.map((r: any) => {
+      const d = rate.get(String(r.districtId));
+      return d ? { name: r.districtName, x: r.medianDelayDays, y: d.ratePer100k, sameDay: r.sameDayPct } : null;
+    }).filter(Boolean) as any[];
+  }, [rows, socio]);
+
+  const r = useMemo(() => {
+    const n = joined.length;
+    if (n < 3) return null;
+    const mx = joined.reduce((a, p) => a + p.x, 0) / n;
+    const my = joined.reduce((a, p) => a + p.y, 0) / n;
+    let sxy = 0; let sxx = 0; let syy = 0;
+    for (const p of joined) { const dx = p.x - mx; const dy = p.y - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+    if (!sxx || !syy) return 0;
+    return Math.round((sxy / Math.sqrt(sxx * syy)) * 1000) / 1000;
+  }, [joined]);
+
+  const sorted = useMemo(() => {
+    const c = [...rows];
+    if (sort === 'delay') return c.sort((a: any, b: any) => b.medianDelayDays - a.medianDelayDays);
+    if (sort === 'sameDay') return c.sort((a: any, b: any) => b.sameDayPct - a.sameDayPct);
+    return c.sort((a: any, b: any) => String(a.districtName).localeCompare(String(b.districtName)));
+  }, [rows, sort]);
+
+  if (!data) return <div className="card"><Skeleton rows={6} /></div>;
   if (!rows.length) return null;
-  const delays = rows.map((r: any) => r.medianDelayDays);
-  const spread = Math.max(...delays) - Math.min(...delays);
+  const delays = rows.map((x: any) => x.medianDelayDays);
+  const spread = Math.round((Math.max(...delays) - Math.min(...delays)) * 10) / 10;
   const uniform = spread <= 3;
-  const max = Math.max(1, ...delays);
+  const maxDelay = Math.max(...delays, 1);
+
   return (
     <Section
       title={<span className="flex items-center gap-2"><Clock size={15} className="text-kadi-blue" />
         Reporting propensity — does the rate just reflect faster reporting?</span>}
-      action={<InfoDot>{data.method}</InfoDot>}>
-      <div className="p-4">
-        <div className={`rounded-card px-3 py-2.5 mb-3 text-[13px] ${uniform ? 'bg-kadi-teal/10 border border-kadi-teal/30' : 'bg-kadi-blue50/50 border border-kadi-blue/25'}`}>
-          {uniform ? (
-            <>State median delay is <b className="font-num">{data.stateMedianDelayDays} days</b>, and it barely
-            moves across districts (range {spread.toFixed(1)}d). So the crime-rate differences are
-            <b> not</b> an artefact of some districts reporting faster — reporting propensity is ruled out
-            as the confounder here, which strengthens the urbanisation reading rather than undermining it.</>
-          ) : (
-            <>Reporting delay ranges {Math.min(...delays)}–{Math.max(...delays)} days across districts, so
-            part of the rate difference may be reporting speed rather than underlying crime. Read the
-            urbanisation correlation with that in mind.</>
-          )}
+      action={<InfoDot width="w-80">
+        <b className="block mb-1 text-kadi-navy">The confounder every rate comparison must clear</b>
+        {data.method}
+        <span className="block mt-1.5 text-ink-muted">
+          If it did not clear, the urbanisation reading would be partly an artefact: urban districts
+          would look worse simply because more of what happens there gets reported.
+        </span>
+      </InfoDot>}>
+      <div className="p-4 grid lg:grid-cols-2 gap-5">
+        {/* LEFT — the verdict, then every district rather than the first eight. */}
+        <div className="min-w-0">
+          <div className={`rounded-card px-3 py-2.5 text-[13px] leading-relaxed border ${
+            uniform ? 'bg-kadi-teal/10 border-kadi-teal/30' : 'bg-kadi-blue50/50 border-kadi-blue/25'}`}>
+            {uniform ? (
+              <>State median delay is <b className="font-num">{data.stateMedianDelayDays} days</b> and it barely
+              moves across districts (range <b className="font-num">{spread}d</b>). The crime-rate differences
+              are <b>not</b> an artefact of some districts reporting faster — reporting propensity is ruled
+              out as the confounder here, which <b>strengthens</b> the urbanisation reading rather than
+              undermining it.</>
+            ) : (
+              <>Delay ranges <b className="font-num">{Math.min(...delays)}–{Math.max(...delays)} days</b> across
+              districts, so part of the rate difference may be reporting speed rather than underlying crime.
+              Read the urbanisation correlation with that in mind.</>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-3 mb-1.5 gap-2">
+            <div className="label">All {rows.length} districts</div>
+            <Select value={sort} onChange={(v) => setSort(v as any)} className="w-44"
+              options={[
+                { value: 'delay', label: 'Sort: slowest first' },
+                { value: 'sameDay', label: 'Sort: same-day %' },
+                { value: 'name', label: 'Sort: name' },
+              ]} />
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_72px_60px] gap-x-3 px-1 pb-1
+            text-[10.5px] uppercase tracking-wide text-ink-muted font-semibold">
+            <span>District</span><span className="text-right">Median</span><span className="text-right">Same day</span>
+          </div>
+          <div className="max-h-[290px] overflow-auto pr-1 space-y-1.5">
+            {sorted.map((d: any) => (
+              <div key={d.districtId} className="grid grid-cols-[minmax(0,1fr)_72px_60px] gap-x-3 items-center text-[12.5px]">
+                <div className="min-w-0">
+                  <div className="truncate text-ink">{d.districtName}</div>
+                  <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden mt-0.5">
+                    <div className="h-full rounded-full bg-kadi-blue" style={{ width: `${(d.medianDelayDays / maxDelay) * 100}%` }} />
+                  </div>
+                </div>
+                <span className="text-right font-num text-ink">{d.medianDelayDays}d</span>
+                <span className="text-right font-num text-ink-muted">{d.sameDayPct}%</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="space-y-1.5">
-          {rows.slice(0, 8).map((r: any) => (
-            <div key={r.districtId} className="flex items-center gap-2 text-[12.5px]">
-              <span className="w-28 shrink-0 truncate text-ink">{r.districtName}</span>
-              <span className="flex-1 h-2 bg-surface-3 rounded overflow-hidden max-w-[180px]">
-                <span className="block h-full bg-kadi-blue" style={{ width: `${(r.medianDelayDays / max) * 100}%` }} />
-              </span>
-              <span className="font-num text-ink-muted w-16 text-right">{r.medianDelayDays}d median</span>
-              <span className="font-num text-ink-subtle w-20 text-right">{r.sameDayPct}% same-day</span>
+
+        {/* RIGHT — the test itself, which is what the empty half was for. */}
+        <div className="min-w-0">
+          <div className="label mb-1">Does delay explain the rate?</div>
+          <div className="h-[240px]">
+            <ResponsiveContainer width="100%" height="100%" key={joined.length}>
+              <ScatterChart margin={{ top: 8, right: 14, bottom: 34, left: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EDF1F6" />
+                <XAxis type="number" dataKey="x" tick={AXIS} tickLine={false} axisLine={{ stroke: '#D9E1EC' }}
+                  domain={['dataMin - 0.5', 'dataMax + 0.5']}
+                  label={{ value: 'Median reporting delay (days)', position: 'insideBottom', offset: -20, style: AXIS }} />
+                <YAxis type="number" dataKey="y" tick={AXIS} tickLine={false} axisLine={false} width={46}
+                  label={{ value: 'FIRs per 100k', angle: -90, position: 'insideLeft', style: AXIS }} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ payload }: any) => {
+                  const p = payload?.[0]?.payload; if (!p) return null;
+                  return (<div className="bg-surface border border-line rounded-ctl px-2.5 py-1.5 text-xs shadow-card">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-ink-muted">{p.x}d median · {p.sameDay}% same-day</div>
+                    <div className="text-ink-muted">{p.y}/100k</div>
+                  </div>);
+                }} />
+                <Scatter data={joined} isAnimationActive={false} fill="#1A6FC4" fillOpacity={0.75} />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="rounded-card border border-line bg-surface-2 px-3 py-2.5 mt-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] uppercase tracking-wide text-ink-muted">Delay vs rate</span>
+              {r != null && (
+                <b className="text-lg font-num" style={{ color: Math.abs(r) < 0.3 ? '#1E874B' : '#C9820A' }}>
+                  r = {r > 0 ? '+' : ''}{r}
+                </b>
+              )}
             </div>
-          ))}
+            <p className="text-[12px] text-ink-muted mt-1 leading-relaxed">
+              {r != null && Math.abs(r) < 0.3
+                ? 'Effectively no relationship. Districts that report faster do not record higher rates — the cloud is flat, not sloped, and that is what "ruled out" means here.'
+                : 'How fast a district reports does track with the rate it records, so part of the gap is reporting behaviour rather than offending.'}
+            </p>
+          </div>
         </div>
       </div>
     </Section>
