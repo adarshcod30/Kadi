@@ -1005,9 +1005,10 @@ export default function Intelligence() {
             q={stationQ} setQ={setStationQ} />
         </motion.div>
       )}
-      {/* Per-capita ranking across districts is a state question. Under "My stations" it
-          would answer something the reader did not ask. */}
-      {!districtView && (
+      {/* Per-capita ranking across districts is a state question, and only a state question.
+          Guarding it on !districtView let it through at station rank too, where a board of
+          31 districts answers nothing an SHO asked of their own register. */}
+      {tier === 'state' && (
       <motion.div variants={rise}>
         <Section
           title={<span className="flex items-center gap-2"><Users2 size={15} className="text-kadi-blue" />Counts mislead — the same districts ranked per 100,000 residents</span>}
