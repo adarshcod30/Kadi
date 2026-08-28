@@ -113,8 +113,19 @@ function status() {
   };
 }
 
-// Column set the endpoint expects. It is the dataset's own schema, including row_key -- the
-// pipeline drops that internally, but the endpoint validates against what it was trained from.
+// Column set the endpoint expects: the dataset's own schema, and NOTHING else.
+//
+// row_key used to be sent alongside these, because the classifier's dataset carried it and the
+// endpoint validated against the columns it was trained from. The regressor trains on the
+// numeric-only file, which has no key column, and the endpoint rejects the extra field
+// outright:
+//
+//     http 400 INVALID_DATA "Unexpected columns present in input"
+//                           unexpected_columns: ["row_key"]
+//
+// Worth recording because the failure is silent from the outside: the request 400s, the guard
+// falls back to the rule, and the surface reports "rule is ranking" -- which looks exactly
+// like a missing key rather than a malformed payload.
 const FEATURES = [
   'district_id', 'crime_head_id', 'month_index', 'month_of_year',
   'lag_1', 'lag_2', 'lag_3', 'lag_12',
@@ -201,7 +212,6 @@ async function scoreSpikes(req, rows) {
       if (i >= shortlist.length) return;
       const rec = {};
       for (const f of FEATURES) rec[f] = Number(shortlist[i][f]) || 0;
-      rec.row_key = String(shortlist[i].row_key || `${shortlist[i].district_id}-${shortlist[i].crime_head_id}`);
       out[i] = await postOne(rec, token, key);
     }
   }

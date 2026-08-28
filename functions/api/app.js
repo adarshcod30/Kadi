@@ -1325,7 +1325,23 @@ r.get('/analytics/outlook', handle(async (req) => {
         + 'hex string with no quotes or spaces. Copy the X-QUICKML-ENDPOINT-KEY value only.');
       e.status = 400; e.code = 'bad_request'; throw e;
     }
-    const ok = await datastore.insertRows(req, 'AppConfig', [{ configKey, configValue: value }]);
+    // Write, then CHECK — rather than trusting the insert's own return value.
+    //
+    // The first real use of this route reported "Write failed" for a key that had in fact
+    // landed: insertRows resolved false while the row was written. An operator who believes
+    // that message pastes again, or goes hunting in the console for a problem that does not
+    // exist. So success is defined as "the key is readable afterwards", which is the only
+    // thing the caller actually cares about.
+    //
+    // The check reads presence and length. It never returns the value and never logs it.
+    const wrote = await datastore.insertRows(req, 'AppConfig', [{ configKey, configValue: value }]);
+    let present = false;
+    try {
+      const rows = await datastore.query(req,
+        `SELECT configValue FROM AppConfig WHERE configKey = '${configKey}'`, 'AppConfig');
+      present = Boolean(rows && rows.length && String(rows[0].configValue || '').length >= 32);
+    } catch { present = false; }
+    const ok = present || wrote;
     // Audited like any other privileged write. The configKey is recorded; the value never is.
     audit.record({ user: req.user, action: 'install_model_key', targetType: 'config',
       targetId: configKey, ip: req.clientIp, req });
@@ -1335,11 +1351,17 @@ r.get('/analytics/outlook', handle(async (req) => {
       model: which,
       // Deliberately not echoed. A route that returns the secret it was just given turns every
       // log and every browser history entry into a place the credential now lives.
+      verified: present,
       note: ok
-        ? 'Key stored. The next scoring call will use the model; reload Forecast to see the '
-          + 'ranking switch from rule to model.'
-        : 'Write failed — see /ai/status datastore.diag for the reason. The model keeps '
-          + 'ranking by rule until a key is present.',
+        ? (present
+          ? 'Key stored and read back. Reload Forecast — the ranking should switch from rule '
+            + 'to model. If it still says rule, the payload is being rejected rather than the '
+            + 'key being missing; check /ai/status for the endpoint\'s own error.'
+          : 'Write reported success but could not be read back yet. Reload Forecast in a '
+            + 'moment; if it still ranks by rule, paste the key again.')
+        : 'Write failed and no key is present. The model keeps ranking by rule, which is a '
+          + 'working ordering — the baseline it was measured against — so nothing is broken '
+          + 'while you retry.',
     };
   }));
 
