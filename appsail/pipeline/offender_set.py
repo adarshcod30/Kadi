@@ -193,13 +193,20 @@ def build(tables, unit_district, identities, today: date):
 
 
 def write_csv(data_dir: str, rows, name: str = "training_set_offender.csv") -> str:
-    """Console-ready: row_key for traceability, the features, the target. Nothing else.
+    """Console-ready: the seven features and the target. NUMERIC COLUMNS ONLY.
 
-    offender_id and as_of are deliberately NOT written. Both are in row_key if a prediction
-    needs tracing back, and an identity column in a training file is an invitation for a model
-    to memorise a person rather than learn a behaviour.
+    row_key is deliberately absent, and that is not a style choice. QuickML's model stages
+    refuse a frame containing a text column -- "Previous stage result contains non-numeric
+    columns. Columns row_key." -- so a key column forces an extra Select/Drop stage into every
+    pipeline built on this file. Leaving it out makes the pipeline Source -> model and the
+    scoring payload seven numbers, with nothing to keep in step.
+
+    Traceability is not lost: predictions come back in the order they were sent, and the
+    serving code holds the offender each row belongs to. offender_id and as_of are likewise
+    absent -- an identity column in a training file is an invitation for a model to memorise a
+    person rather than learn a behaviour.
     """
-    header = ["row_key"] + FEATURES + [TARGET]
+    header = FEATURES + [TARGET]
     path = os.path.join(common.derived_dir(data_dir), name)
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
