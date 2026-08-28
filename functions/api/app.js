@@ -26,6 +26,16 @@ const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
 
+// Cache salt for values COMPUTED from the corpus rather than read straight out of it.
+//
+// The /stats key is built from buildId, which fingerprints the DATA bundle -- so a corpus
+// regeneration busts it. But a bug in the code that derives a value from unchanged data does
+// not move buildId, and the stale payload keeps being served for the rest of the TTL. That is
+// exactly what happened to the district heat grid: the fix computed it correctly and the
+// deployed endpoint kept returning the old empty one. Bump this whenever the SHAPE or CONTENT
+// of a cached derivation changes.
+const DERIVED_VERSION = 'v2-heat';
+
 // Zone values are machine tokens and the model copies facts verbatim, so anything reaching
 // it must already be language. Shared by /command and /zones.
 const ZONE_LABEL_TEXT = {
@@ -294,7 +304,7 @@ function buildApp() {
       // Every axis scoped() filters on must appear in the key. drillUnitId was missing:
       // two SIs in different stations of one district would have shared a cache entry.
       req,
-      `stats:${q.buildId()}:${req.user.role}:${req.user.districtId || 'state'}:${req.user.drillUnitId || 'all'}`,
+      `stats:${DERIVED_VERSION}:${q.buildId()}:${req.user.role}:${req.user.districtId || 'state'}:${req.user.drillUnitId || 'all'}`,
       async () => q.stats(req.user),
     );
     if (String(req.query.explain) !== 'true') return data;

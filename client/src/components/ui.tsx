@@ -73,9 +73,13 @@ export function MiniSpark({ data, color = '#1A6FC4', width = 96, height = 26 }: 
   );
 }
 
-export function KpiCard({ label, value, delta, hint, accent, onClick, spark, tier }: {
+export function KpiCard({ label, value, delta, hint, accent, onClick, spark, tier, sub }: {
   label: ReactNode; value: ReactNode; delta?: number; hint?: string; accent?: string; onClick?: () => void;
   spark?: number[]; tier?: 'state' | 'district' | 'station';
+  // What the figure is measured against. A label over a bare number leaves the reader to supply
+  // the context, and for most of these they cannot — "127 networks" means nothing until you know
+  // how many of them cross a district line.
+  sub?: string;
 }) {
   // A tier-coloured top rule ties the card to whose view it belongs in; the sparkline gives
   // the number a shape. Both optional, so existing call sites render unchanged.
@@ -95,6 +99,7 @@ export function KpiCard({ label, value, delta, hint, accent, onClick, spark, tie
         </div>
         {spark && spark.length > 1 && <MiniSpark data={spark} color={rule} />}
       </div>
+      {sub && <div className="text-[12px] text-ink-muted mt-1.5 leading-snug">{sub}</div>}
       {hint && <div className="text-xs text-ink-muted mt-1">{hint}</div>}
     </button>
   );

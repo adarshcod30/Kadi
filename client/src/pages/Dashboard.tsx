@@ -125,22 +125,55 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* KPIs — auto-fit so the row reflows 2/3/5 without a stranded middle card (the uneven
-          spacing the brief flagged), each with a tier-coloured rule. The headline card carries
-          a sparkline of the last 12 months so the number shows its own recent shape. */}
+      {/* KPIs. Each carries a SUBTITLE that says what the figure is measured against, the same
+          treatment the Health cockpit got: a label over a bare number leaves the reader to
+          supply the context, and most of them cannot. Auto-fit so the row reflows 2/3/5 without
+          a stranded middle card, tier-coloured rule, and a sparkline on the headline. */}
       <motion.div variants={stagger} initial="hidden" animate="show"
-        className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         {[
-          { label: t('openCases'), value: stats?.openCases, hint: 'FIRs still under active investigation.', to: '/cases?status=1', spark: trendSpark },
-          { label: t('flagged'), value: stats?.seriousFlaggedCases, hint: 'Cases carrying a high-severity health flag — ageing, pendency or undetected-risk. The Health cockpit shows the subset within your rank scope.', accent: '#C9820A', to: '/health' },
-          { label: t('networks'), value: stats?.activeNetworks, hint: 'Resolved offenders who operate with co-offenders — genuine groups, not just cases with a similar modus operandi.', accent: '#1A6FC4', to: '/offenders' },
-          { label: 'Resolved offenders', value: stats?.resolvedOffenders, hint: 'Distinct repeat offenders after name-variant entity resolution.', to: '/offenders' },
-          { label: 'Emerging hotspots', value: stats?.emergingHotspots, hint: 'Areas where recent activity far exceeds the historical baseline.', accent: '#C0392B', to: '/map' },
+          {
+            label: t('openCases'), value: stats?.openCases, to: '/cases?status=1', spark: trendSpark,
+            sub: stats?.totalCases
+              ? `of ${stats.totalCases.toLocaleString()} registered — ${Math.round((stats.openCases / stats.totalCases) * 100)}% still under investigation`
+              : 'FIRs still under active investigation',
+            hint: 'FIRs still under active investigation. The sparkline is the last 12 complete months of registrations in this scope.',
+          },
+          {
+            label: t('flagged'), value: stats?.seriousFlaggedCases, accent: '#C9820A', to: '/health',
+            sub: stats?.openCases
+              ? `${Math.round((stats.seriousFlaggedCases / Math.max(1, stats.openCases)) * 100)}% of the open register needs supervision`
+              : 'high-severity health flags',
+            hint: 'Cases carrying a high-severity health flag — ageing past the peer median, pendency or undetected-risk. Open the Health cockpit for the worklist and each case\u2019s recommended action.',
+          },
+          {
+            label: t('networks'), value: stats?.activeNetworks, accent: '#1A6FC4', to: '/offenders',
+            // NOT "of them": the two figures count different populations — networks are
+            // offenders with a co-offender, cross-district is offenders active in 2+ districts,
+            // and the second is not a subset of the first. Saying "of them" produced the
+            // nonsense "57 networks, 262 of them cross district lines".
+            sub: stats?.crossDistrictNetworks != null
+              ? `${stats.crossDistrictNetworks.toLocaleString()} offenders here also work across district lines`
+              : 'offenders who work with co-offenders',
+            hint: 'Resolved offenders who operate with co-offenders — genuine groups, not merely cases with a similar modus operandi. The cross-district count is the part no single station register can see.',
+          },
+          {
+            label: 'Resolved offenders', value: stats?.resolvedOffenders, to: '/offenders',
+            sub: stats?.highRiskOffenders != null
+              ? `${stats.highRiskOffenders.toLocaleString()} scored high risk on behaviour alone`
+              : 'distinct repeat offenders after entity resolution',
+            hint: 'Distinct repeat offenders after name-variant entity resolution — spelling variants, initials and transliteration drift merged into one identity. Risk is scored from behaviour and evidence only, never caste, religion or occupation.',
+          },
+          {
+            label: 'Emerging hotspots', value: stats?.emergingHotspots, accent: '#C0392B', to: '/map',
+            sub: 'places where recent activity far exceeds their own baseline',
+            hint: 'Clusters whose recent incident count sits far above what that location normally records. Judged against each area\u2019s own history, never a shared cut-off, so a consistently busy area does not sit permanently red.',
+          },
         ].map((k) => (
           <motion.div key={k.label} variants={rise}>
             <KpiCard label={<span className="flex items-center gap-1">{k.label}<Hint text={k.hint} /></span>}
               value={k.value?.toLocaleString() ?? '—'} accent={k.accent} tier={homeTier} spark={k.spark}
-              onClick={() => nav(k.to)} />
+              sub={k.sub} onClick={() => nav(k.to)} />
           </motion.div>
         ))}
       </motion.div>

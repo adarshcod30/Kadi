@@ -973,9 +973,25 @@ module.exports = {
       heads.set(h, (heads.get(h) || 0) + 1);
       const m = String(c.crimeRegisteredDate || '').slice(0, 7);
       if (m) trend.set(m, (trend.get(m) || 0) + 1);
-      if (c.dow !== undefined && c.hour !== undefined) {
-        const k = `${c.dow}:${c.hour}`;
-        heat.set(k, (heat.get(k) || 0) + 1);
+      // Derived from the incident timestamp, NOT read off the case. This used to test
+      // `c.dow !== undefined && c.hour !== undefined`, and a case object carries neither
+      // field -- so the condition never fired and every district and station was served an
+      // empty hour-by-weekday grid. Only the state view looked right, because that path
+      // returns the pipeline's precomputed heat instead of computing its own.
+      //
+      // incidentFromDate is 'YYYY-MM-DD HH:MM:SS'. Parsed by slice rather than by Date so the
+      // hour is the one written on the FIR, not the one the server's timezone shifts it to.
+      const ts = c.incidentFromDate || '';
+      if (ts.length >= 13) {
+        const hour = parseInt(ts.slice(11, 13), 10);
+        const d = new Date(`${ts.slice(0, 10)}T00:00:00Z`);
+        const day = d.getUTCDay();                 // 0 = Sunday
+        if (Number.isFinite(hour) && !Number.isNaN(day)) {
+          // The grid runs Mon..Sun, so Sunday moves from 0 to 6.
+          const dow = (day + 6) % 7;
+          const k = `${dow}:${hour}`;
+          heat.set(k, (heat.get(k) || 0) + 1);
+        }
       }
     }
     const health = db.healthList.filter((h) => ids.has(String(h.caseMasterId)));
