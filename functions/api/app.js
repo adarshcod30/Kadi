@@ -1206,6 +1206,8 @@ function buildApp() {
       download: '/server/api/ml/training-set.csv',
       downloadFull: '/server/api/ml/training-set.csv?grain=full',
       downloadDistrict: '/server/api/ml/training-set.csv?grain=district',
+      downloadOffender: '/server/api/ml/training-set.csv?grain=offender',
+      offenderSet: q.offenderSetMeta(),
       serving: mlforecast.status(),
       // The feature order the serving code will send at scoring time. Published so a mismatch
       // between the CSV that trained the model and the payload that queries it is visible
@@ -1221,7 +1223,10 @@ function buildApp() {
     // nothing to remember in the console. ?grain=full and ?grain=district serve the raw sets.
     const g = String(req.query.grain || '');
     const file = g === 'district' ? 'training_set_district.csv'
-      : g === 'full' ? 'training_set.csv' : 'training_set_spike.csv';
+      : g === 'full' ? 'training_set.csv'
+        // The second model's set: repeat offending, built on the resolved identities. It is a
+        // different task on a different grain, not another slice of the spike data.
+        : g === 'offender' ? 'training_set_offender.csv' : 'training_set_spike.csv';
     const p = require('path').join(q.dataDir(), 'derived', file);
     if (!require('fs').existsSync(p)) {
       return res.status(404).json({ ok: false, error: { code: 'not_found', message: 'Run the pipeline to build the training set.' } });

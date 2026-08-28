@@ -1100,6 +1100,11 @@ module.exports = {
     for (const d of ((db.socio && db.socio.districts) || [])) out[String(d.districtId)] = d;
     return out;
   },
+  // The repeat-offending set's metadata, written by the pipeline beside its CSV.
+  offenderSetMeta: () => {
+    const db = load();
+    return db.offenderSetMeta || { rows: 0, reason: 'The pipeline has not built the offender set yet.' };
+  },
   // What the current training set holds, for the console upload step. Written by the pipeline
   // alongside the CSV so the two can never disagree about row count or date range.
   trainingSetMeta: () => {

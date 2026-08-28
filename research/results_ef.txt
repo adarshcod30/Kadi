@@ -1,0 +1,18 @@
+corpus asOf 2026-07-13  cases 59,985
+
+==============================================================================
+E. CROSS-DISTRICT ESCALATION (offender, at each case)
+  question : will this offender's next case be in a district they have not worked before?
+  rows     : 1,408   positive rate: 44.7%
+  rules    : share of districts so far 0.691, districts so far 0.442, moved last time 0.523, inverse prior cases 0.674
+  auc      : model 0.586  vs best rule (share of districts so far) 0.691  -> loses   margin -0.105
+  ap       : model 0.573  vs best rule (share of districts so far) 0.653  -> loses   margin -0.080
+cases in a linkage cluster: 34,126
+
+==============================================================================
+F. EARLY LINKAGE (case, at registration)
+  question : will this fresh FIR turn out to belong to a linkage cluster?
+  rows     : 59,985   positive rate: 56.9%
+  rules    : sub-head history 0.929, station history 0.497, accused named 0.519
+  auc      : model 0.930  vs best rule (sub-head history) 0.929  -> WINS    margin +0.002
+  ap       : model 0.950  vs best rule (sub-head history) 0.949  -> WINS    margin +0.001

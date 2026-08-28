@@ -1,0 +1,36 @@
+corpus asOf 2026-07-13  cases 59,985
+
+==============================================================================
+B. STATION SURGE — target: ratio  n > 1.4 x roll_3
+  question : will this station be unusually busy next month?
+  rows     : 8,940   positive rate: 5.9%
+  rules    : z of last month 0.504, acceleration 3/12 0.335, inverse recent level 0.717, volatility (cv) 0.433
+  auc      : model 0.738  vs best rule (inverse recent level) 0.717  -> WINS    margin +0.021
+  ap       : model 0.424  vs best rule (inverse recent level) 0.332  -> WINS    margin +0.092
+  scale-free feature set only: auc 0.583  ap 0.277   -> COLLAPSES — the win was station size
+
+==============================================================================
+B. STATION SURGE — target: z      n > roll_12 + 2sd
+  question : will this station be unusually busy next month?
+  rows     : 8,940   positive rate: 8.9%
+  rules    : z of last month 0.479, acceleration 3/12 0.387, inverse recent level 0.697, volatility (cv) 0.368
+  auc      : model 0.710  vs best rule (inverse recent level) 0.697  -> WINS    margin +0.013
+  ap       : model 0.377  vs best rule (inverse recent level) 0.355  -> WINS    margin +0.023
+  scale-free feature set only: auc 0.520  ap 0.218   -> COLLAPSES — the win was station size
+
+==============================================================================
+B. STATION SURGE — target: p90    n > own 12mo p90
+  question : will this station be unusually busy next month?
+  rows     : 8,940   positive rate: 21.9%
+  rules    : z of last month 0.511, acceleration 3/12 0.460, inverse recent level 0.626, volatility (cv) 0.449
+  auc      : model 0.639  vs best rule (inverse recent level) 0.626  -> WINS    margin +0.013
+  ap       : model 0.556  vs best rule (inverse recent level) 0.534  -> WINS    margin +0.022
+  scale-free feature set only: auc 0.539  ap 0.470   -> COLLAPSES — the win was station size
+
+==============================================================================
+D. REPEAT OFFENDING (resolved offender x quarter)
+  question : will this known offender appear on a new FIR within 180 days?
+  rows     : 4,464   positive rate: 36.5%
+  rules    : recency (-days since last) 0.562, offending rate/yr 0.438, prior case count 0.420
+  auc      : model 0.827  vs best rule (recency (-days since last)) 0.562  -> WINS    margin +0.265
+  ap       : model 0.707  vs best rule (recency (-days since last)) 0.433  -> WINS    margin +0.274

@@ -40,6 +40,7 @@ import national
 import socio
 import forecast
 import training_set
+import offender_set
 
 TODAY = date(2026, 7, 13)
 
@@ -301,6 +302,13 @@ def run(data_dir: str):
     step("ML training set")
     training_meta = training_set.compute(tables, unit_district, TODAY, data_dir)
 
+    # The second training set: repeat offending, built on the RESOLVED identities rather than
+    # on Accused.PersonID -- which is a within-case index (three distinct values across 54,337
+    # rows), not a person. It therefore has to run after entity resolution, not beside the
+    # spike set.
+    step("ML training set — offender risk")
+    offender_meta = offender_set.compute(tables, unit_district, identities, TODAY, data_dir)
+
     # ---------------- write artifacts ----------------
     step("writing derived artifacts")
     common.write_json(data_dir, "offenders", offenders)
@@ -324,6 +332,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "socio", socio_ctx)
     common.write_json(data_dir, "forecast", forecast_ctx)
     common.write_json(data_dir, "training_set_meta", training_meta)
+    common.write_json(data_dir, "offender_set_meta", offender_meta)
 
     step("ground-truth evaluation")
     gt_path = os.path.join(data_dir, "_ground_truth.json")
