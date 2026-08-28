@@ -18,6 +18,7 @@ const insight = require('./services/insight');
 const intel = require('./services/intelligence');
 const fc = require('./services/forecasting');
 const reactq = require('./services/react');
+const agenda = require('./services/agenda');
 const submissions = require('./services/submissions');
 const mlforecast = require('./services/mlforecast');
 const translate = require('./services/translate');
@@ -84,7 +85,7 @@ function buildApp() {
   //
   // Failure is swallowed. A Data Store outage degrades the register to the bundle, which is
   // the same contract every other adapter here keeps.
-  const LIVE_PATHS = /^\/(cases|case-updates|stats|geo\/points|analytics\/(worklist|outlook))/;
+  const LIVE_PATHS = /^\/(cases|case-updates|stats|geo\/points|analytics\/(worklist|agenda|outlook))/;
   app.use(async (req, _res, next) => {
     if (LIVE_PATHS.test(req.path)) {
       req.user._live = await submissions.liveCases(req, q.db()).catch(() => []);
@@ -727,6 +728,99 @@ function buildApp() {
     });
     const { text, source } = await insight.generate(req, 'the action queue for this officer today',
       { findings, recordsInView: String(out.total) },
+      { maxTokens: 190, system: insight.SIGNALS_SYSTEM });
+    return { ...out, insight: text, insightSource: source };
+  }));
+
+  // ---- react surface, rebuilt ------------------------------------------------------------
+  // The agenda. Same admission rule at every rank -- a date and a named post -- but a
+  // different SHAPE per rank, because the response to a failing investigation is a case file
+  // at a station, a visit at a district, and a phone call at the state. Filtering one list
+  // three ways produced a screen that handed the DGP case numbers to open, which is not a
+  // thing a DGP does.
+  //
+  // The effective rank is what the reader is LOOKING AT, not what they hold: a DGP drilled
+  // into a district gets the district's agenda, and one drilled into a station gets that
+  // station's. `framing` then records whether that is their own ground or someone else's, so
+  // the surface can address the items to the officer who actually owes them.
+  r.get('/analytics/agenda', handle(async (req) => {
+    const db = q.db();
+    const caps = rbac.capabilities(req.user);
+    const drillUnit = req.user.drillUnitId || null;
+    const tier = (caps.tier === 'station' || drillUnit) ? 'station'
+      : (caps.tier === 'district' || caps.drilledFromState) ? 'district' : 'state';
+    const framing = tier === caps.tier ? 'own' : 'delegate';
+
+    const unitId = caps.unitId || drillUnit;
+    // The zone row comes from the station roster, NOT from db.zones.stations. The two carry
+    // the same statistics under different names: the roster has unitName and zoneZ, the raw
+    // zones blob has neither (it stores `z` and no name at all). Reading the wrong one is why
+    // a drilled station rendered as "this station" with a blank sigma.
+    const roster = (q.stations(req.user, { sort: 'zone' }).items) || [];
+    const zoneRow = tier === 'station'
+      ? roster.find((s) => String(s.unitId) === String(unitId)) || null
+      : null;
+    const scopeName = tier === 'station'
+      ? (zoneRow && zoneRow.unitName) || caps.unitName || 'this station'
+      : tier === 'district' ? caps.districtName || 'this district' : 'Karnataka';
+
+    const { rows: cases } = q.filterCases(req.user, {});
+    const asOf = q.corpusAsOf();
+
+    // Offenders are filtered to the ones that carry a live signal, not the whole watchlist:
+    // risk alone puts someone last seen four years ago above someone offending this quarter,
+    // and neither list on its own produces the intersection this page needs.
+    const cut = (() => {
+      const d = new Date(`${asOf}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 90);
+      return d.toISOString().slice(0, 10);
+    })();
+    const offenders = (q.listOffenders(req.user, { page: 1, pageSize: 200 }).items || [])
+      .filter((o) => (o.riskScore || 0) >= 70 && o.lastSeen && o.lastSeen >= cut);
+
+    let linkedIn = [];
+    if (tier !== 'state') {
+      const cmd = tier === 'station' ? q.stationCommand(req.user) : q.districtCommand(req.user);
+      linkedIn = cmd.linkedOutSample || cmd.linkedInFromOtherDistricts || [];
+    }
+
+    const out = agenda.agenda({
+      tier,
+      framing,
+      scopeName,
+      asOf,
+      db,
+      cases,
+      deadlineOf: (c) => q.caseDeadline(db, c),
+      zones: db.zones || { districts: [], stations: [] },
+      zoneRow,
+      stations: roster,
+      nearRepeat: tier === 'station' ? q.nearRepeat(req.user, {}) : { clusters: [] },
+      linkedIn,
+      offenders,
+    });
+    out.scope = caps.effectiveScope;
+    if (String(req.query.explain) === 'false' || !out.openNow) return out;
+
+    // The narration is told what the officer is being asked to DO, not what is wrong. A
+    // model given a list of problems writes a summary; given a list of obligations with
+    // dates and owners it writes an instruction, which is what this page is for.
+    // Hand the model TOTALS and the single leading item, not three rows verbatim. Given
+    // three rows it paraphrases them back and the paragraph says nothing the list below does
+    // not already say, one line lower.
+    const findings = [
+      `1. ${out.dueWeek} charge-sheets fall due within seven days in ${scopeName}; `
+      + `${out.clock.soon} more within twenty-one. ${out.clock.critical + out.clock.soon + out.clock.ok} `
+      + `of ${out.clock.total} open cases are still inside their window, and ${out.clock.breached} `
+      + `are past it (${out.clock.breachRate}%).`,
+    ];
+    out.blocks.forEach((b, idx) => {
+      findings.push(`${idx + 2}. ${b.title}: ${(b.items || []).length ? `${b.total} items` : 'nothing outstanding'}.`
+        + ((b.items || []).length ? ` The first is ${b.items[0].title}, owed by ${b.items[0].owner}.` : ''));
+    });
+    const { text, source } = await insight.generate(req,
+      `the day's agenda for this ${tier === 'state' ? 'state commander' : tier === 'district' ? 'district supervisor' : 'station officer'}`,
+      { findings, recordsInView: String(out.clock.total) },
       { maxTokens: 190, system: insight.SIGNALS_SYSTEM });
     return { ...out, insight: text, insightSource: source };
   }));

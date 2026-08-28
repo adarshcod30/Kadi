@@ -17,6 +17,16 @@ Sortable by risk, recency, case count, reach, network size or arrests.
 Health — the investigation-health worklist, ordered so the cases nearest failure surface
 first. Each carries its reasons and a recommended action.
 
+React — the day's agenda. An item appears here only if it carries a date by which it must
+be done and one post responsible for doing it; everything without both belongs on Health or
+Cases. The spine is the charge-sheet clock: Heinous offences carry a 90-day window, others 60,
+counted from the earliest recorded arrest and from registration where no arrest is on the
+file. Each rank sees a different shape rather than a filtered copy of one list — a station
+reads its own cases and named IOs, a district reads its stations and which one to visit today
+with the exact crime numbers to ask about, and the state reads districts, which SP to speak to
+and the cross-district offenders no single district can own. Drilling into a district or a
+station shows that officer's own agenda, addressed to them.
+
 Map — density, heatmap and individual incidents over satellite, streets or a night basemap.
 Filter by crime head, period and time of day. Pulsing red marks areas sharply above their own
 baseline.

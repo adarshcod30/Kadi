@@ -206,6 +206,16 @@ export const useWorklist = (params: Record<string, unknown> = {}) =>
     staleTime: 2 * 60 * 1000,
   });
 
+// The agenda behind React. `unit` is passed explicitly rather than picked up by the client
+// the way `district` is, because drilling into one station is a deliberate act on this page
+// and not an ambient scope the rest of the product should inherit.
+export const useAgenda = (params: Record<string, unknown> = {}) =>
+  useQuery({
+    queryKey: ['agenda', role(), params],
+    queryFn: () => api.get<any>(`/analytics/agenda${qs(params)}`),
+    staleTime: 2 * 60 * 1000,
+  });
+
 // ---- the write path ---------------------------------------------------------------------
 // Submissions and lifecycle updates. Every mutation invalidates the register as well as the
 // queue, because approving a case changes what /cases returns -- and a queue that empties
