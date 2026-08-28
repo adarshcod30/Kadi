@@ -170,6 +170,20 @@ export default function MapPage() {
     return m;
   }, [districts]);
 
+  // The two things that pulse on the canvas, derived once so the markers, the side panel and
+  // the cards below can never disagree about what is "emerging" in this view.
+  const emergingClusters = useMemo(
+    () => (hotspots?.hotspots || []).filter((h: any) => h.emergingFlag),
+    [hotspots],
+  );
+  const pulsingStations = useMemo(
+    () => (selDistrict
+      ? (stations?.items || []).filter((r: any) => String(r.districtId) === String(selDistrict)
+        && (r.zone === 'red_pulsing' || r.zone === 'red') && r.lat != null && r.lng != null)
+      : []),
+    [stations, selDistrict],
+  );
+
   const filteredPoints = useMemo(() => {
     const items = points?.items || [];
     if (hours[0] === 0 && hours[1] === 23) return items;
@@ -419,17 +433,15 @@ export default function MapPage() {
     markers.current.forEach((mk) => mk.remove());
     markers.current = [];
 
-    for (const h of (hotspots?.hotspots || []).filter((x) => x.emergingFlag)) {
+    for (const h of emergingClusters) {
       const el = document.createElement('div');
       el.className = 'hotspot-pulse';
       el.title = `Emerging cluster: ${h.recentCount} in 60d vs ~${h.baselineExpected} expected`;
       markers.current.push(new maplibregl.Marker({ element: el }).setLngLat([h.centroidLng, h.centroidLat]).addTo(m));
     }
 
-    if (selDistrict) {
-      const hot = (stations?.items || []).filter((r: any) => String(r.districtId) === String(selDistrict)
-        && (r.zone === 'red_pulsing' || r.zone === 'red') && r.lat != null && r.lng != null);
-      for (const r of hot) {
+    {
+      for (const r of pulsingStations) {
         const el = document.createElement('div');
         el.className = r.zone === 'red_pulsing' ? 'hotspot-pulse' : 'hotspot-pulse hotspot-pulse--steady';
         el.title = `${r.unitName}: ${r.current ?? 0} recent vs baseline ${r.baseline ?? 0}`
@@ -437,7 +449,7 @@ export default function MapPage() {
         markers.current.push(new maplibregl.Marker({ element: el }).setLngLat([r.lng, r.lat]).addTo(m));
       }
     }
-  }, [ready, hotspots, selDistrict, stations]);
+  }, [ready, emergingClusters, pulsingStations]);
 
 
   // ---- police stations, toggled ----
@@ -741,16 +753,35 @@ export default function MapPage() {
               and when does it happen -- both recomputed as the filters change. */}
           <ViewPulse points={filteredPoints} grid={grid} layer={layer} hours={hours} period={period} />
 
+          {/* THE PANEL MUST LIST WHAT THE MAP DRAWS. Two different things pulse on the canvas —
+              DBSCAN clusters state-wide, and stations running above their own baseline once you
+              drill into a district — but this panel only ever counted the clusters. So Mysuru
+              showed two pulsing dots beside the words "None currently", which reads as a broken
+              feature. It now lists both, labelled by what each one is. */}
           <Section title={<span className="flex items-center gap-2"><Flame size={14} className="text-danger" /> Emerging hotspots</span>}>
             <div className="p-3 space-y-2 max-h-[22vh] overflow-auto">
-              {(hotspots?.hotspots || []).filter((h) => h.emergingFlag).map((h) => (
+              {emergingClusters.map((h: any) => (
                 <button key={h.cellId} onClick={() => map.current?.flyTo({ center: [h.centroidLng, h.centroidLat], zoom: 11, duration: 900 })}
                   className="w-full text-left border border-line rounded-ctl p-2 text-sm hover:bg-kadi-blue50">
-                  <div className="flex items-center gap-2"><Chip color="red">emerging</Chip><span className="font-num">{h.recentCount} in 60d</span></div>
+                  <div className="flex items-center gap-2"><Chip color="red">cluster</Chip><span className="font-num">{h.recentCount} in 60d</span></div>
                   <div className="text-xs text-ink-muted mt-1">vs ~{h.baselineExpected} expected · tap to zoom</div>
                 </button>
               ))}
-              {!(hotspots?.hotspots || []).some((h) => h.emergingFlag) && <div className="text-sm text-ink-muted">None currently.</div>}
+              {pulsingStations.map((r: any) => (
+                <button key={r.unitId} onClick={() => map.current?.flyTo({ center: [r.lng, r.lat], zoom: 12, duration: 900 })}
+                  className="w-full text-left border border-line rounded-ctl p-2 text-sm hover:bg-kadi-blue50">
+                  <div className="flex items-center gap-2">
+                    <Chip color={r.zone === 'red_pulsing' ? 'red' : 'amber'}>station</Chip>
+                    <span className="truncate">{r.unitName}</span>
+                    <span className="font-num text-ink-muted ml-auto">{r.current ?? 0}</span>
+                  </div>
+                  <div className="text-xs text-ink-muted mt-1">
+                    vs baseline {r.baseline ?? 0}{r.changePct != null ? ` · ${r.changePct > 0 ? '+' : ''}${r.changePct}%` : ''} · tap to zoom
+                  </div>
+                </button>
+              ))}
+              {!emergingClusters.length && !pulsingStations.length
+                && <div className="text-sm text-ink-muted">None currently — nothing in this view sits materially above its own baseline.</div>}
             </div>
           </Section>
 
@@ -761,7 +792,9 @@ export default function MapPage() {
 
       {/* Three cards beneath the map and its panel (P3-10), tier-shaped: the most important
           reading of the current view for whoever is looking. */}
-      <MapCards me={me} districts={districts} hotspots={hotspots} points={filteredPoints} grid={grid} />
+      <MapCards me={me} selDistrict={selDistrict} selData={selData} districts={districts}
+        clusters={emergingClusters} pulsing={pulsingStations} stations={stations}
+        points={filteredPoints} grid={grid} />
     </div>
   );
 }
@@ -778,31 +811,67 @@ function MapCard({ tone, title, children }: { tone: string; title: string; child
     </div>
   );
 }
-function MapCards({ me, districts, hotspots, points, grid }: any) {
+function MapCards({ me, selDistrict, selData, districts, clusters, pulsing, stations, points, grid }: any) {
   const tier = me?.capabilities?.effectiveScope === 'unit' ? 'station'
-    : me?.capabilities?.effectiveScope === 'district' ? 'district' : 'state';
+    : (selDistrict || me?.capabilities?.effectiveScope === 'district') ? 'district' : 'state';
   const tone = { state: '#1A6FC4', district: '#E8871E', station: '#2FA8A0' }[tier];
-  const emerging = (hotspots?.hotspots || []).filter((h: any) => h.emergingFlag);
-  // Busiest hour across whatever is plotted.
+
+  // Busiest hour across whatever is plotted, in the current scope.
   const byHour = new Array(24).fill(0);
   for (const p of points || []) if (p.hour != null) byHour[p.hour] += 1;
   let peak = 0; for (let h = 1; h < 24; h += 1) if (byHour[h] > byHour[peak]) peak = h;
+  const hasHours = byHour.some((n) => n > 0);
   const win = `${String(peak).padStart(2, '0')}:00–${String((peak + 3) % 24).padStart(2, '0')}:00`;
-  const top = (districts?.districts || [])[0];
-  const total = (points || []).length;
+
+  // Everything pulsing in THIS view — clusters plus stations above their own baseline — so the
+  // card agrees with the map and the panel rather than counting only one of the two.
+  const hot = (clusters?.length || 0) + (pulsing?.length || 0);
+
+  // THE LEADING AREA IS SCOPE-DEPENDENT, and reading it off the state district list was the
+  // bug: drilled into Mysuru the card still announced Bengaluru City, because that list is
+  // always state-wide. At district scope the right unit is a STATION inside that district; at
+  // state scope it is a district.
+  let leadLabel = 'Leading area';
+  let leadName = '—';
+  let leadSub = 'No area data in this view.';
+  if (tier === 'state') {
+    const top = (districts?.districts || [])[0];
+    leadLabel = 'Heaviest district';
+    if (top) { leadName = top.district; leadSub = `${top.total.toLocaleString()} cases — the district carrying the most volume state-wide.`; }
+  } else {
+    const inScope = (stations?.items || [])
+      .filter((r: any) => !selDistrict || String(r.districtId) === String(selDistrict))
+      .sort((a: any, b: any) => (b.cases || 0) - (a.cases || 0));
+    const top = inScope[0];
+    leadLabel = tier === 'station' ? 'Your station' : 'Busiest station';
+    if (top) {
+      leadName = top.unitName;
+      leadSub = `${(top.cases || 0).toLocaleString()} cases — the heaviest register in ${selData?.district || 'this district'}.`;
+    }
+  }
+
+  const total = grid?.total ?? (points || []).length;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
       <MapCard tone={tone} title="Concentration">
-        <div className="text-2xl font-semibold font-num text-kadi-navy">{grid?.total?.toLocaleString() ?? total.toLocaleString()}</div>
-        <p className="text-[13px] text-ink-muted mt-0.5">incidents in view · {emerging.length} emerging hotspot{emerging.length === 1 ? '' : 's'} where recent activity far exceeds the local baseline.</p>
+        <div className="text-2xl font-semibold font-num text-kadi-navy">{total?.toLocaleString()}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">
+          incidents in view · {hot} area{hot === 1 ? '' : 's'} running above their own baseline
+          {pulsing?.length ? ` (${pulsing.length} station${pulsing.length === 1 ? '' : 's'})` : ''}.
+        </p>
       </MapCard>
       <MapCard tone={tone} title="Busiest window">
-        <div className="text-2xl font-semibold font-num text-kadi-navy">{win}</div>
-        <p className="text-[13px] text-ink-muted mt-0.5">peak hours in the current view — the window to weight patrol cover toward.</p>
+        <div className="text-2xl font-semibold font-num text-kadi-navy">{hasHours ? win : '—'}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">
+          {hasHours
+            ? 'peak hours in the current view — the window to weight patrol cover toward.'
+            : 'no timed incidents in the current view.'}
+        </p>
       </MapCard>
-      <MapCard tone={tone} title={tier === 'station' ? 'Your beat' : tier === 'district' ? 'Leading station area' : 'Biggest load'}>
-        <div className="text-lg font-semibold text-kadi-navy truncate">{top?.district || '—'}</div>
-        <p className="text-[13px] text-ink-muted mt-0.5">{top ? `${top.total.toLocaleString()} cases — ${tier === 'state' ? 'the district carrying the most volume right now.' : 'the heaviest area in your scope.'}` : 'No area data in view.'}</p>
+      <MapCard tone={tone} title={leadLabel}>
+        <div className="text-lg font-semibold text-kadi-navy truncate">{leadName}</div>
+        <p className="text-[13px] text-ink-muted mt-0.5">{leadSub}</p>
       </MapCard>
     </div>
   );
