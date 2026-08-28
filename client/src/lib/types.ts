@@ -11,6 +11,7 @@ export interface Me {
     isStation?: boolean;
     // Present only at station tier: the one register this user holds.
     unitName?: string | null;
+    unitId?: string | null;
     districtName?: string | null;
     districtId: string | null;
     drillUnitId: string | null;

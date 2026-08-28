@@ -55,6 +55,22 @@ function buildApp() {
     // a 500, and the fallback secret fails closed on its own.
     await auth.loadSecret(req).catch(() => {});
     req.user = rbac.userFromRequest(req);
+    // A PINNED SCOPE MUST NOT BE INTERSECTED WITH A CONTRADICTORY FILTER.
+    //
+    // rbac already ignores ?district= and ?unit= for a station officer -- their boundary comes
+    // from the account and nothing in the URL may move it. But the query layer reads those
+    // params straight off req.query and applies them ON TOP of the scoped set, so a station
+    // user landing on /map?district=7 got (their own station) AND (district 7) = nothing at
+    // all: an empty map, "0 incidents", a blank busiest window. The client carries the last
+    // drilled district on every call, so this happened to any SHO who had previously looked at
+    // another district.
+    //
+    // Stripping the params here keeps the rule in ONE place, which is what rbac's own comment
+    // asks for. Nothing downstream has to know about tiers to behave correctly.
+    if (req.user && req.user.roleMeta && req.user.roleMeta.tier === 'station' && req.query) {
+      delete req.query.district;
+      delete req.query.unit;
+    }
     req.clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local';
     next();
   });

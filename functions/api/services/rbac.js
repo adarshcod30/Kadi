@@ -169,6 +169,9 @@ function capabilities(user) {
     scope: user.roleMeta.scope,
     tier: user.roleMeta.tier,
     districtId: user.districtId || null,
+    // The station this account holds. The client needs the id, not just the name, to narrow a
+    // panel to the officer's own register without string-matching on a display label.
+    unitId: user.unitId || null,
     drillUnitId: user.drillUnitId || null,
     canViewVulnerability: true,
     canViewAudit: stateTier || user.role === 'SP',

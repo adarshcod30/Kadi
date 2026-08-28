@@ -170,6 +170,23 @@ export default function MapPage() {
     return m;
   }, [districts]);
 
+  // Scope, from the account and the current drill — every panel on this page keys off it.
+  const scopeTier: 'state' | 'district' | 'station' =
+    me?.capabilities?.effectiveScope === 'unit' ? 'station'
+      : (selDistrict || me?.capabilities?.effectiveScope === 'district') ? 'district' : 'state';
+  // Stations inside the current scope, biggest register first.
+  const scopedStations = useMemo(() => {
+    const rows = (stations?.items || [])
+      .filter((r: any) => !selDistrict || String(r.districtId) === String(selDistrict))
+      .sort((a: any, b: any) => (b.cases || 0) - (a.cases || 0));
+    // A station officer's own register, not the 120 others in their district. /stations stays
+    // district-wide on purpose -- the map still draws neighbouring stations as context -- so the
+    // narrowing happens here, where the panel claims to be about "your station".
+    const own = me?.capabilities?.unitId;
+    if (own) return rows.filter((r: any) => String(r.unitId) === String(own));
+    return rows;
+  }, [stations, selDistrict, me]);
+
   // The two things that pulse on the canvas, derived once so the markers, the side panel and
   // the cards below can never disagree about what is "emerging" in this view.
   const emergingClusters = useMemo(
@@ -733,19 +750,40 @@ export default function MapPage() {
               </Section>
             </motion.div>
           ) : (
-            <Section title="Districts by volume">
-              <div className="p-2 max-h-[300px] overflow-auto">
-                {(districts?.districts || []).map((d: any, i: number) => (
-                  <button key={d.districtId} onClick={() => setSelDistrict(d.districtId)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-kadi-blue50 text-sm">
-                    <span className="w-5 text-ink-muted font-num text-xs">{i + 1}</span>
-                    <span className="flex-1 text-left truncate">{d.district}</span>
-                    <div className="w-16 h-1.5 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-kadi-blue" style={{ width: `${(d.total / (districts.maxCount || 1)) * 100}%` }} /></div>
-                    <span className="font-num text-xs w-12 text-right">{d.total.toLocaleString()}</span>
-                  </button>
-                ))}
-              </div>
-            </Section>
+            /* A ladder of 31 districts is a STATE question. Below state scope it is context
+               the reader cannot act on and, for a station officer, not even about them — so
+               the panel becomes the stations in their own scope instead. */
+            scopeTier === 'state' ? (
+              <Section title="Districts by volume">
+                <div className="p-2 max-h-[300px] overflow-auto">
+                  {(districts?.districts || []).map((d: any, i: number) => (
+                    <button key={d.districtId} onClick={() => setSelDistrict(d.districtId)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-kadi-blue50 text-sm">
+                      <span className="w-5 text-ink-muted font-num text-xs">{i + 1}</span>
+                      <span className="flex-1 text-left truncate">{d.district}</span>
+                      <div className="w-16 h-1.5 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-kadi-blue" style={{ width: `${(d.total / (districts.maxCount || 1)) * 100}%` }} /></div>
+                      <span className="font-num text-xs w-12 text-right">{d.total.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+              </Section>
+            ) : (
+              <Section title={scopeTier === 'station' ? 'Your station' : 'Stations by volume'}>
+                <div className="p-2 max-h-[300px] overflow-auto">
+                  {scopedStations.length ? scopedStations.map((r: any, i: number) => (
+                    <button key={r.unitId} onClick={() => r.lat != null && map.current?.flyTo({ center: [r.lng, r.lat], zoom: 12, duration: 900 })}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-kadi-blue50 text-sm">
+                      <span className="w-5 text-ink-muted font-num text-xs">{i + 1}</span>
+                      <span className="flex-1 text-left truncate">{r.unitName}</span>
+                      <div className="w-16 h-1.5 bg-surface-3 rounded overflow-hidden">
+                        <div className="h-full bg-kadi-blue" style={{ width: `${(r.cases / (scopedStations[0]?.cases || 1)) * 100}%` }} />
+                      </div>
+                      <span className="font-num text-xs w-12 text-right">{(r.cases || 0).toLocaleString()}</span>
+                    </button>
+                  )) : <div className="px-2 py-3 text-sm text-ink-muted">No stations in this scope.</div>}
+                </div>
+              </Section>
+            )
           )}
 
           {/* A compact reading of the current view, not a second dashboard. It answers the
