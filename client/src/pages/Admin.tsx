@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ShieldCheck, Database, Cpu, UserPlus, Check, X, Loader2, AlertTriangle, RefreshCw, Play, Sliders } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Database, Cpu, UserPlus, Check, X, Loader2, AlertTriangle, RefreshCw, Play, Sliders, KeyRound } from 'lucide-react';
 import { useMe, useEval, useStats, useAccessRequests, useDecideRequest } from '../api/hooks';
 import { Section, Empty, Chip } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
@@ -70,6 +70,8 @@ export default function Admin() {
             <div className="text-xs text-ink-muted pt-2">Synthetic dataset (schema-faithful). Real KSP export drops in unchanged.</div>
           </div>
         </Section>
+
+        <ModelKeys />
 
         <Section title="Roles">
           <div className="p-4 flex flex-wrap gap-2">
@@ -144,6 +146,95 @@ const ACTIONS: { key: string; label: string; path: string; desc: string; danger?
   { key: 'kb', label: 'Rebuild assistant knowledge base', path: '/admin/sync-knowledge-base',
     desc: 'Refresh the grounding corpus the assistant retrieves from.' },
 ];
+// Installing a QuickML endpoint key.
+//
+// Both trained models rank by their fallback rule until a key is present, and the only thing
+// standing between "rule is ranking" and "model is ranking" is one credential reaching the
+// AppConfig table. Doing that by hand meant finding the endpoint in the Catalyst console,
+// copying a header value, then hand-editing a Data Store row — three places to get it wrong,
+// for a step whose failure looks exactly like a broken model.
+//
+// The field is type="password" and the value is never echoed back by the route, so the key
+// does not end up in a screenshot, a response body or a browser history entry. What comes back
+// is whether it landed.
+function ModelKeys() {
+  const [vals, setVals] = useState<Record<string, string>>({ offender: '', spike: '' });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
+
+  const MODELS = [
+    { key: 'offender', label: 'Repeat offending', endpoint: 'kadi-offender-endpoint',
+      config: 'quickml.offenderEndpointKey' },
+    { key: 'spike', label: 'Spike risk', endpoint: 'kadi-spike-regressor-endpoint',
+      config: 'quickml.spikeRegressorEndpointKey' },
+  ];
+
+  const install = async (m: typeof MODELS[number]) => {
+    setBusy(m.key);
+    try {
+      const res = await api.post<any>('/admin/model-key', { model: m.key, key: vals[m.key] });
+      setMsg((x) => ({ ...x, [m.key]: { ok: !!res?.installed, text: res?.note || 'Stored.' } }));
+      if (res?.installed) setVals((v) => ({ ...v, [m.key]: '' }));
+    } catch (e: any) {
+      setMsg((x) => ({ ...x, [m.key]: { ok: false, text: e?.message || 'Failed.' } }));
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <KeyRound size={16} className="text-kadi-blue" /> Model endpoint keys
+      <InfoDot width="w-96">
+        <b className="block mb-1 text-kadi-navy">Why the models rank by rule until this is done</b>
+        A QuickML endpoint is authenticated by a key that is a live credential, so it is kept in
+        the AppConfig Data Store table rather than in the repository or in a config file the
+        deployment carries. Until a key is present, each model falls back to the simple rule it
+        was measured against — which is a working ranking, just a weaker one.
+        <b className="block mt-1.5 text-kadi-navy">Where to find it</b>
+        Catalyst console → QuickML → Endpoints → open the endpoint → Headers →
+        X-QUICKML-ENDPOINT-KEY. Copy the value only, without quotes.
+        <b className="block mt-1.5 text-kadi-navy">What happens to it</b>
+        It is written to AppConfig and never read back. No surface in this app will show it
+        again — only whether a key is present.
+      </InfoDot>
+    </span>}>
+      <div className="divide-y divide-line">
+        {MODELS.map((m) => {
+          const r = msg[m.key];
+          return (
+            <div key={m.key} className="px-4 py-3">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-sm font-medium text-ink">{m.label}</span>
+                <span className="text-[12px] text-ink-muted font-mono">{m.endpoint}</span>
+                <span className="ml-auto text-[11px] text-ink-subtle font-mono">{m.config}</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={vals[m.key]}
+                  onChange={(e) => setVals((v) => ({ ...v, [m.key]: e.target.value }))}
+                  placeholder="Paste X-QUICKML-ENDPOINT-KEY"
+                  className="flex-1 rounded-ctl border border-line bg-surface px-3 py-1.5 text-[12.5px] font-mono focus:border-kadi-blue focus:outline-none"
+                />
+                <button onClick={() => install(m)} disabled={busy === m.key || vals[m.key].length < 32}
+                  className="btn-outline text-xs shrink-0 inline-flex items-center gap-1.5 disabled:opacity-40">
+                  {busy === m.key ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />} Install
+                </button>
+              </div>
+              {r && (
+                <div className={`text-[12px] mt-1.5 leading-relaxed ${r.ok ? 'text-success' : 'text-danger'}`}>
+                  {r.ok ? '\u2713 ' : '\u2715 '}{r.text}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
 function AdminControls() {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, { ok: boolean; msg: string }>>({});

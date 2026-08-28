@@ -1295,6 +1295,54 @@ r.get('/analytics/outlook', handle(async (req) => {
     return quickml.syncKnowledgeBase(req);
   }));
 
+  // ---- installing a model endpoint key ---------------------------------------------------
+  // QuickML endpoint keys are live credentials, so they live in the AppConfig Data Store table
+  // beside the auth signing secret and never in the repository. Getting one INTO that table
+  // used to mean hand-editing a Data Store row in the console, which is exactly the kind of
+  // fiddly step that gets skipped and then looks like the model is broken.
+  //
+  // This route is the paste target for the Admin screen. It writes and never reads back: the
+  // value goes in, and afterwards the only thing any surface will tell you is whether a key is
+  // present, never what it is.
+  r.post('/admin/model-key', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin', 'DGP']);
+    const ALLOWED = {
+      offender: 'quickml.offenderEndpointKey',
+      spike: 'quickml.spikeRegressorEndpointKey',
+    };
+    const which = String((req.body || {}).model || '');
+    const value = String((req.body || {}).key || '').trim();
+    const configKey = ALLOWED[which];
+    if (!configKey) {
+      const e = new Error(`model must be one of: ${Object.keys(ALLOWED).join(', ')}`);
+      e.status = 400; e.code = 'bad_request'; throw e;
+    }
+    // A pasted key that arrived with surrounding quotes or whitespace fails silently at the
+    // endpoint with a 401 that looks like a permissions problem. Reject the obvious mistakes
+    // here, where the message can say what is actually wrong.
+    if (value.length < 32 || /[\s'"]/.test(value)) {
+      const e = new Error('That does not look like an endpoint key — expected a long unbroken '
+        + 'hex string with no quotes or spaces. Copy the X-QUICKML-ENDPOINT-KEY value only.');
+      e.status = 400; e.code = 'bad_request'; throw e;
+    }
+    const ok = await datastore.insertRows(req, 'AppConfig', [{ configKey, configValue: value }]);
+    // Audited like any other privileged write. The configKey is recorded; the value never is.
+    audit.record({ user: req.user, action: 'install_model_key', targetType: 'config',
+      targetId: configKey, ip: req.clientIp, req });
+    return {
+      installed: ok,
+      configKey,
+      model: which,
+      // Deliberately not echoed. A route that returns the secret it was just given turns every
+      // log and every browser history entry into a place the credential now lives.
+      note: ok
+        ? 'Key stored. The next scoring call will use the model; reload Forecast to see the '
+          + 'ranking switch from rule to model.'
+        : 'Write failed — see /ai/status datastore.diag for the reason. The model keeps '
+          + 'ranking by rule until a key is present.',
+    };
+  }));
+
   r.get('/ai/status', handle(async () => ({
     forecastModel: mlforecast.status(),
     quickml: quickml.status(),
