@@ -1755,6 +1755,12 @@ module.exports = {
     const src = load().caseAnomalies || {};
     const narrowed = user && (user.roleMeta.scope !== 'state' || user.drilledFromState);
     const did = narrowed ? String(user.districtId) : null;
+    // This endpoint stopped at the district for everyone below state, so an SHO was handed
+    // 763 flagged files from 120 stations -- and the response then labelled itself scope
+    // 'unit', which the screen read as neither district nor unit and printed "state-wide".
+    // Both halves were wrong in different directions. A station reads its own register.
+    const tier = (user && user.roleMeta && user.roleMeta.tier) || 'state';
+    const uid = (tier === 'station' ? user.unitId : (user && user.drillUnitId)) || null;
 
     let cases = (src.caseAnomalies || []).map((a) => {
       const c = db.cases.get(String(a.caseMasterId));
@@ -1762,6 +1768,7 @@ module.exports = {
         ...a,
         districtId: c ? String(c.districtId) : null,
         districtName: c ? c.districtName : '',
+        unitId: c ? String(c.unitId) : null,
         unitName: c ? c.unitName : '',
         crimeHead: c ? c.crimeHead : '',
         crimeSubHead: c ? c.crimeSubHead : '',
@@ -1769,6 +1776,7 @@ module.exports = {
       };
     });
     if (did) cases = cases.filter((a) => a.districtId === did);
+    if (uid) cases = cases.filter((a) => a.unitId === String(uid));
     cases.sort((a, b) => b.anomalyScore - a.anomalyScore);
 
     const unitDistrict = new Map();
@@ -1780,6 +1788,11 @@ module.exports = {
         districtName: st ? st.districtName : '' };
     });
     if (did) stations = stations.filter((a) => a.districtId === did);
+    // The station list is a supervisory instrument: it names registers whose false-case rate
+    // sits above their peers. An SHO cannot act on another station's, so at station rank it
+    // narrows to their own -- present when they ARE the outlier, which they need to know,
+    // and empty when they are not.
+    if (uid) stations = stations.filter((a) => String(a.unitId) === String(uid));
     stations.sort((a, b) => (b.falseRate - a.falseRate));
 
     return {
@@ -1787,7 +1800,10 @@ module.exports = {
       caseTotal: cases.length,
       stations,
       stationTotal: stations.length,
-      scope: scopeLabel(user, narrowed),
+      // The scope this response's DATA was filtered to, which is what the screen labels. It
+      // is not the same question as the reader's rank: a state officer drilled into one
+      // station holds state rank and is reading a unit.
+      scope: uid ? 'unit' : (did ? 'district' : 'state'),
     };
   },
   clusters: () => load().clusters,

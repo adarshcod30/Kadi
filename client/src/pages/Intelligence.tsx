@@ -246,8 +246,10 @@ function Outliers({ anomalies }: { anomalies: any }) {
         {stations.length > 0 && (
           <div className="rounded-card border border-warn/30 bg-warn/5 px-3 py-2.5">
             <div className="text-[13px] text-ink mb-1.5">
-              <b>{stations.length} station{stations.length > 1 ? 's' : ''}</b> closing
-              false cases well above their peer group
+              {anomalies.scope === 'unit'
+                ? <><b>This register</b> is closing false cases well above its peer group</>
+                : <><b>{stations.length} station{stations.length > 1 ? 's' : ''}</b> closing
+                  false cases well above their peer group</>}
             </div>
             {stations.slice(0, 4).map((a: any) => (
               <div key={a.unitId} className="text-[12.5px] text-ink-muted flex items-center gap-2">
@@ -264,8 +266,11 @@ function Outliers({ anomalies }: { anomalies: any }) {
 
         <div>
           <div className="label mb-1.5">
+            {/* Three scopes, not two. The old ternary had a branch for district and an else
+                for everything else, so a station read its own count as "state-wide". */}
             Most unusual case files — {anomalies.caseTotal.toLocaleString()} flagged
-            {anomalies.scope === 'district' ? ' in this district' : ' state-wide'}
+            {anomalies.scope === 'unit' ? ' on this register'
+              : anomalies.scope === 'district' ? ' in this district' : ' state-wide'}
           </div>
           {cases.length === 0 && (
             <div className="text-[12.5px] text-ink-muted">No case here departs from its peers this period.</div>
