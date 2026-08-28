@@ -578,3 +578,24 @@ test('forecasting: a live case in a new month must not move the corpus clock', (
   assert.ok(erAfter.total > 0, 'emerging risk must not collapse to zero');
   assert.strictEqual(erAfter.total, erBefore.total);
 });
+
+// The scope label an officer reads must name the district whose cases they are being shown.
+//
+// rbac holds its own id -> name map so it stays importable without loading the corpus, and
+// that copy had drifted: 25 of the 31 names disagreed with the district table, so ?district=6
+// announced "Tumakuru" while returning Kalaburagi's stations. Every screen that reads
+// capabilities().districtName was mislabelled, and nothing failed -- both halves were
+// internally consistent, they simply disagreed with each other. This is the assertion that
+// was missing.
+test('rbac district names match the corpus district table', () => {
+  const q = require('../api/services/queries');
+  const districts = q.db().lookups.districts;
+  const wrong = [];
+  for (const [id, row] of districts) {
+    const label = rbac.DISTRICT_NAMES[Number(id)];
+    if (label !== row.DistrictName) wrong.push(`${id}: rbac="${label}" corpus="${row.DistrictName}"`);
+  }
+  assert.deepStrictEqual(wrong, [], `district name drift:\n  ${wrong.join('\n  ')}`);
+  assert.strictEqual(Object.keys(rbac.DISTRICT_NAMES).length, districts.size,
+    'rbac must name every district in the corpus and no others');
+});

@@ -642,6 +642,22 @@ function agenda(ctx) {
   const openNow = blocks.reduce((a, b) => a + (b.items || []).length, 0);
   const dueWeek = clock.tally.critical;
 
+  // A written summary, computed rather than generated. The model gets the same numbers and
+  // usually phrases them better, but when it is unavailable the panel used to fall back to a
+  // generic key-value dump -- "the day's agenda for this state commander: records in view
+  // 16870" -- which is not a sentence anybody can act on. This is the floor.
+  const running = clock.tally.critical + clock.tally.soon + clock.tally.ok;
+  const lead = blocks.find((b) => (b.items || []).length);
+  const nounForTier = tier === 'station' ? 'on this register'
+    : tier === 'district' ? `across ${scopeName}` : `across ${scopeName}`;
+  const summary = clock.total === 0
+    ? `No case ${tier === 'station' ? 'on this register' : `in ${scopeName}`} is currently under investigation, so no charge-sheet window is running.`
+    : `${clock.tally.critical} charge-sheet${clock.tally.critical === 1 ? '' : 's'} fall${clock.tally.critical === 1 ? 's' : ''} due `
+      + `${nounForTier} within seven days and ${clock.tally.soon} more within three weeks. `
+      + `${running.toLocaleString()} of ${clock.total.toLocaleString()} open cases are still inside their window; `
+      + `${clock.tally.breached.toLocaleString()} are past it. `
+      + (lead ? `Start with ${lead.items[0].title} — ${lead.items[0].owner}.` : 'Nothing else is outstanding.');
+
   return {
     tier,
     framing,
@@ -650,6 +666,7 @@ function agenda(ctx) {
     clock: { ...clock.tally, total: clock.total, breachRate: pct(clock.tally.breached, clock.total) },
     openNow,
     dueWeek,
+    summary,
     blocks,
     basis: 'Every item here carries a date and a named post. The charge-sheet window is '
       + 'inferred from recorded gravity — Heinous 90 days, otherwise 60 — counted from the '

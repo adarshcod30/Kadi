@@ -249,8 +249,10 @@ export default function ReactPage() {
       {/* Header. The breadcrumb is not decoration -- it is the only thing on the page that
           says whether you are reading your own ground or somebody else's, and the whole
           delegate framing below depends on the reader knowing which. */}
-      <div className="flex items-start gap-3 flex-wrap">
-        <div className="min-w-0 flex-1">
+      {/* The scope badge sits at the far right of the header row, beside the page's other
+          control, the way Health does it — next to the title it read as part of the title. */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
           {(district || unit) && caps?.canViewWholeState && (
             <div className="text-[12px] text-ink-muted mb-1 flex items-center gap-1 flex-wrap">
               <button onClick={() => up('state')} className="hover:text-kadi-blue hover:underline">Karnataka</button>
@@ -264,7 +266,6 @@ export default function ReactPage() {
           )}
           <h1 className="text-xl font-semibold text-kadi-navy flex items-center gap-2 flex-wrap">
             <Zap size={19} className="text-kadi-gold" /> React
-            <TierChip tier={tier} label={data.scopeName} />
             <InfoDot label="What this page is" align="left" width="w-96">
               <b className="block mb-1 text-kadi-navy">A diary, not a report</b>
               An item earns a place here only if it has a date by which it must be done and one
@@ -290,10 +291,13 @@ export default function ReactPage() {
               : `What falls due in ${scopeWord}, and who owes it.`}
           </p>
         </div>
-        <button onClick={() => navigator.clipboard?.writeText(brief)}
-          className="flex items-center gap-1.5 text-[12.5px] rounded-ctl border border-line bg-surface px-3 py-1.5 hover:bg-kadi-blue50 hover:border-kadi-blue transition-colors">
-          <ClipboardCopy size={13} className="text-kadi-blue" /> Copy today's agenda
-        </button>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <TierChip tier={tier} label={data.scopeName} />
+          <button onClick={() => navigator.clipboard?.writeText(brief)}
+            className="flex items-center gap-1.5 text-[12.5px] rounded-ctl border border-line bg-surface px-3 py-1.5 hover:bg-kadi-blue50 hover:border-kadi-blue transition-colors">
+            <ClipboardCopy size={13} className="text-kadi-blue" /> Copy today's agenda
+          </button>
+        </div>
       </div>
 
       {/* The clock, as three numbers rather than one total. The old page led with 26,212 --

@@ -800,7 +800,9 @@ function buildApp() {
       offenders,
     });
     out.scope = caps.effectiveScope;
-    if (String(req.query.explain) === 'false' || !out.openNow) return out;
+    if (String(req.query.explain) === 'false' || !out.openNow) {
+      return { ...out, insight: out.summary, insightSource: 'deterministic' };
+    }
 
     // The narration is told what the officer is being asked to DO, not what is wrong. A
     // model given a list of problems writes a summary; given a list of obligations with
@@ -814,14 +816,20 @@ function buildApp() {
       + `of ${out.clock.total} open cases are still inside their window, and ${out.clock.breached} `
       + `are past it (${out.clock.breachRate}%).`,
     ];
-    out.blocks.forEach((b, idx) => {
-      findings.push(`${idx + 2}. ${b.title}: ${(b.items || []).length ? `${b.total} items` : 'nothing outstanding'}.`
-        + ((b.items || []).length ? ` The first is ${b.items[0].title}, owed by ${b.items[0].owner}.` : ''));
-    });
+    // ONE instruction, and nothing about the page itself. Handing over block titles and
+    // counts made the model narrate the furniture -- "Superintendents to speak to today are 5
+    // and the state's charge-sheet clock is 5" -- which is a description of a screen, not of
+    // a day. It gets the clock and the single most pressing obligation, and nothing else.
+    const lead = out.blocks.find((b) => (b.items || []).length);
+    if (lead) {
+      const i = lead.items[0];
+      findings.push(`2. The most pressing single item is ${i.title}, owed by ${i.owner}. `
+        + `The instruction for it is: ${i.action}`);
+    }
     const { text, source } = await insight.generate(req,
       `the day's agenda for this ${tier === 'state' ? 'state commander' : tier === 'district' ? 'district supervisor' : 'station officer'}`,
       { findings, recordsInView: String(out.clock.total) },
-      { maxTokens: 190, system: insight.SIGNALS_SYSTEM });
+      { maxTokens: 190, system: insight.SIGNALS_SYSTEM, fallbackText: out.summary });
     return { ...out, insight: text, insightSource: source };
   }));
 

@@ -60,8 +60,14 @@ function fallback(kind, facts) {
   return bits.length ? `${kind}: ${bits.join(', ')}.` : '';
 }
 
-async function generate(req, kind, facts, { maxTokens = 220, system = SYSTEM } = {}) {
-  if (!quickml.configured()) return { text: fallback(kind, facts), source: 'deterministic' };
+// `fallbackText` lets a caller supply its own deterministic sentence. The generic fallback
+// below flattens facts into "kind: key value, key value." -- serviceable for a band of
+// findings, unreadable as a headline paragraph. A surface that can phrase its own numbers
+// should, and then the model is an improvement on the floor rather than the only thing
+// standing between the reader and a key-value dump.
+async function generate(req, kind, facts, { maxTokens = 220, system = SYSTEM, fallbackText = null } = {}) {
+  const floor = () => ({ text: fallbackText || fallback(kind, facts), source: 'deterministic' });
+  if (!quickml.configured()) return floor();
   try {
     const out = await quickml.complete(req, {
       system,
@@ -70,10 +76,10 @@ async function generate(req, kind, facts, { maxTokens = 220, system = SYSTEM } =
       temperature: 0.35,
     });
     const text = (out || '').trim();
-    if (!text) return { text: fallback(kind, facts), source: 'deterministic' };
+    if (!text) return floor();
     return { text, source: 'glm-4.7-flash' };
   } catch {
-    return { text: fallback(kind, facts), source: 'deterministic' };
+    return floor();
   }
 }
 

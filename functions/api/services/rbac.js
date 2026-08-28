@@ -18,14 +18,23 @@
 // them linked to cases elsewhere), so the silo argument has something to show.
 // Names for the scope readout. Kept here rather than looked up from the store so rbac stays
 // free of a data dependency -- it is imported by tests that never load the corpus.
+// The id -> name map for the scope readout, kept here rather than looked up from the store
+// so rbac stays free of a data dependency: it is imported by tests that never load the corpus.
+//
+// That independence has a cost, and it was being paid. Twenty-five of these thirty-one names
+// had drifted out of step with the district table in the corpus, so `?district=6` labelled
+// itself Tumakuru while returning Kalaburagi's stations, and every screen that reads
+// capabilities().districtName -- the footer, the shell, the React breadcrumb -- named the
+// wrong district. The values below are now taken from the corpus table, and a test asserts
+// the two agree so the map cannot drift again in silence.
 const DISTRICT_NAMES = {
-  1: 'Bengaluru City', 2: 'Bengaluru Rural', 3: 'Mysuru', 4: 'Mandya', 5: 'Hassan',
-  6: 'Tumakuru', 7: 'Kalaburagi', 8: 'Ballari', 9: 'Vijayapura', 10: 'Belagavi',
-  11: 'Dharwad', 12: 'Hubballi-Dharwad', 13: 'Udupi', 14: 'Dakshina Kannada',
-  15: 'Uttara Kannada', 16: 'Shivamogga', 17: 'Chitradurga', 18: 'Davanagere',
-  19: 'Kolar', 20: 'Chikkaballapura', 21: 'Ramanagara', 22: 'Chamarajanagar',
-  23: 'Kodagu', 24: 'Chikkamagaluru', 25: 'Haveri', 26: 'Gadag', 27: 'Bagalkote',
-  28: 'Koppal', 29: 'Raichur', 30: 'Yadgir', 31: 'Bidar',
+  1: 'Bengaluru City', 2: 'Bengaluru Rural', 3: 'Mysuru', 4: 'Dakshina Kannada', 5: 'Belagavi',
+  6: 'Kalaburagi', 7: 'Hubballi-Dharwad', 8: 'Ballari', 9: 'Vijayapura', 10: 'Shivamogga',
+  11: 'Tumakuru', 12: 'Davanagere', 13: 'Udupi', 14: 'Hassan', 15: 'Mandya',
+  16: 'Chitradurga', 17: 'Kolar', 18: 'Raichur', 19: 'Bidar', 20: 'Koppal',
+  21: 'Haveri', 22: 'Gadag', 23: 'Chikkamagaluru', 24: 'Chamarajanagar', 25: 'Kodagu',
+  26: 'Bagalkote', 27: 'Yadgir', 28: 'Chikkaballapura', 29: 'Ramanagara', 30: 'Uttara Kannada',
+  31: 'Dharwad',
 };
 
 const STATION_UNIT_ID = '46';
@@ -206,6 +215,6 @@ function capabilities(user) {
 }
 
 module.exports = {
-  ROLES, ALIASES, DEMO_USERS, userFromRequest, userFromToken, caseInScope, requireRole, capabilities,
+  ROLES, ALIASES, DEMO_USERS, DISTRICT_NAMES, userFromRequest, userFromToken, caseInScope, requireRole, capabilities,
   STATION_UNIT_ID, STATION_NAME,
 };
