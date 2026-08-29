@@ -22,7 +22,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Send, Mic, MicOff, FileDown, ShieldCheck, Volume2, VolumeX, Languages,
-  AlertTriangle, Sparkles, BookOpen, Database, Square,
+  AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage,
 } from 'lucide-react';
 import { useAssistant, useExport, useTranslate } from '../api/hooks';
 import { useLang, useTx } from '../lib/i18n';
@@ -37,6 +37,10 @@ interface Msg {
   res?: AssistantResponse;
   alt?: string;          // the other-language rendering, once asked for
   altLang?: string;
+  // Set on answers read from an image the user supplied. A third kind of claim, and the
+  // reader must be able to tell it from the register at a glance: the register is a record,
+  // a photograph is a photograph.
+  doc?: { answer: string; model?: string; ms?: number; refused?: boolean; filename?: string };
 }
 
 const SUGGESTIONS = [
@@ -82,6 +86,11 @@ export default function Assistant() {
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [reading, setReading] = useState(false);
   const voices = useVoices();
 
   const speechSupported = typeof window !== 'undefined'
@@ -115,6 +124,100 @@ export default function Assistant() {
    * English for a button they pressed in Kannada is the same half-done feeling this page was
    * rebuilt to remove.
    */
+  // Recording, on the server, with Zia's Audio-to-Text model.
+  //
+  // Browser Web Speech is kept below as the fallback, but it is no longer the primary path:
+  // it is Chrome and Edge only, and its Kannada is patchy enough that the interface used to
+  // tell everyone else to type instead. MediaRecorder plus a server model works in every
+  // browser and transcribes Kannada exactly -- checked by round-tripping synthesised speech
+  // back through it.
+  const stopRecording = () => {
+    try { mediaRef.current?.stop(); } catch { /* already stopped */ }
+    mediaRef.current?.stream?.getTracks?.().forEach((t) => t.stop());
+    mediaRef.current = null;
+    setListening(false);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
+        chunksRef.current = [];
+        // Too short to be speech. Saying so beats sending a click to a model and showing
+        // whatever it makes of it.
+        if (blob.size < 2048) {
+          setNotice({ kind: 'warn', text: tx('Nothing was recorded. Hold the button while speaking.') });
+          return;
+        }
+        setTranscribing(true);
+        try {
+          const r = await fetch(`${API_BASE}/assistant/transcribe?lang=${lang}`, {
+            method: 'POST',
+            headers: { 'Content-Type': blob.type || 'audio/webm' },
+            body: blob,
+          });
+          const j = await r.json();
+          const text = j?.data?.text;
+          if (text) { setInput(text); send(text); } else {
+            setNotice({
+              kind: 'warn',
+              text: tx('That could not be transcribed. Try again, or type the question.'),
+            });
+          }
+        } catch {
+          setNotice({ kind: 'warn', text: tx('Transcription is unavailable right now.') });
+        } finally { setTranscribing(false); }
+      };
+      mr.start();
+      mediaRef.current = mr;
+      setListening(true);
+      setNotice(null);
+    } catch {
+      setNotice({
+        kind: 'warn',
+        text: tx('Microphone access was refused. Allow it in the browser address bar, then try again.'),
+      });
+    }
+  };
+
+  // Reading a document or photograph the officer is holding.
+  //
+  // The answer is pinned to the image and shown as its own kind of message. It is never
+  // merged into an answer about the register, because only one of the two is a record.
+  const readDocument = async (file: File) => {
+    if (!file) return;
+    const q = input.trim() || 'What does this document say? List every field you can read.';
+    setMsgs((m) => [...m, { role: 'user', content: `${q}  ·  ${file.name}` }]);
+    setInput('');
+    setReading(true);
+    try {
+      const r = await fetch(`${API_BASE}/assistant/document?q=${encodeURIComponent(q)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      const j = await r.json();
+      const d = j?.data;
+      setMsgs((m) => [...m, {
+        role: 'assistant',
+        content: d?.answer || tx('The document could not be read.'),
+        doc: {
+          answer: d?.answer || '', model: d?.model, ms: d?.ms,
+          refused: Boolean(d?.refused), filename: file.name,
+        },
+      }]);
+    } catch {
+      setMsgs((m) => [...m, {
+        role: 'assistant', content: tx('The document reader is unavailable right now.'),
+        doc: { answer: '', filename: file.name },
+      }]);
+    } finally { setReading(false); }
+  };
+
   const send = async (text: string, display?: string) => {
     const q = text.trim();
     if (!q || inFlight.current) return;
@@ -197,8 +300,23 @@ export default function Assistant() {
   };
 
   const toggleMic = () => {
+    // Server transcription first, wherever the browser can record at all -- which is
+    // everywhere that matters, and unlike Web Speech it is not limited to two browsers and
+    // does Kannada properly. Web Speech stays below as the fallback.
+    // typeof on the method rather than truthiness: TypeScript types getUserMedia as always
+    // present, so `&& navigator.mediaDevices?.getUserMedia` is a condition it can prove true
+    // and warns about. The runtime question -- does this browser actually have it -- is real.
+    const canRecord = typeof navigator !== 'undefined'
+      && typeof navigator.mediaDevices !== 'undefined'
+      && typeof navigator.mediaDevices.getUserMedia === 'function'
+      && typeof MediaRecorder !== 'undefined';
+    if (canRecord) {
+      if (listening) { stopRecording(); return; }
+      startRecording();
+      return;
+    }
     if (!speechSupported) {
-      setNotice({ kind: 'warn', text: tx('Voice input needs Chrome or Edge. Type the question instead.') });
+      setNotice({ kind: 'warn', text: tx('Voice input is not available in this browser. Type the question instead.') });
       return;
     }
     if (listening) { try { recRef.current?.stop(); } catch { /* already stopping */ } setListening(false); return; }
@@ -400,6 +518,36 @@ export default function Assistant() {
                 </div>
               )}
 
+              {/* The third kind of claim. A photograph is not a record, and the badge says which
+                  one the reader is looking at before they act on it. */}
+              {m.doc && (
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[11px]">
+                  {m.doc.refused ? (
+                    <span className="chip bg-surface-3 text-ink-muted border border-line flex items-center gap-1">
+                      <FileImage size={10} /> {tx('Not answered')}
+                    </span>
+                  ) : (
+                    <span className="chip bg-kadi-gold/25 text-ink border border-kadi-gold/40 flex items-center gap-1">
+                      <FileImage size={10} /> {tx('Read from the document you supplied')}
+                    </span>
+                  )}
+                  {m.doc.filename && (
+                    <span className="text-ink-subtle truncate max-w-[12rem]">{m.doc.filename}</span>
+                  )}
+                  {m.doc.ms ? <span className="text-ink-subtle font-num">{m.doc.ms} ms</span> : null}
+                  <InfoDot label="About document reading" align="left" width="w-80">
+                    <b className="block mb-1 text-kadi-navy">Grounded in the image, and only the image</b>
+                    This answer comes from the picture you just supplied. It is not mixed with the
+                    case database, and the image is not stored.
+                    <b className="block mt-1.5 text-kadi-navy">What it will not do</b>
+                    It does not identify people from photographs and will not answer questions
+                    about caste, religion or community. If a field is not legible in the image it
+                    says so rather than guessing — an invented FIR number or registration mark is
+                    worse than no answer.
+                  </InfoDot>
+                </div>
+              )}
+
               {m.res && (
                 <div className="mt-2 space-y-2">
                   {/* Where the answer came from. Records and knowledge base are different kinds
@@ -457,13 +605,28 @@ export default function Assistant() {
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mt-3 flex gap-2">
-        <button type="button" onClick={toggleMic} title={tx('Voice')}
-          className={`btn ${listening ? 'bg-danger text-white animate-pulse' : 'btn-outline'} ${!speechSupported ? 'opacity-50' : ''}`}>
+        <button type="button" onClick={toggleMic}
+          title={listening ? tx('Stop recording') : tx('Ask by voice')}
+          aria-label={listening ? tx('Stop recording') : tx('Ask by voice')}
+          disabled={transcribing}
+          className={`btn ${listening ? 'bg-danger text-white animate-pulse' : 'btn-outline'} ${transcribing ? 'opacity-50' : ''}`}>
           {listening ? <MicOff size={18} /> : <Mic size={18} />}
+        </button>
+        {/* Reading a document. accept + capture means a phone opens the camera and a desktop
+            opens the file picker, from the same control. */}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) readDocument(f); e.target.value = ''; }} />
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={reading}
+          title={tx('Read a document or photograph')} aria-label={tx('Read a document or photograph')}
+          className={`btn btn-outline ${reading ? 'opacity-50' : ''}`}>
+          <FileImage size={18} />
         </button>
         <div className="flex-1 relative">
           <input value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder={listening ? tx('Listening…') : tx('Ask a question…')}
+            placeholder={listening ? tx('Recording… tap the microphone to stop')
+              : transcribing ? tx('Transcribing…')
+                : reading ? tx('Reading the document…')
+                  : tx('Ask a question, or attach a document…')}
             className={`input w-full ${kn ? 'kn' : ''}`} />
           {/* Live transcript sits under the box rather than overwriting what was typed. */}
           {interim && (
