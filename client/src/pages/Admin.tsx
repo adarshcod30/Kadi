@@ -38,6 +38,12 @@ export default function Admin() {
 
       {canAdmin && <AdminControls />}
 
+      {canAdmin && <ModelServing />}
+
+      {canAdmin && <DataArtifacts />}
+
+      {canAdmin && <AiServices />}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title={<span className="flex items-center gap-2"><ShieldCheck size={16} className="text-kadi-blue" /> Fairness & evaluation</span>}>
           <div className="p-4 space-y-3 text-sm">
@@ -51,14 +57,6 @@ export default function Admin() {
               </div>
             )}
             <div className="text-xs text-ink-muted">Ground-truth eval runs on planted synthetic patterns; target ≥ 90%.</div>
-          </div>
-        </Section>
-
-        <Section title={<span className="flex items-center gap-2"><Cpu size={16} className="text-kadi-blue" /> Pipeline status</span>}>
-          <div className="p-4 space-y-2 text-sm">
-            <Row label="Entity resolution" ok /><Row label="Case-linkage graph build" ok /><Row label="Community detection" ok />
-            <Row label="Risk scoring" ok /><Row label="Health metrics" ok /><Row label="Anomaly + spatial" ok />
-            <div className="text-xs text-ink-muted pt-2">Heavy compute runs in AppSail / Catalyst Jobs (nightly Cron). The app reads precomputed results only.</div>
           </div>
         </Section>
 
@@ -393,6 +391,196 @@ function AccessRequests() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------------------
+// WHAT REPLACED THE "PIPELINE STATUS" PANEL, AND WHY.
+//
+// That panel listed six stages and reported every one of them ok. It could not have reported
+// anything else: nothing on the page read anything about the artifacts, so the six ticks were
+// drawn from a hard-coded array. A status display that cannot show a fault is worse than none,
+// because it is trusted and it is decorative — an administrator looking at a green board had
+// no way to learn that the knowledge base had been returning nothing for weeks, or that a
+// model was falling back to its rule.
+//
+// These three panels read the real thing off /admin/overview: what each derived artifact
+// contains and when it was built, which models are actually serving by model rather than by
+// rule and whether their key is installed, and what the AI surfaces report about themselves.
+// ---------------------------------------------------------------------------------------
+function useOverview() {
+  return useQuery({
+    queryKey: ['admin-overview'],
+    queryFn: () => api.get<any>('/admin/overview'),
+    retry: false,
+  });
+}
+
+/** The AUC track from Forecast, at admin scale: grey to the rule, teal for what the model adds. */
+function Margin({ model, rule }: { model: number; rule: number }) {
+  const pct = (v: number) => Math.max(0, Math.min(100, ((v - 0.5) / 0.5) * 100));
+  const r = pct(rule); const m = pct(model);
+  return (
+    <div className="relative h-1.5 w-24 rounded-full bg-surface-3 overflow-hidden shrink-0">
+      <div className="absolute inset-y-0 left-0 bg-ink-subtle/35" style={{ width: `${r}%` }} />
+      <div className="absolute inset-y-0 bg-kadi-teal"
+        style={{ left: `${Math.min(r, m)}%`, width: `${Math.max(Math.abs(m - r), 0.8)}%` }} />
+    </div>
+  );
+}
+
+function ModelServing() {
+  const { data, isLoading, error } = useOverview();
+  const models = data?.models || [];
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <Cpu size={16} className="text-kadi-blue" /> Models
+      <span className="text-[12px] font-normal text-ink-muted">
+        {models.length ? `${models.length} serving · ${models.filter((m: any) => m.keyInstalled).length} keys installed` : ''}
+      </span>
+      <InfoDot label="How to read this" align="left" width="w-96">
+        <b className="block mb-1 text-kadi-navy">Every model is shown against the rule it must beat</b>
+        Grey is what the best simple rule reaches on the same question; teal is what the model
+        adds. A model serves only while its measured margin holds — the check reads the
+        measurement, not a flag, so a revised number unplugs the model by itself.
+        <b className="block mt-1.5 text-kadi-navy">Key installed</b>
+        Whether a QuickML endpoint key is present in AppConfig. Without one the panel falls back
+        to the rule and says so rather than pretending.
+      </InfoDot>
+    </span>}>
+      {isLoading && <div className="p-4 text-sm text-ink-muted">Reading the serving modules…</div>}
+      {error && <div className="p-4 text-sm text-danger">Could not read model status.</div>}
+      {!isLoading && !error && (
+        <div className="divide-y divide-line/70">
+          {models.map((m: any) => (
+            <div key={m.slug} className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
+              <span className="font-mono text-[11px] text-ink-subtle w-24 shrink-0">{m.slug}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] text-ink">{m.question}</div>
+                <div className="text-[11.5px] text-ink-subtle">{m.family}</div>
+              </div>
+              <Margin model={m.auc} rule={m.rule} />
+              <span className="font-num text-[12px] whitespace-nowrap">
+                <span className="font-semibold text-ink">{m.auc.toFixed(3)}</span>
+                <span className="text-ink-subtle"> vs {m.rule.toFixed(3)}</span>
+                <span className="ml-1.5 font-semibold text-kadi-teal">+{m.margin.toFixed(3)}</span>
+              </span>
+              <span className={`chip text-[10.5px] ${m.keyInstalled
+                ? 'bg-kadi-teal/10 text-kadi-teal border border-kadi-teal/40'
+                : 'bg-surface-2 text-ink-muted border border-line'}`}>
+                {m.keyInstalled ? 'key installed' : 'no key — ranks by rule'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function DataArtifacts() {
+  const { data, isLoading } = useOverview();
+  const arts = data?.artifacts || [];
+  const sets = data?.trainingSets || [];
+  const mb = ((data?.artifactBytes || 0) / 1048576).toFixed(1);
+  const stale = arts.filter((a: any) => a.ageDays > 7);
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <Database size={16} className="text-kadi-blue" /> Derived artifacts
+      <span className="text-[12px] font-normal text-ink-muted">
+        {arts.length ? `${arts.length} files · ${mb} MB` : ''}
+      </span>
+    </span>}>
+      {isLoading ? <div className="p-4 text-sm text-ink-muted">Reading the store…</div> : (
+        <div className="p-4 space-y-3">
+          {/* Freshness stated as a fact rather than a tick. If something is stale this is where
+              an administrator finds out, which the six green rows here before could never say. */}
+          <div className="text-[12.5px] text-ink-muted">
+            {stale.length === 0
+              ? `Every artifact was rebuilt within the last week. Newest ${arts[0]?.ageDays ?? 0} days old.`
+              : `${stale.length} artifact${stale.length === 1 ? '' : 's'} older than seven days — the app is reading what the pipeline last wrote, not what it would write today.`}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {sets.map((t: any) => (
+              <div key={t.name} className="rounded-ctl border border-line bg-surface-2 p-3">
+                <div className="text-[13px] font-medium text-ink">{t.name}</div>
+                <div className="text-[11.5px] text-ink-subtle mt-0.5">{t.grain}</div>
+                <div className="mt-2 font-num text-[12px] text-ink">
+                  {Number(t.rows).toLocaleString()} rows · {t.features} features
+                </div>
+                <div className="font-num text-[11.5px] text-ink-subtle">{t.from} → {t.to}</div>
+              </div>
+            ))}
+          </div>
+          <details>
+            <summary className="text-[12.5px] text-kadi-blue cursor-pointer">
+              All {arts.length} files
+            </summary>
+            <div className="mt-2 max-h-64 overflow-y-auto rounded-ctl border border-line">
+              <table className="w-full text-[12px]">
+                <tbody>
+                  {arts.map((a: any) => (
+                    <tr key={a.file} className="border-b border-line/60 last:border-0">
+                      <td className="px-3 py-1.5 font-mono text-ink">{a.file}</td>
+                      <td className="px-3 py-1.5 text-right font-num text-ink-subtle">
+                        {(a.bytes / 1024).toFixed(0)} KB
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-num text-ink-subtle">
+                        {a.ageDays}d
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function AiServices() {
+  const { data, isLoading } = useOverview();
+  const ai = data?.ai || {};
+  const kb = ai.knowledgeBase || {};
+  const dr = ai.documentReader || {};
+  const nlp = ai.nlp || {};
+  const langs = nlp?.models?.translate?.languages || [];
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <Sliders size={16} className="text-kadi-blue" /> AI services
+    </span>}>
+      {isLoading ? <div className="p-4 text-sm text-ink-muted">Probing…</div> : (
+        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-[12.5px]">
+          <div className="rounded-ctl border border-line bg-surface-2 p-3">
+            <div className="text-[13px] font-medium text-ink">Knowledge base</div>
+            <div className="text-ink-muted mt-1">
+              {kb.ragDocumentsCached
+                ? `${kb.ragDocumentsCached} documents indexed and answering.`
+                : 'No documents cached yet — the first question of the session loads them.'}
+            </div>
+            <div className="text-ink-subtle mt-1">Answers questions of meaning, not of count.</div>
+          </div>
+          <div className="rounded-ctl border border-line bg-surface-2 p-3">
+            <div className="text-[13px] font-medium text-ink">Document reader</div>
+            <div className="text-ink-muted mt-1">{dr.model || '—'}</div>
+            <div className="text-ink-subtle mt-1">
+              Refuses identification of people and any question about caste, religion or community.
+            </div>
+          </div>
+          <div className="rounded-ctl border border-line bg-surface-2 p-3">
+            <div className="text-[13px] font-medium text-ink">Speech &amp; translation</div>
+            <div className="text-ink-muted mt-1">
+              {langs.length ? `Translation across ${langs.length} languages.` : '—'}
+            </div>
+            <div className="text-ink-subtle mt-1">
+              Speech in and out for English, Hindi and Kannada.
+            </div>
+          </div>
         </div>
       )}
     </Section>
