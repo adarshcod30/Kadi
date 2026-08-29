@@ -33,11 +33,29 @@ const TIMEOUT_MS = Number(process.env.ZIA_NLP_TIMEOUT_MS || 12000);
 // language before spending a round trip finding out.
 const TRANSLATE_LANGS = ['en', 'hi', 'kn', 'ta', 'te', 'ml', 'mr', 'bn', 'gu', 'pa', 'or'];
 const SPEECH_LANGS = ['en', 'hi', 'kn'];
+// THE ROSTER THE ENDPOINT ACTUALLY HAS, WHICH IS NOT THE ONE THE CONSOLE DOCUMENTS.
+//
+// The console's model card lists English male as Thomas, Adam, Brian. Asking for Thomas returns
+//
+//     400 {"message":"Speaker 'Thomas' is not available for language 'en'."}
+//
+// while David and Emma -- documented nowhere -- return valid audio. Every one of the twelve was
+// called to find this out, and a nonsense name was called too, to confirm the endpoint really
+// validates rather than silently substituting a default. Hindi and Kannada match their card.
+//
+// Recorded here because the documentation is the thing a reader would trust, and on this point
+// it is wrong.
 const SPEAKERS = {
-  en: { male: ['Thomas', 'Adam', 'Brian'], female: ['Mary', 'Anna', 'Beth'] },
+  en: { male: ['Adam', 'Brian', 'David'], female: ['Mary', 'Anna', 'Beth', 'Emma'] },
   hi: { male: ['Rohit', 'Aman'], female: ['Divya', 'Rani'] },
   kn: { male: ['Suresh', 'Chetan'], female: ['Anu', 'Vidya'] },
 };
+// What the model accepts alongside a speaker. All three were sitting unused: every request went
+// out moderate/moderate/neutral, which is the flattest combination on offer and a fair part of
+// why the voice was described as robotic.
+const PITCH = ['low', 'moderate', 'high'];
+const SPEED = ['slow', 'moderate', 'fast'];
+const EMOTION = ['neutral', 'happy', 'sad', 'angry'];
 
 let lastError = null;
 const errors = {};
@@ -228,6 +246,7 @@ async function probe(req) {
 }
 
 module.exports = {
+  SPEAKERS, PITCH, SPEED, EMOTION,
   translate, speak, transcribe, status, probe,
   TRANSLATE_LANGS, SPEECH_LANGS, SPEAKERS,
 };

@@ -280,6 +280,16 @@ function buildApp() {
   //
   // Returns audio/wav bytes, or 503 with a reason the interface can show. It never falls back
   // to an English voice reading Kannada text: that is noise, not an accent.
+  // What voices exist, so the interface can offer them instead of hard-coding a list that is
+  // already wrong once (the console documents a Thomas the endpoint does not have).
+  r.get('/tts/voices', handle(async () => ({
+    speakers: zianlp.SPEAKERS,
+    pitch: zianlp.PITCH,
+    speed: zianlp.SPEED,
+    emotion: zianlp.EMOTION,
+    note: 'Read off the deployed endpoint, not the model card — the two disagree on English.',
+  })));
+
   r.post('/tts', async (req, res) => {
     try {
       const { text, lang = 'en', speaker, speed, pitch, emotion } = req.body || {};

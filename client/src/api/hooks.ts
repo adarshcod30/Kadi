@@ -324,3 +324,9 @@ export const useTranslate = () =>
         engine: string; translated: number; total: number;
       }>('/translate', { texts: v.texts, to: v.to || 'kn' }),
   });
+
+// The voices the deployed TTS endpoint actually has. Fetched rather than hard-coded: the
+// console's model card lists an English speaker the endpoint refuses, so a list compiled from
+// the documentation would be wrong on first use.
+export const useServerVoices = () =>
+  useQuery({ queryKey: ['tts-voices'], queryFn: () => api.get<any>('/tts/voices'), staleTime: Infinity });

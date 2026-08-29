@@ -24,7 +24,7 @@ import {
   Send, Mic, MicOff, FileDown, ShieldCheck, Volume2, VolumeX, Languages,
   AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage, Copy, ChevronDown,
 } from 'lucide-react';
-import { useAssistant, useExport, useTranslate } from '../api/hooks';
+import { useAssistant, useExport, useTranslate, useServerVoices } from '../api/hooks';
 import { useLang, useTx } from '../lib/i18n';
 import { API_BASE } from '../lib/api';
 import { InfoDot } from '../components/InfoDot';
@@ -157,6 +157,14 @@ export default function Assistant() {
   // Last resolved case / district / crime head. A ref rather than state: it must be current at
   // the moment send() runs, and it never needs to trigger a render of its own.
   const convo = useRef<Record<string, unknown>>({});
+  // Which voice reads each language, and how. Every request used to go out on the first female
+  // voice at moderate/neutral — the flattest combination the model offers.
+  const [voicePref, setVoicePref] = useState<Record<string, string>>(
+    () => { try { return JSON.parse(localStorage.getItem('kadi.voices') || '{}'); } catch { return {}; } },
+  );
+  const [speed, setSpeed] = useState('moderate');
+  const [emotion, setEmotion] = useState('neutral');
+  const { data: ttsVoices } = useServerVoices();
   const [transcribing, setTranscribing] = useState(false);
   const [reading, setReading] = useState(false);
   const voices = useVoices();
@@ -402,6 +410,48 @@ export default function Assistant() {
     setAudible(false);
   };
 
+  // SPLITTING A MIXED ANSWER BY SCRIPT BEFORE SPEAKING IT.
+  //
+  // A Kannada answer is not purely Kannada. It carries station names, an FIR number, a figure:
+  // "ಈ ಪ್ರಕರಣ Dharwad Colony PS ನಲ್ಲಿ ದಾಖಲಾಗಿದೆ". Handing that whole string to one Kannada voice
+  // makes it read Latin script with Kannada phonetics, which is the stumble that gets described
+  // as robotic — it is not the voice, it is the wrong voice for that run of characters.
+  //
+  // So the text is cut into runs of one script and each run is spoken by the engine that owns
+  // it, played in order. Digits and punctuation attach to whichever run they follow, because a
+  // number belongs to the sentence around it: "40 links" read by the English voice mid-Kannada
+  // sentence sounds worse than the Kannada voice counting to forty.
+  const KN_RANGE = /[\u0C80-\u0CFF]/;
+  const segments = (text: string): { text: string; lang: 'kn' | 'en' }[] => {
+    const out: { text: string; lang: 'kn' | 'en' }[] = [];
+    let buf = '';
+    let cur: 'kn' | 'en' | null = null;
+    for (const ch of text) {
+      const isKn = KN_RANGE.test(ch);
+      const isNeutral = !/[A-Za-z\u0C80-\u0CFF]/.test(ch);
+      const want: 'kn' | 'en' | null = isNeutral ? cur : (isKn ? 'kn' : 'en');
+      // Leading digits and punctuation belong to the run that follows them. Assigning cur here
+      // and overwriting buf dropped them: "16,136 cases are slipping" was spoken as "cases are
+      // slipping", losing the only figure in the sentence before it reached the voice.
+      if (cur === null) { buf += ch; if (want !== null) cur = want; continue; }
+      if (want === null || want === cur) { buf += ch; continue; }
+      if (buf.trim()) out.push({ text: buf, lang: cur });
+      cur = want; buf = ch;
+    }
+    if (buf.trim() && cur) out.push({ text: buf, lang: cur });
+    // A run of two characters is a fragment, not a sentence — fold it into its neighbour rather
+    // than switching voice for "PS".
+    return out.reduce<{ text: string; lang: 'kn' | 'en' }[]>((acc, seg) => {
+      const prev = acc[acc.length - 1];
+      if (prev && (seg.text.trim().length < 3 || prev.text.trim().length < 3)) {
+        prev.text += seg.text;
+        return acc;
+      }
+      acc.push({ ...seg });
+      return acc;
+    }, []);
+  };
+
   /**
    * Read an answer aloud, browser first and Zia second.
    *
@@ -416,23 +466,45 @@ export default function Assistant() {
     const wantKn = l === 'kn';
     const localVoice = wantKn ? knVoice : enVoice;
 
-    if (!ttsSupported || !localVoice) {
+    // Server voice. Always used for a mixed-script answer even when the browser has a voice,
+    // because the browser has exactly one per utterance and a mixed sentence needs two.
+    const parts = segments(text);
+    const mixed = parts.length > 1;
+    if (!ttsSupported || !localVoice || mixed) {
       try {
         setSpeakingIdx(idx);
-        const res = await fetch(`${API_BASE}/tts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang: wantKn ? 'kn' : 'en' }),
-        });
-        if (!res.ok) throw new Error('tts');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
         const el = audioRef.current || new Audio();
         audioRef.current = el;
-        el.src = url;
-        el.onended = () => { setSpeakingIdx(null); URL.revokeObjectURL(url); };
-        el.onerror = () => { setSpeakingIdx(null); URL.revokeObjectURL(url); };
-        await el.play();
+        // Each run fetched and played in order. Sequential rather than concatenated: the model
+        // returns a complete WAV per call, and stitching two WAV headers together produces a
+        // file that plays the first and stops.
+        for (const seg of parts) {
+          // eslint-disable-next-line no-await-in-loop
+          const res = await fetch(`${API_BASE}/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: seg.text,
+              lang: seg.lang,
+              speaker: voicePref[seg.lang] || undefined,
+              speed, emotion,
+            }),
+          });
+          if (!res.ok) throw new Error('tts');
+          // eslint-disable-next-line no-await-in-loop
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          el.src = url;
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>((resolve, reject) => {
+            el.onended = () => { URL.revokeObjectURL(url); resolve(); };
+            el.onerror = () => { URL.revokeObjectURL(url); reject(new Error('play')); };
+            el.play().catch(reject);
+          });
+          // Stopped mid-sequence: honour it rather than starting the next run.
+          if (!audioRef.current) break;
+        }
+        setSpeakingIdx(null);
       } catch {
         setSpeakingIdx(null);
         setNotice({
@@ -620,6 +692,51 @@ export default function Assistant() {
             <Mic size={11} /> {tx('Voice input unavailable in this browser')}
           </span>
         )}
+        {/* The voice, chosen rather than inherited. Every answer used to be read by the first
+            female voice in the list at moderate speed and neutral emotion, because that is what
+            female[0] and two defaults give you — nobody picked it. Kept as one quiet control
+            that opens rather than a row of three selects. */}
+        {ttsVoices?.speakers && (
+          <details className="relative">
+            <summary className="flex items-center gap-1 cursor-pointer hover:text-kadi-blue list-none">
+              <Volume2 size={11} /> {tx('Voice')}
+            </summary>
+            <div className="absolute z-30 mt-1 w-64 card p-3 space-y-2 shadow-hover text-[11.5px]">
+              {(['en', 'kn'] as const).map((l) => (
+                <label key={l} className="block">
+                  <span className="text-ink-muted">{l === 'en' ? tx('English voice') : tx('Kannada voice')}</span>
+                  <select
+                    value={voicePref[l] || ''}
+                    onChange={(e) => {
+                      const next = { ...voicePref, [l]: e.target.value };
+                      setVoicePref(next);
+                      try { localStorage.setItem('kadi.voices', JSON.stringify(next)); } catch { /* quota */ }
+                    }}
+                    className="input w-full mt-0.5 text-[12px]">
+                    <option value="">{tx('Default')}</option>
+                    {[...(ttsVoices.speakers[l]?.female || []), ...(ttsVoices.speakers[l]?.male || [])]
+                      .map((v: string) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </label>
+              ))}
+              <label className="block">
+                <span className="text-ink-muted">{tx('Speed')}</span>
+                <select value={speed} onChange={(e) => setSpeed(e.target.value)}
+                  className="input w-full mt-0.5 text-[12px]">
+                  {(ttsVoices.speed || []).map((v: string) => <option key={v} value={v}>{tx(v)}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-ink-muted">{tx('Delivery')}</span>
+                <select value={emotion} onChange={(e) => setEmotion(e.target.value)}
+                  className="input w-full mt-0.5 text-[12px]">
+                  {(ttsVoices.emotion || []).map((v: string) => <option key={v} value={v}>{tx(v)}</option>)}
+                </select>
+              </label>
+            </div>
+          </details>
+        )}
+
         {/* Turning this off silences what is already playing. Leaving the current answer to
             finish after the reader has just said "stop speaking to me" is the wrong reading of
             the control. */}

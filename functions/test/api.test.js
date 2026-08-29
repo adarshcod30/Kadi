@@ -854,3 +854,50 @@ test('every audited action has a human label on the Audit page', () => {
   assert.deepStrictEqual(missing, [],
     `these actions are recorded by the server and have no label on the Audit page: ${missing.join(', ')}`);
 });
+
+// A mixed-script answer is spoken by two voices, one per run, because handing
+// "ಈ ಪ್ರಕರಣ Dharwad Colony PS ನಲ್ಲಿ" to a single Kannada voice makes it read Latin script with
+// Kannada phonetics — the stumble that gets reported as "robotic". The split must be LOSSLESS:
+// an early version dropped leading digits, so "16,136 cases are flagged" was spoken as "cases
+// are flagged" and the only figure in the sentence never reached the reader.
+test('splitting an answer by script loses no characters', () => {
+  const KN = /[ಀ-೿]/;
+  // The same routine the Assistant page uses to segment before speaking.
+  const segments = (text) => {
+    const out = []; let buf = ''; let cur = null;
+    for (const ch of text) {
+      const isNeutral = !/[A-Za-zಀ-೿]/.test(ch);
+      const want = isNeutral ? cur : (KN.test(ch) ? 'kn' : 'en');
+      if (cur === null) { buf += ch; if (want !== null) cur = want; continue; }
+      if (want === null || want === cur) { buf += ch; continue; }
+      if (buf.trim()) out.push({ text: buf, lang: cur });
+      cur = want; buf = ch;
+    }
+    if (buf.trim() && cur) out.push({ text: buf, lang: cur });
+    return out.reduce((acc, seg) => {
+      const prev = acc[acc.length - 1];
+      if (prev && (seg.text.trim().length < 3 || prev.text.trim().length < 3)) {
+        prev.text += seg.text; return acc;
+      }
+      acc.push({ ...seg }); return acc;
+    }, []);
+  };
+
+  const cases = [
+    '16,136 cases are flagged as slipping.',
+    'ಈ ಪ್ರಕರಣ Dharwad Colony PS ನಲ್ಲಿ ದಾಖಲಾಗಿದೆ.',
+    'ಎಫ್ಐಆರ್ 100310297202500003 — Crimes Against Body, ಸ್ಥಿತಿ Charge Sheeted.',
+    '2026 ಸಾಲಿನ ಪ್ರಕರಣ',
+    'Plain English with no Kannada at all.',
+  ];
+  for (const c of cases) {
+    const segs = segments(c);
+    assert.strictEqual(segs.map((s) => s.text).join(''), c,
+      `segmentation dropped characters from: ${c}`);
+    assert.ok(segs.every((s) => s.lang === 'en' || s.lang === 'kn'),
+      'every run must be assigned a language');
+  }
+  // The mixed sentence genuinely splits; the single-script ones do not.
+  assert.strictEqual(segments(cases[1]).length, 3, 'a mixed sentence should split into runs');
+  assert.strictEqual(segments(cases[4]).length, 1, 'pure English should stay one run');
+});
