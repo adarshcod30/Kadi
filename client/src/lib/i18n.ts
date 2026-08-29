@@ -21,6 +21,7 @@ export type Lang = 'en' | 'kn';
 export const DICT: Record<string, { en: string; kn: string }> = {
   // The sidebar's own heading. Named here so it turns over with everything else.
   navHeading: { en: 'Workspace', kn: 'ಕಾರ್ಯಕ್ಷೇತ್ರ' },
+  evidence: { en: 'Evidence', kn: 'ಸಾಕ್ಷ್ಯ' },
   appName: { en: 'KADI', kn: 'ಕಡಿ' },
   tagline: { en: 'Connecting the links', kn: 'ಕೊಂಡಿಗಳನ್ನು ಜೋಡಿಸುವುದು' },
   ksp: { en: 'Karnataka State Police — Crime Intelligence', kn: 'ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ — ಅಪರಾಧ ಗುಪ್ತಚರ' },

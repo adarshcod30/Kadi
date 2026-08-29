@@ -15,6 +15,7 @@ import Health from './pages/Health';
 import MapPage from './pages/MapPage';
 import Intelligence from './pages/Intelligence';
 import ReactPage from './pages/ReactPage';
+import Evidence from './pages/Evidence';
 import Forecast from './pages/Forecast';
 import Register from './pages/Register';
 import Assistant from './pages/Assistant';
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="/cases/:id" element={<CaseDetail />} />
           <Route path="/intelligence" element={<Intelligence />} />
           <Route path="/react" element={<ReactPage />} />
+          <Route path="/evidence" element={<Evidence />} />
           <Route path="/forecast" element={<Forecast />} />
           <Route path="/register" element={<Register />} />
           <Route path="/graph" element={<GraphExplorer />} />

@@ -28,6 +28,7 @@ export const ACTION_LABELS: Record<string, string> = {
   request_case_update: 'Case update requested',
   submit_case: 'Case submitted for approval',
   sign_in: 'Signed in',
+  evidence_image: 'Evidence image read',
 };
 
 export default function Audit() {

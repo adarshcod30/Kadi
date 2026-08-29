@@ -6,7 +6,7 @@ import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
   Globe, MapPin, ChevronDown, Check, LogOut, PanelLeftClose, PanelLeftOpen, Building2,
-  Zap, TrendingUp, FilePlus2, Inbox,
+  Zap, TrendingUp, FilePlus2, Inbox, ScanText,
 } from 'lucide-react';
 import { useMe, useAlerts, useLookups, useSubmissions } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
@@ -24,6 +24,7 @@ const NAV = [
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'insights' },
   { to: '/react', icon: Zap, key: 'react' },
+  { to: '/evidence', icon: ScanText, key: 'evidence' },
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },

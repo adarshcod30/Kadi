@@ -26,6 +26,7 @@ const pendencyrisk = require('./services/pendencyrisk');
 const translate = require('./services/translate');
 const zianlp = require('./services/zianlp');
 const vlm = require('./services/vlm');
+const ziavision = require('./services/ziavision');
 const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
@@ -1269,6 +1270,54 @@ r.get('/analytics/outlook', handle(async (req) => {
         note: 'Read from the image you supplied. Nothing here is from the case database, and '
           + 'the image is not stored.',
       };
+    }),
+  );
+
+  // Reading an evidence image. One capability per call, chosen by the caller, so a reader is
+  // never handed four analyses of a photograph they asked one question about.
+  r.post(
+    '/evidence/:capability',
+    express.raw({ type: () => true, limit: '12mb' }),
+    handle(async (req) => {
+      const cap = String(req.params.capability || '');
+      if (!Object.keys(ziavision.PATHS).includes(cap)) {
+        const e = new Error(`capability must be one of: ${Object.keys(ziavision.PATHS).join(', ')}`);
+        e.status = 400; e.code = 'bad_request'; throw e;
+      }
+      const image = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!image || image.length < 256) {
+        const e = new Error('No image received.'); e.status = 400; e.code = 'no_image'; throw e;
+      }
+      const mime = String(req.headers['content-type'] || 'image/jpeg');
+      const started = Date.now();
+      const out = await ziavision.call(req, cap, image, { mime, filename: `evidence.${mime.includes('png') ? 'png' : 'jpg'}` });
+      audit.record({
+        user: req.user, action: 'evidence_image', targetType: 'image',
+        queryText: cap, ip: req.clientIp, req,
+      });
+      return {
+        capability: cap,
+        ok: out.ok,
+        data: out.ok ? out.data : null,
+        detail: out.ok ? null : String(out.error || 'unavailable').slice(0, 300),
+        ms: Date.now() - started,
+        bytes: image.length,
+        note: 'Read from the image supplied in this request. Nothing here comes from the case '
+          + 'database and the image is not stored.',
+      };
+    }),
+  );
+
+  // Which image capabilities this deployment actually answers. The console documents these
+  // through SDK samples and the SDK is the thing that does not work here, so the paths are
+  // established by asking rather than by reading.
+  r.post(
+    '/diag/zia-vision',
+    express.raw({ type: () => true, limit: '12mb' }),
+    handle(async (req) => {
+      const image = Buffer.isBuffer(req.body) && req.body.length > 256 ? req.body : null;
+      if (!image) { const e = new Error('post an image'); e.status = 400; throw e; }
+      return { probe: await ziavision.probe(req, image), status: ziavision.status() };
     }),
   );
 
