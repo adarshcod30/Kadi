@@ -1398,7 +1398,17 @@ module.exports = {
     // A state/district user drilling into one station carries the target as drillUnitId; a
     // station-tier officer carries their own unitId. Either way, this view is that one station.
     const uid = String(user.drillUnitId || user.unitId);
-    const mine = db.caseList.filter((c) => String(c.unitId) === uid);
+    // universe(), not db.caseList: this block's headline figures are a REGISTER read, and the
+    // register includes cases approved since the last pipeline run. Reading the bundle alone
+    // put "278 registered / 85 open" in the stat cards and "holds 276 FIRs, of which 83 are
+    // still open" in the narration directly beneath them -- two answers to one question, six
+    // inches apart, on the one screen whose entire argument is that this is the whole of what
+    // the desk can read.
+    //
+    // The link counts below stay honest without special-casing: a case approved since the last
+    // run has no graph entry yet, so it contributes to the register totals and to no linkage,
+    // which is exactly the truth about it.
+    const mine = universe(user).filter((c) => String(c.unitId) === uid);
     const mineIds = new Set(mine.map((c) => String(c.caseMasterId)));
 
     const linkedOut = [];
@@ -1478,7 +1488,21 @@ module.exports = {
 
     const did = String(user.districtId);
     const districts = z.districts.filter((d) => String(d.districtId) === did);
-    const stations = named(z.stations.filter((s) => String(s.districtId) === did));
+    // AT STATION RANK, THE STATION LIST IS THEIR OWN.
+    //
+    // A station officer was being handed the whole district's zone board -- 25 registers for
+    // Bengaluru City -- which the Insights reading then turned into "focus resources on the
+    // three stations showing the highest deviation: Bengaluru Bazaar PS, Bengaluru New Town PS
+    // and Bengaluru South PS". Two of those are registers this officer cannot open, cannot
+    // task and is not answerable for, on the same product whose station view says in as many
+    // words that it is the whole of what this desk can read.
+    //
+    // The district ROW stays: "how the mix here differs from the district" is what the page
+    // promises, and a comparison against the parent is not a peek into it. This is the same
+    // narrowing anomalies() already applies at this rank, and for the same reason.
+    const uid = user.roleMeta.tier === 'station' ? String(user.unitId) : null;
+    const stations = named(z.stations.filter((s) => String(s.districtId) === did
+      && (!uid || String(s.unitId) === uid)));
 
     // A district officer's summary must count THEIR STATIONS, not the one district they are.
     // Passing the state summary through is what made a drilled-in Shivamogga view report
@@ -1486,7 +1510,10 @@ module.exports = {
     //
     // zones.stations only carries non-normal entries, so the normal count has to come from
     // the district's real station roster rather than from the payload.
-    const totalStations = new Set(
+    // Counted over the same set the tally below runs on. A station officer whose board shows
+    // one register must not be told it is one of twenty-five: the denominator has to describe
+    // what they can actually see, or the summary contradicts the list beneath it.
+    const totalStations = uid ? 1 : new Set(
       db.caseList.filter((c) => String(c.districtId) === did).map((c) => String(c.unitId)),
     ).size;
     const tally = { red_pulsing: 0, red: 0, yellow: 0 };

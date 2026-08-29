@@ -86,7 +86,9 @@ function buildApp() {
   //
   // Failure is swallowed. A Data Store outage degrades the register to the bundle, which is
   // the same contract every other adapter here keeps.
-  const LIVE_PATHS = /^\/(cases|case-updates|stats|geo\/points|analytics\/(worklist|agenda|outlook))/;
+  // /command is here because the station view reports a register total, and a register total
+  // that excludes just-approved cases contradicts the /stats cards rendered above it.
+  const LIVE_PATHS = /^\/(cases|case-updates|stats|command|geo\/points|analytics\/(worklist|agenda|outlook))/;
   app.use(async (req, _res, next) => {
     if (LIVE_PATHS.test(req.path)) {
       req.user._live = await submissions.liveCases(req, q.db()).catch(() => []);
