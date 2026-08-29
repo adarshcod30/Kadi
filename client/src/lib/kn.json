@@ -1014,5 +1014,12 @@
  "your role": "ನಿಮ್ಮ ಪಾತ್ರ",
  "Zia barcode scanner": "ಜಿಯಾ ಬಾರ್ಕೋಡ್ ಸ್ಕ್ಯಾನರ್",
  "Zia lists five image services. Two answer here and are on this page. The others were tried, not skipped:": "ಜಿಯಾ ಐದು ಚಿತ್ರ ಸೇವೆಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಿದ್ದಾರೆ. ಎರಡು ಉತ್ತರಗಳು ಇಲ್ಲಿವೆ ಮತ್ತು ಈ ಪುಟದಲ್ಲಿವೆ. ಉಳಿದವುಗಳನ್ನು ಪ್ರಯತ್ನಿಸಲಾಗಿದೆ - ಬಿಟ್ಟುಬಿಡಲಾಗಿಲ್ಲಃ",
- "Zia OCR": "ಝಿಯಾ OCR"
+ "Zia OCR": "ಝಿಯಾ OCR",
+ "A barcode or QR code on a property tag, a seized carton, a notice.": "ಆಸ್ತಿ ಟ್ಯಾಗ್, ಸೆರೆಹಿಡಿದ ಕ್ಯಾನ್ ಅಥವಾ ಎಚ್ಚರಿಕೆಯ ಮೇಲೆ ಇರುವ ಬಾರ್‌ಕೋಡ್ ಅಥವಾ QR ಕೋಡ್.",
+ "Evidence reading is restricted": "ಸಾಕ್ಷ್ಯದ ಓದುವಿಕೆಗೆ ನಿರ್ಬಂಧವಿದೆ.",
+ "How scope works": "ಸ್ಕೋಪ್ ಹೇಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ",
+ "Identity scanner": "ಗುರುತಿನ ಸ್ಕ್ಯಾನರ್",
+ "in the URL is ignored for anything below state tier.": "ರಾಜ್ಯ ಮಟ್ಟಕ್ಕಿಂತ ಕೆಳಗಿನದಕ್ಕೆ URL ನಲ್ಲಿ ಸ್ಕೋಪ್ ಗಮನಿಸಲಾಗುವುದಿಲ್ಲ.",
+ "Reading an uploaded image is a state-tier permission — Administrator, DGP or SCRB Analyst. The register itself remains available at your own scope.": "ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಚಿತ್ರವನ್ನು ಓದುವುದು ರಾಜ್ಯ ಮಟ್ಟದ ಅನುಮತಿ - ಅಡ್ಮಿನಿಸ್ಟ್ರೇಟರ್, DGP ಅಥವಾ SCRB ವಿಶ್ಲೇಷಕ. ನೋಂದಣಿಯೇ ನಿಮ್ಮ ಸ್ಕೋಪ್‌ನಲ್ಲಿ ಲಭ್ಯವಿರುತ್ತದೆ.",
+ "What is this document, and what fields does it carry? If it is a photograph rather than a document, describe what is visible. Do not identify anyone.": "ಈ ಡಾಕ್ಯುಮೆಂಟ್ ಎಂದರೇನು ಮತ್ತು ಇದು ಯಾವ ಕ್ಷೇತ್ರಗಳನ್ನು ಒಯ್ಯುತ್ತದೆ ಇದು ಡಾಕ್ಯುಮೆಂಟ್ ಬದಲಿಗೆ ಛಾಯಾಚಿತ್ರವಾಗಿದ್ದರೆ ಏನು ಗೋಚರಿಸುತ್ತದೆ ಎಂಬುದನ್ನು ವಿವರಿಸಿ. ಯಾರನ್ನೂ ಗುರುತಿಸಬೇಡಿ."
 }

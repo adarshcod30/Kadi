@@ -1279,6 +1279,15 @@ r.get('/analytics/outlook', handle(async (req) => {
     '/evidence/:capability',
     express.raw({ type: () => true, limit: '12mb' }),
     handle(async (req) => {
+      // STATE TIER ONLY, ENFORCED HERE RATHER THAN BY HIDING A NAV ITEM.
+      //
+      // Reading an arbitrary uploaded image is a different kind of permission from reading the
+      // register: the register is scoped, and an upload is whatever the uploader chose to
+      // photograph. That belongs with the ranks that already hold state-wide read — DGP,
+      // Administrator and the SCRB Analyst — and not with a district or station account.
+      // The sidebar hides it for everyone else, but a hidden link is decoration; this is the
+      // boundary.
+      rbac.requireRole(req.user, ['DGP', 'Admin', 'Analyst']);
       const cap = String(req.params.capability || '');
       if (!Object.keys(ziavision.PATHS).includes(cap)) {
         const e = new Error(`capability must be one of: ${Object.keys(ziavision.PATHS).join(', ')}`);

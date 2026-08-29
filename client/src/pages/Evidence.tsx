@@ -25,6 +25,7 @@ import {
 import { Section, Empty } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { API_BASE } from '../lib/api';
+import { useMe } from '../api/hooks';
 import { useTx } from '../lib/i18n';
 
 type Tool = 'ocr' | 'barcode' | 'read';
@@ -56,6 +57,7 @@ const TOOLS: { key: Tool; icon: any; title: string; blurb: string; engine: strin
 
 export default function Evidence() {
   const tx = useTx();
+  const { data: me } = useMe();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [tool, setTool] = useState<Tool>('ocr');
   const [busy, setBusy] = useState(false);
@@ -108,6 +110,18 @@ export default function Evidence() {
       setBusy(false);
     }
   };
+
+  // The server refuses this to anyone below state tier. Saying so here means a district
+  // officer who follows a link gets an explanation rather than three tools that 403.
+  const allowed = ['DGP', 'Admin', 'Analyst'].includes(String((me as any)?.user?.role || ''));
+  if (me && !allowed) {
+    return (
+      <Empty
+        title={tx('Evidence reading is restricted')}
+        hint={tx('Reading an uploaded image is a state-tier permission — Administrator, DGP or SCRB Analyst. The register itself remains available at your own scope.')}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

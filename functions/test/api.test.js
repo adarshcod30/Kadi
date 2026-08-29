@@ -927,3 +927,23 @@ test('the API entry point and every service module actually parse', () => {
       `functions/api/services/${f} failed to load`);
   }
 });
+
+// Reading an arbitrary uploaded image is a different permission from reading the register.
+// The register is scoped; an upload is whatever the uploader chose to photograph. That belongs
+// with the ranks holding state-wide read and not with a district or station account — and the
+// sidebar hiding the link is decoration, so the boundary is asserted here.
+test('evidence image reading is state tier only', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  const route = app.slice(app.indexOf("'/evidence/:capability'"));
+  const guard = route.slice(0, route.indexOf('const cap'));
+  assert.match(guard, /requireRole\(req\.user,\s*\[[^\]]*'DGP'[^\]]*\]\)/,
+    'the evidence route must call requireRole');
+  for (const allowed of ['DGP', 'Admin', 'Analyst']) {
+    assert.ok(guard.includes(`'${allowed}'`), `${allowed} must be permitted`);
+  }
+  for (const denied of ['SP', 'DSP', 'SHO', 'SI']) {
+    assert.ok(!guard.includes(`'${denied}'`), `${denied} must NOT be permitted to read uploads`);
+  }
+});

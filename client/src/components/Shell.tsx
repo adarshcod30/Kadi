@@ -24,7 +24,7 @@ const NAV = [
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'insights' },
   { to: '/react', icon: Zap, key: 'react' },
-  { to: '/evidence', icon: ScanText, key: 'evidence' },
+  { to: '/evidence', icon: ScanText, key: 'evidence', roles: ['DGP', 'Admin', 'Analyst'] },
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
