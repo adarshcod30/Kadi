@@ -81,7 +81,23 @@ function detectDateFrom(text) {
   return null;
 }
 
-function query(user, text, lang) {
+// WHY THIS CARRIES RESOLVED ENTITIES AND NOT A CHAT HISTORY.
+//
+// "who is accused in the case" answered with a list of unrelated FIRs, and "why is this case
+// heinous" answered that the facts contain nothing about this specific case. Both were right
+// about their own inputs: each question arrived with no idea that "the case" had been resolved
+// two turns earlier, so a referring expression matched nothing and fell to the catch-all.
+//
+// The obvious fix is to send the transcript and let a model work it out. That is the fix that
+// costs this assistant the property it is built on. A model given a conversation will answer
+// FROM the conversation -- restating a count it saw three turns ago rather than recomputing it,
+// and a stale count is indistinguishable on screen from a fresh one.
+//
+// So the client carries FACTS, not prose: the case, district and crime head that were last
+// RESOLVED by the deterministic engine. A follow-up binds its pronoun to those and re-queries
+// the register. "who is accused in the case" becomes a fresh lookup of a known case number,
+// answered from rows, cited, and as verifiable as if the number had been typed again.
+function query(user, text, lang, context = {}) {
   const db = load();
   const isKn = KN.test(text) || lang === 'kn';
   const t = text.toLowerCase();
@@ -107,9 +123,20 @@ function query(user, text, lang) {
   // text rather than the lowercased copy because digits are the whole pattern, and bounded at
   // 10 so a year or a count cannot be mistaken for one.
   const crimeNoMatch = String(text).match(/\b(\d{10,})\b/);
-  const crimeNoAsked = crimeNoMatch ? crimeNoMatch[1] : null;
+  // A referring expression only binds when there is something to bind it TO. Without the
+  // context check this would hijack every sentence containing the word "case".
+  const refersBack = /\b(this|that|the|its|it'?s?)\s+(case|fir|incident)\b|\bthis fir\b|\bಈ ಪ್ರಕರಣ|\bಆ ಪ್ರಕರಣ/i
+    .test(String(text));
+  const carriedCase = context && context.crimeNo ? String(context.crimeNo) : null;
+  const crimeNoAsked = crimeNoMatch ? crimeNoMatch[1] : (refersBack && carriedCase ? carriedCase : null);
+  // Recorded so the interface can say WHICH case it took the question to be about. A follow-up
+  // answered against the wrong case is the failure mode here, and it should be visible.
+  const resolvedFromContext = Boolean(!crimeNoMatch && crimeNoAsked);
 
-  if (hasWhy && !hasForecast) {
+  // ...and not when a case is on the table. "why is this case heinous" is a question about one
+  // FIR, but the socio branch owns the word "why" and answered it with per-capita rates across
+  // five districts. The same guard already exists for forecasts; a case needs it too.
+  if (hasWhy && !hasForecast && !crimeNoAsked) {
     intent = 'socio_rates';
     const socio = queries.socio();
     const top = (socio.districts || []).slice(0, 5);
@@ -224,6 +251,49 @@ function query(user, text, lang) {
       linked.forEach((n) => citations.push({ type: 'case', id: String(n.caseId), label: String(n.label) }));
       const accused = (d.parties && d.parties.accused) || [];
       const nLinks = (g.edges || []).length;
+
+      // ANSWER THE QUESTION THAT WAS ASKED, NOT THE ONE THE INTENT IS NAMED AFTER.
+      //
+      // Every question about a case used to get the same summary paragraph, so "who is accused"
+      // was answered with a station and a status and no names. A case has several things a
+      // reader can want from it and they are all already on the record.
+      const asks = (re) => re.test(t);
+      if (asks(/\bwho\b|accused|ಆರೋಪಿ/)) {
+        const names = accused.map((a) => a.name).filter(Boolean);
+        names.slice(0, 8).forEach((nm, i) => citations.push({
+          type: 'accused', id: String(accused[i].accusedMasterId || i), label: nm,
+        }));
+        answer = names.length
+          ? (isKn
+            ? `${c.crimeNo} ಪ್ರಕರಣದಲ್ಲಿ ${names.length} ಆರೋಪಿ: ${names.join(', ')}.`
+            : `${names.length} accused recorded on FIR ${c.crimeNo}: ${names.join(', ')}.`)
+          : (isKn
+            ? `${c.crimeNo} ಪ್ರಕರಣದಲ್ಲಿ ಯಾವುದೇ ಆರೋಪಿ ದಾಖಲಾಗಿಲ್ಲ.`
+            : `No accused is recorded on FIR ${c.crimeNo}.`);
+        // Names are records, not wording. The model paraphrasing a list of accused persons is
+        // exactly the place not to let it.
+        noPhrase = true;
+      } else if (asks(/heinous|ಘೋರ|serious|gravity/)) {
+        answer = isKn
+          ? `${c.crimeNo} — ${c.crimeHead || ''}, ಗಂಭೀರತೆ ${c.gravity || 'ದಾಖಲಾಗಿಲ್ಲ'}. `
+            + 'ಘೋರ ಎಂಬ ವರ್ಗೀಕರಣ ದಾಖಲಾದ ಅಪರಾಧ ಶೀರ್ಷಿಕೆ ಮತ್ತು ಕಲಮುಗಳಿಂದ ಬರುತ್ತದೆ, ಮಾದರಿಯಿಂದ ಅಲ್ಲ.'
+          : `FIR ${c.crimeNo} is recorded as ${c.crimeHead || 'an unrecorded head'} with gravity `
+            + `${c.gravity || 'not recorded'}. That classification comes from the crime head and `
+            + 'the sections applied on the register, not from any model — KADI reports it, it does '
+            + 'not decide it.';
+        noPhrase = true;
+      } else if (asks(/network|linked|connect|ಜಾಲ|ಸಂಬಂಧ/)) {
+        answer = isKn
+          ? `${c.crimeNo} ಸುತ್ತ ${linked.length} ಸಂಬಂಧಿತ ಪ್ರಕರಣ ಮತ್ತು ${nLinks} ಕೊಂಡಿಗಳಿವೆ.`
+          : `The network around FIR ${c.crimeNo} holds ${linked.length} linked case`
+            + `${linked.length === 1 ? '' : 's'} across ${nLinks} links.`;
+      } else if (asks(/status|charge ?sheet|ಸ್ಥಿತಿ/)) {
+        answer = isKn
+          ? `${c.crimeNo} ಪ್ರಕರಣದ ಸ್ಥಿತಿ: ${c.status || 'ದಾಖಲಾಗಿಲ್ಲ'}.`
+          : `FIR ${c.crimeNo} is currently ${c.status || 'of unrecorded status'}, registered at `
+            + `${c.unitName || 'an unrecorded station'}.`;
+        noPhrase = true;
+      } else {
       answer = isKn
         ? `ಎಫ್‌ಐಆರ್ ${c.crimeNo} — ${c.crimeHead || ''}, ${c.districtName || ''} `
           + `(${c.unitName || ''}), ಸ್ಥಿತಿ ${c.status || ''}. `
@@ -237,6 +307,7 @@ function query(user, text, lang) {
             ? `The network around it holds ${linked.length} linked case`
               + `${linked.length === 1 ? '' : 's'} across ${nLinks} links.`
             : 'No linked cases were found around it.');
+      }
       action = { type: 'open_case', id: String(c.caseMasterId) };
     }
   } else if (hasList) {
@@ -264,6 +335,14 @@ function query(user, text, lang) {
 
   return {
     intent, lang: isKn ? 'kn' : 'en', answer, citations, action, noPhrase,
+    // What a follow-up may refer to. Facts the deterministic engine resolved, not prose.
+    context: {
+      crimeNo: crimeNoAsked || (context && context.crimeNo) || null,
+      districtId: detectDistrict(text, db) || (context && context.districtId) || null,
+      head: detectHead(text, db) || (context && context.head) || null,
+    },
+    // Surfaced so the reader can see the assistant took "this case" to mean a specific one.
+    ...(resolvedFromContext ? { resolvedFromContext: crimeNoAsked } : {}),
     fairness: queries.FAIRNESS_STATEMENT,
     grounded: true,
   };
@@ -275,7 +354,7 @@ function query(user, text, lang) {
  * the original answer is returned unchanged - the model can improve phrasing but can
  * never be a single point of failure, and can never invent an FIR number.
  */
-async function queryEnhanced(user, text, lang, req) {
+async function queryEnhanced(user, text, lang, req, context = {}) {
   // Timed, and the timings are returned. This endpoint returned an empty HTTP 200 past about
   // fifteen seconds -- the platform gives up and sends nothing, the browser's res.json()
   // throws, and the interface said "could not be answered" over an answer that had been
@@ -327,10 +406,10 @@ async function queryEnhanced(user, text, lang, req) {
   // 'unknown', or came back as the catch-all list branch that any sentence containing ಪ್ರಕರಣ
   // falls into. That keeps the coverage the translation buys for phrasings nobody listed,
   // without letting a loose rendering overrule a word that was actually there.
-  let base = query(user, text, asksInKannada ? 'kn' : lang);
+  let base = query(user, text, asksInKannada ? 'kn' : lang, context);
   const weak = (i) => i === 'unknown' || i === 'cases_query';
   if (routed !== text && weak(base.intent)) {
-    const viaEnglish = query(user, routed, asksInKannada ? 'kn' : lang);
+    const viaEnglish = query(user, routed, asksInKannada ? 'kn' : lang, context);
     if (!weak(viaEnglish.intent)) base = viaEnglish;
     else if (base.intent === 'unknown') base = viaEnglish;
   }

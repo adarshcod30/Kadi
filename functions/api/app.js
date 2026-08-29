@@ -1140,8 +1140,11 @@ r.get('/analytics/outlook', handle(async (req) => {
   r.post('/assistant/query', handle(async (req) => {
     const text = (req.body && req.body.text) || '';
     const lang = (req.body && req.body.lang) || 'en';
+    // The conversation's resolved entities, carried by the client. Facts, never prose: see the
+    // note above query() for why a transcript is deliberately not accepted here.
+    const context = (req.body && req.body.context) || {};
     audit.record({ user: req.user, action: 'assistant_query', targetType: 'nl', queryText: text, ip: req.clientIp, req });
-    return assistant.queryEnhanced(req.user, text, lang, req);
+    return assistant.queryEnhanced(req.user, text, lang, req, context);
   }));
   r.post('/assistant/voice', handle(async (req) => {
     // Local fallback: client does Web Speech STT/TTS; here we answer the transcribed text.

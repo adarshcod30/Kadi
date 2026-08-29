@@ -154,6 +154,9 @@ export default function Assistant() {
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // Last resolved case / district / crime head. A ref rather than state: it must be current at
+  // the moment send() runs, and it never needs to trigger a render of its own.
+  const convo = useRef<Record<string, unknown>>({});
   const [transcribing, setTranscribing] = useState(false);
   const [reading, setReading] = useState(false);
   const voices = useVoices();
@@ -363,7 +366,11 @@ export default function Assistant() {
     setInput(''); setInterim(''); setNotice(null);
     setMsgs((m) => [...m, { role: 'user', content: (display || q).trim() }]);
     try {
-      const res = await ask.mutateAsync({ text: q, lang });
+      // The conversation's resolved entities travel with the question so a follow-up can say
+      // "this case". Facts only — the transcript is deliberately never sent; see the note above
+      // query() in assistant.js.
+      const res = await ask.mutateAsync({ text: q, lang, context: convo.current });
+      if (res && (res as any).context) convo.current = (res as any).context;
       setMsgs((m) => [...m, { role: 'assistant', content: res.answer, res }]);
       if (autoSpeak) speak(res.ttsText || res.answer, res.lang, msgs.length + 1);
     } catch (e: any) {

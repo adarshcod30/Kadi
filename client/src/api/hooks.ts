@@ -134,7 +134,10 @@ export const useAudit = (enabled: boolean, action?: string) =>
   });
 
 export const useAssistant = () =>
-  useMutation({ mutationFn: (body: { text: string; lang: string }) => api.post<AssistantResponse>('/assistant/query', body) });
+  useMutation({
+    mutationFn: (body: { text: string; lang: string; context?: Record<string, unknown> }) =>
+      api.post<AssistantResponse>('/assistant/query', body),
+  });
 export const useExport = () =>
   useMutation({ mutationFn: (body: { title: string; messages: any[] }) => api.post<{ html: string; filename: string }>('/assistant/export', body) });
 
