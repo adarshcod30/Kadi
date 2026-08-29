@@ -70,7 +70,7 @@ export class ApiError extends Error {
   constructor(code: string, message: string) { super(message); this.code = code; }
 }
 
-async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, opts: RequestInit = {}, attempt = 0): Promise<T> {
   // Carry the drilled district on every call. The server holds no session and re-derives
   // scope from each request, so a scope that lived only in the URL bar would be ignored by
   // every fetch the page makes.
@@ -97,7 +97,29 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
       window.location.href = '/app/login';
     }
   }
-  const body = await res.json().catch(() => ({ ok: false, error: { code: 'bad_json', message: 'Invalid response' } }));
+  // AN EMPTY HTTP 200 IS A PLATFORM FAILURE, NOT AN ANSWER, AND IT IS WORTH ONE RETRY.
+  //
+  // The assistant endpoint intermittently returns 200 with a zero-byte body. It is not a
+  // duration threshold -- an empty response has come back at 6.8s while a full one came back
+  // at 9.9s -- so it is the platform dropping an invocation rather than the work being too
+  // slow. res.json() then throws, and the interface reported "could not be answered" over an
+  // answer the server had computed correctly.
+  //
+  // Retried once, and only here: the body was not parseable, so nothing was acted on, and
+  // every call that reaches this transport is a read. A real API error carries ok:false and a
+  // code, and is thrown immediately without a retry -- resending a request the server has
+  // already refused would only be slower at saying no.
+  const text = await res.text();
+  if (!text.trim() && attempt === 0) {
+    await new Promise((r) => { setTimeout(r, 400); });
+    return request<T>(path, opts, attempt + 1);
+  }
+  let body: any;
+  try {
+    body = text.trim() ? JSON.parse(text) : { ok: false, error: { code: 'empty_response', message: 'The server returned an empty response. Please try again.' } };
+  } catch {
+    body = { ok: false, error: { code: 'bad_json', message: 'Invalid response' } };
+  }
   if (!body.ok) throw new ApiError(body.error?.code || 'error', body.error?.message || 'Request failed');
   return body.data as T;
 }

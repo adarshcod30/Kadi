@@ -850,22 +850,34 @@ function listHealth(user, q = {}) {
       // colour by it without a second request. Null when no clock runs.
       deadline: dl };
   };
-  let all = rows.map(enrich);
-  // Deadline-first ordering, opt-in via ?sort=deadline. Cases with a running clock rise to the
-  // top, soonest due first; everything without a clock keeps the pipeline's health order below.
+  const total = rows.length;
+  const page = pageOf(q);
+  const pageSize = pageSizeOf(q, 30);
+  const from = (page - 1) * pageSize;
+
+  // ENRICH THE PAGE, NOT THE CORPUS.
+  //
+  // This used to enrich every matching row and then slice five of them out. At state tier
+  // "which cases are slipping" matches 16,136 rows, so it computed sixteen thousand statutory
+  // deadlines to display five -- about 4.9 seconds of the assistant's response, and the thing
+  // that kept its total near the point where the platform drops the invocation and returns an
+  // empty 200.
+  //
+  // Only the deadline sort actually needs the enriched field, so only it pays for the whole
+  // set. The default order comes from filterHealth and the age sort reads a field that is
+  // already on the raw row, so both can order first and enrich a page of thirty.
   if (q.sort === 'deadline') {
-    all = all.sort((a, b) => {
+    const all = rows.map(enrich).sort((a, b) => {
       const ax = a.deadline ? (a.deadline.daysRemaining ?? 1e9) : 1e9 + 1;
       const bx = b.deadline ? (b.deadline.daysRemaining ?? 1e9) : 1e9 + 1;
       return ax - bx;
     });
-  } else if (q.sort === 'age') {
-    all = all.sort((a, b) => (b.investigationAgeDays || 0) - (a.investigationAgeDays || 0));
+    return { items: all.slice(from, from + pageSize), total, page, pageSize };
   }
-  const total = all.length;
-  const page = pageOf(q);
-  const pageSize = pageSizeOf(q, 30);
-  return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize };
+  const ordered = q.sort === 'age'
+    ? rows.slice().sort((a, b) => (b.investigationAgeDays || 0) - (a.investigationAgeDays || 0))
+    : rows;
+  return { items: ordered.slice(from, from + pageSize).map(enrich), total, page, pageSize };
 }
 
 function healthSummary(user) {

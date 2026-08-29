@@ -9,6 +9,12 @@ const quickml = require('./quickml');
 
 const KN = /[ಀ-೿]/; // Kannada script range
 
+// How long the wording model may take before the request stops waiting for it. Sized against
+// what it actually costs: the phrasing call runs 8-12s at state tier, and the deterministic
+// answer beneath it is ready in about one. Five seconds keeps the nicety on the fast path and
+// removes it from the critical one.
+const PHRASE_DEADLINE_MS = Number(process.env.ASSISTANT_PHRASE_DEADLINE_MS || 5000);
+
 // Safe parametrized query tools (whitelisted) — the assistant may only call these.
 const TOOLS = {
   casesByHeadDistrict(user, { head, district, dateFrom }) {
@@ -196,8 +202,15 @@ function query(user, text, lang) {
  * never be a single point of failure, and can never invent an FIR number.
  */
 async function queryEnhanced(user, text, lang, req) {
+  // Timed, and the timings are returned. This endpoint returned an empty HTTP 200 past about
+  // fifteen seconds -- the platform gives up and sends nothing, the browser's res.json()
+  // throws, and the interface said "could not be answered" over an answer that had been
+  // computed correctly. Knowing which half spent the time is the difference between fixing
+  // that and guessing at it.
+  const t0 = Date.now();
   const base = query(user, text, lang);
-  if (!quickml.configured()) return { ...base, llm: 'disabled' };
+  const baseMs = Date.now() - t0;
+  if (!quickml.configured()) return { ...base, llm: 'disabled', timing: { baseMs } };
 
   // Questions the case database cannot answer go to the knowledge base.
   //
@@ -258,10 +271,29 @@ async function queryEnhanced(user, text, lang, req) {
     base.answer,
     ...(base.citations || []).slice(0, 8).map((c) => `- ${c.type} ${c.label} (id ${c.id})`),
   ].join('\n');
-  const phrased = await quickml.phrase(req, { question: text, facts, lang: base.lang });
-  if (!phrased) return { ...base, llm: 'fallback' };
+
+  // THE PHRASING IS COSMETIC AND MUST NEVER COST THE ANSWER.
+  //
+  // The deterministic answer is complete in about a second; the model then spends eight to
+  // twelve more re-wording it, and the whole request was waiting on that. At state tier this
+  // put a simple "which cases are slipping" at 9-13 seconds -- close enough to the gateway's
+  // patience that it failed intermittently, showing a generic error over an answer that had
+  // been computed correctly and thrown away.
+  //
+  // So the model gets a deadline rather than the request's whole budget. Past it, the answer
+  // that already exists is returned and the response says the phrasing timed out, which is a
+  // true statement about a nicety rather than a failure of the question.
+  const phrased = await Promise.race([
+    quickml.phrase(req, { question: text, facts, lang: base.lang }).catch(() => null),
+    new Promise((resolve) => { setTimeout(() => resolve(null), PHRASE_DEADLINE_MS); }),
+  ]);
+  const phraseMs = Date.now() - t0 - baseMs;
+  if (!phrased) return { ...base, llm: 'fallback', timing: { baseMs, phraseMs } };
   // Citations, intent and action stay as computed; only the prose is replaced.
-  return { ...base, answer: phrased, llm: 'glm-4.7', deterministicAnswer: base.answer };
+  return {
+    ...base, answer: phrased, llm: 'glm-4.7', deterministicAnswer: base.answer,
+    timing: { baseMs, phraseMs },
+  };
 }
 
 module.exports = { queryEnhanced, query, TOOLS };

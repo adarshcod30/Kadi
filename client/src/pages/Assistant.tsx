@@ -124,6 +124,57 @@ export default function Assistant() {
    * English for a button they pressed in Kannada is the same half-done feeling this page was
    * rebuilt to remove.
    */
+  // WHY THE RECORDING IS RE-ENCODED BEFORE IT IS SENT.
+  //
+  // MediaRecorder produces WebM/Opus in Chrome and Firefox and MP4/AAC in Safari. The Zia
+  // Audio-to-Text model accepts WAV and MP3 and rejects the rest outright:
+  //
+  //     http 400 {"code":"INVALID_FILE_EXTENSION"}
+  //
+  // which is what every voice question had been getting. The earlier round-trip test passed
+  // only because it fed the model a WAV from the text-to-speech model rather than anything a
+  // browser had recorded -- a test that proved the transport and missed the format.
+  //
+  // OfflineAudioContext does the whole conversion: it downmixes to one channel and resamples
+  // to 16 kHz in one render, which is also the rate speech models want and about a tenth of
+  // the bytes of the raw capture.
+  const toWav = async (blob: Blob): Promise<Blob> => {
+    const Ctx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const ctx = new Ctx();
+    try {
+      const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+      const rate = 16000;
+      const frames = Math.max(1, Math.round(decoded.duration * rate));
+      const off = new OfflineAudioContext(1, frames, rate);
+      const src = off.createBufferSource();
+      src.buffer = decoded;
+      src.connect(off.destination);
+      src.start();
+      const pcm = (await off.startRendering()).getChannelData(0);
+
+      // 16-bit PCM WAV: 44-byte header then the samples, clamped rather than wrapped —
+      // an overflowing sample wraps to the opposite extreme and reads as a click.
+      const out = new ArrayBuffer(44 + pcm.length * 2);
+      const view = new DataView(out);
+      const ascii = (at: number, str: string) => {
+        for (let i = 0; i < str.length; i += 1) view.setUint8(at + i, str.charCodeAt(i));
+      };
+      ascii(0, 'RIFF'); view.setUint32(4, 36 + pcm.length * 2, true); ascii(8, 'WAVE');
+      ascii(12, 'fmt '); view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+      view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+      view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+      ascii(36, 'data'); view.setUint32(40, pcm.length * 2, true);
+      for (let i = 0; i < pcm.length; i += 1) {
+        const v = Math.max(-1, Math.min(1, pcm[i]));
+        view.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+      }
+      return new Blob([out], { type: 'audio/wav' });
+    } finally {
+      ctx.close().catch(() => {});
+    }
+  };
+
   // Recording, on the server, with Zia's Audio-to-Text model.
   //
   // Browser Web Speech is kept below as the fallback, but it is no longer the primary path:
@@ -155,21 +206,30 @@ export default function Assistant() {
         }
         setTranscribing(true);
         try {
+          const wav = await toWav(blob);
           const r = await fetch(`${API_BASE}/assistant/transcribe?lang=${lang}`, {
             method: 'POST',
-            headers: { 'Content-Type': blob.type || 'audio/webm' },
-            body: blob,
+            headers: { 'Content-Type': 'audio/wav' },
+            body: wav,
           });
           const j = await r.json();
           const text = j?.data?.text;
           if (text) { setInput(text); send(text); } else {
+            // The reason travels. "Nothing happened after I spoke" is the least debuggable
+            // failure in the product, and a generic apology is what kept this one hidden.
+            const why = j?.data?.detail || j?.error?.message;
             setNotice({
               kind: 'warn',
-              text: tx('That could not be transcribed. Try again, or type the question.'),
+              text: why
+                ? `${tx('That could not be transcribed.')} ${why}`
+                : tx('That could not be transcribed. Try again, or type the question.'),
             });
           }
-        } catch {
-          setNotice({ kind: 'warn', text: tx('Transcription is unavailable right now.') });
+        } catch (e: any) {
+          setNotice({
+            kind: 'warn',
+            text: `${tx('Transcription failed.')} ${e?.message || ''}`.trim(),
+          });
         } finally { setTranscribing(false); }
       };
       mr.start();
@@ -230,8 +290,18 @@ export default function Assistant() {
       const res = await ask.mutateAsync({ text: q, lang });
       setMsgs((m) => [...m, { role: 'assistant', content: res.answer, res }]);
       if (autoSpeak) speak(res.ttsText || res.answer, res.lang, msgs.length + 1);
-    } catch {
-      setNotice({ kind: 'error', text: tx('That query could not be answered just now. Please try again.') });
+    } catch (e: any) {
+      // The generic apology is what hid this. A query that failed because the gateway gave up
+      // waiting, one that failed because the user is offline, and one that failed because the
+      // server threw all read identically -- so the only debugging move left to a reader was
+      // to try again and hope. The reason travels now.
+      const why = e?.message || e?.error?.message || '';
+      setNotice({
+        kind: 'error',
+        text: why
+          ? `${tx('That query could not be answered.')} ${why}`
+          : tx('That query could not be answered just now. Please try again.'),
+      });
     } finally {
       inFlight.current = false;
     }
