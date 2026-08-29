@@ -125,6 +125,29 @@ const CANDIDATES = [
     why: 'Beats the rule on AUC and is still not worth shipping: the event happens to 0.1% of officer-months, so average precision is 0.018. A model that is right about almost nothing ranks well and helps no one.' },
 ];
 
+// Counted, not typed. These sentences have been wrong twice: once when the model family grew
+// from two to seven, and once when I "corrected" them by hand and still got the rejected count
+// wrong. A number that describes a list on the same page should be read off that list.
+const N_SERVING = CANDIDATES.filter((c) => c.ship).length;
+const N_REJECTED = CANDIDATES.filter((c) => !c.ship).length + FAMILY_REJECTED.length;
+const N_MEASURED = N_SERVING + N_REJECTED;
+const WORDS: Record<number, string> = {
+  5: 'Five', 6: 'Six', 7: 'Seven', 10: 'Ten', 11: 'Eleven', 12: 'Twelve', 14: 'Fourteen',
+  17: 'Seventeen', 18: 'Eighteen', 19: 'Nineteen', 20: 'Twenty',
+};
+const word = (n: number) => WORDS[n] || String(n);
+
+// The registry phrases each task as a statement -- "next FIR is in a district they have never
+// worked" -- because that is how it reads in a table. A card asks it, so it needs a capital and
+// a question mark and nothing else. Prefixing "Will this offender ..." is what produced "Will
+// this offender next FIR is in a district they have never worked?".
+const askable = (q?: string) => {
+  const t = String(q || 'back on a new FIR').trim();
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)}${t.endsWith('?') ? '' : '?'}`;
+};
+const ML_BLURB = `${word(N_SERVING)} trained models that rank, each against the simple rule it `
+  + `has to beat — and the ${word(N_REJECTED).toLowerCase()} that did not.`;
+
 export default function Forecast() {
   const nav = useNavigate();
   const { data: me } = useMe();
@@ -181,7 +204,7 @@ export default function Forecast() {
           { key: 'stat', icon: BarChart3, label: 'Statistical forecaster',
             blurb: 'Trend, seasonality and deviation, computed in the open and shown with the error it measured on itself.' },
           { key: 'ml', icon: Cpu, label: 'ML forecaster',
-            blurb: 'Two trained models that rank, each against the simple rule it has to beat — and the five that did not.' },
+            blurb: ML_BLURB },
         ] as const).map((t) => (
           <button key={t.key} onClick={() => setHead(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-1.5 transition-colors ${
@@ -193,7 +216,7 @@ export default function Forecast() {
       <p className="text-[12.5px] text-ink-muted -mt-2">
         {head === 'stat'
           ? 'Trend, seasonality and deviation, computed in the open and shown with the error it measured on itself.'
-          : 'Two trained models that rank, each against the simple rule it has to beat — and the five that did not.'}
+          : ML_BLURB}
       </p>
 
       {head === 'stat' && <>
@@ -564,15 +587,24 @@ function MlHead({ risk, spike, tier, nav, model, setModel }: {
   risk: any; spike: any; tier: string; nav: any; model: string; setModel: (m: string) => void;
 }) {
   const served = (s: any) => s?.rankedBy === 'model';
+  // The row for whichever model the picker is on, from the server's own registry when it has
+  // answered and from the page's table before that.
+  const fam = MODEL_FAMILY.find((f) => f.slug === model) || MODEL_FAMILY[1];
+  const sel = ((risk?.models || []).find((m: any) => m.slug === model))
+    || { question: fam.label.toLowerCase(), modelAuc: fam.model, ruleAuc: fam.rule, ruleName: fam.ruleName };
   return (
     <>
       {/* What is actually serving, first and without decoration. A model page whose first
           panel is a result rather than a provenance statement is asking to be believed. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Reads the model the picker is on rather than restating one model's numbers. The
+            hard-coded version drifted the moment the measurement was corrected: this card said
+            0.769 while the panel directly beneath it said 0.746, which is worse than either
+            number being wrong on its own. */}
         <ModelCard
           title="Repeat offending"
-          question="Will this offender be back within 180 days?"
-          model={0.769} rule={0.565} ruleName="recency"
+          question={askable(sel.question)}
+          model={sel.modelAuc} rule={sel.ruleAuc} ruleName={sel.ruleName || 'recency'}
           serving={served(risk)} lastError={risk?.serving?.lastError}
         />
         <ModelCard
@@ -780,7 +812,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel }: {
 
       {/* The losers. This is the panel that makes the two winners mean something. */}
       <Section title={<span className="flex items-center gap-2">
-        <Cpu size={15} className="text-ink-muted" /> Eleven tasks were measured. Two are serving.
+        <Cpu size={15} className="text-ink-muted" /> {word(N_MEASURED)} tasks were measured. {word(N_SERVING)} are serving.
       </span>}>
         <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
           Every candidate was scored on a time-ordered hold-out against the <b>best</b> simple
