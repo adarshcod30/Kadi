@@ -117,7 +117,13 @@ above 300.
 
 ## 4. The review screen
 
-`/kannada`, in the sidebar for every rank.
+`/kannada`, reached from the icon beside the language toggle in the top bar — not from the
+workspace rail.
+
+Correcting the machine's Kannada is not a feature of the product; it is a tool for maintaining
+one. A place in the rail beside Cases and Offenders would advertise it as something an officer
+does as part of the job. It is also where somebody is standing at the moment they need it: you
+notice a bad translation right after switching the language.
 
 - English above Kannada, stacked rather than in columns — the two scripts have very different
   line lengths and a two-column layout leaves one side ragged at every width worth supporting.

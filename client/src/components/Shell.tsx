@@ -28,10 +28,6 @@ const NAV = [
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
-  // Open to every rank, unlike Audit and Administration above it. The officers reading the
-  // Kannada interface all day are station officers, and they are the ones who know when a word
-  // is a correct translation and not what anybody actually calls that thing.
-  { to: '/kannada', icon: Languages, key: 'kannada' },
   // About sits at the very bottom of the rail: orientation material, not a daily destination,
   // so it is last — below the operational and admin sections, out of the way but reachable.
   { to: '/about', icon: Info, key: 'about' },
@@ -140,6 +136,18 @@ export function Shell({ children }: { children: ReactNode }) {
           className="text-sm px-2 py-1 shrink-0 rounded hover:bg-white/10" title="Language">
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
+        {/* Correcting the machine's Kannada is not a feature of the product — it is a tool for
+            maintaining one. So it sits next to the control it belongs to rather than taking a
+            place in the workspace rail beside Cases and Offenders, which would advertise it as
+            something an officer does as part of the job.
+            It is also where somebody is standing at the moment they need it: you notice a bad
+            translation right after switching the language, and the fix is now one icon away
+            instead of a hunt down the sidebar. */}
+        <NavLink to="/kannada" title={t('kannada')} aria-label={t('kannada')}
+          className={({ isActive }) => `px-1.5 py-1 shrink-0 rounded hover:bg-white/10 ${
+            isActive ? 'bg-white/15' : ''}`}>
+          <Languages size={15} />
+        </NavLink>
         <ScopeBadge me={me} />
         <button ref={alertsPop.anchorRef as React.RefObject<HTMLButtonElement>}
           onClick={alertsPop.toggle} {...alertsPop.holdProps}
