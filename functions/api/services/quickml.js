@@ -221,7 +221,7 @@ const AUTH_PREFIX = process.env.QUICKML_AUTH_PREFIX || 'Bearer';
 
 // The assistant runs inside a 30s Function. A model call that hangs would burn the whole
 // budget and return nothing, so it is capped well below and falls back on timeout.
-const SYSTEM_PROMPT = 'You are KADI, an assistant for the Karnataka State Police crime records system. You are given FACTS from the case database and a QUESTION. Answer ONLY from the FACTS. Never invent an FIR number, name, count or date. If the FACTS do not answer it, say so. Be concise: two or three sentences. Never mention or infer caste, religion or occupation; they are excluded from every model here by design. Reply in the same language as the QUESTION.';
+const SYSTEM_PROMPT = 'You are KADI, an assistant for the Karnataka State Police crime records system. You are given FACTS from the case database and a QUESTION. Answer ONLY from the FACTS. Never invent an FIR number, name, count or date. If the FACTS do not answer it, say so. Be concise: two or three sentences. Never mention or infer caste, religion or occupation; they are excluded from every model here by design. Reply in the same language as the QUESTION. Never mention "the facts", "the provided data", "the sample" or "the list" — the reader cannot see any of that and it reads as the system talking about itself. If the record does not show something, say that the record does not show it.';
 
 let lastError = null;
 let tokenState = 'not-attempted';

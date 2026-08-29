@@ -79,6 +79,15 @@ export default function Assistant() {
   const [interim, setInterim] = useState('');
   const [notice, setNotice] = useState<{ kind: 'warn' | 'error'; text: string } | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  // Whether anything is ACTUALLY making sound, asked of the two audio pipes rather than
+  // inferred from which message we last started.
+  //
+  // speakingIdx was standing in for this and could not: speechSynthesis QUEUES utterances, so
+  // when one finishes its onend clears the flag while the queue keeps talking. The Stop button
+  // was bound to that flag, so it disappeared while the assistant carried on speaking and left
+  // no way to stop it. There is no global "something is speaking" event to subscribe to, so
+  // this polls the two sources that know.
+  const [audible, setAudible] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const ask = useAssistant();
   const exp = useExport();
@@ -101,6 +110,17 @@ export default function Assistant() {
     () => voices.find((v) => /^en[-_]IN/i.test(v.lang)) || voices.find((v) => /^en/i.test(v.lang)),
     [voices],
   );
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const synth = typeof window !== 'undefined' && 'speechSynthesis' in window
+        ? (window.speechSynthesis.speaking || window.speechSynthesis.pending) : false;
+      const el = audioRef.current;
+      const server = Boolean(el && !el.paused && !el.ended);
+      setAudible(Boolean(synth || server));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, ask.isPending]);
   useEffect(() => {
@@ -308,12 +328,15 @@ export default function Assistant() {
   };
 
   const stopSpeaking = () => {
+    // cancel() drops the queue as well as the current utterance, which is the half that was
+    // missing: pausing one sentence while five more waited behind it is not stopping.
     if (ttsSupported) window.speechSynthesis.cancel();
     // Server audio is a different pipe and needs stopping separately, or "Stop" silences the
     // browser voice and leaves Zia's still playing.
     const el = audioRef.current;
     if (el) { el.pause(); el.currentTime = 0; }
     setSpeakingIdx(null);
+    setAudible(false);
   };
 
   /**
@@ -531,12 +554,22 @@ export default function Assistant() {
             ? (knVoice ? tx('Kannada read-aloud ready') : tx('Kannada read-aloud ready — spoken by Zia'))
             : (enVoice ? tx('Read-aloud ready') : tx('Read-aloud ready — spoken by Zia'))}
         </span>
-        <button onClick={() => setAutoSpeak((v) => !v)} className="flex items-center gap-1 hover:text-kadi-blue">
+        {/* Turning this off silences what is already playing. Leaving the current answer to
+            finish after the reader has just said "stop speaking to me" is the wrong reading of
+            the control. */}
+        <button
+          onClick={() => setAutoSpeak((v) => { if (v) stopSpeaking(); return !v; })}
+          className="flex items-center gap-1 hover:text-kadi-blue">
           {autoSpeak ? <Volume2 size={11} /> : <VolumeX size={11} />}
           {autoSpeak ? tx('Speak answers automatically') : tx('Answers are not spoken')}
         </button>
-        {speakingIdx !== null && (
-          <button onClick={stopSpeaking} className="flex items-center gap-1 text-danger hover:underline">
+        {/* Bound to `audible`, not to which message we last started. The old condition went
+            false the moment one utterance ended, taking the only stop control off the screen
+            while the queue behind it kept talking. */}
+        {(audible || speakingIdx !== null) && (
+          <button onClick={stopSpeaking}
+            aria-label={tx('Stop speaking')}
+            className="flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 font-medium text-danger hover:bg-danger/20">
             <Square size={10} /> {tx('Stop')}
           </button>
         )}

@@ -28,6 +28,21 @@ const TOOLS = {
   slippingCases(user) {
     return queries.listHealth(user, { severity: 'high', pageSize: 200 });
   },
+  // One FIR, by the number written on it. The register holds 59,987 cases and every one of
+  // them was reachable by this route -- there was simply no intent that took it, so a question
+  // naming a case number fell into the generic list and the model was handed six unrelated
+  // FIRs to answer from. It said, correctly, that the one asked about was not among them.
+  caseByNumber(user, { crimeNo }) {
+    const res = queries.listCases(user, { search: crimeNo, pageSize: 5 });
+    const hit = (res.items || []).find((c) => String(c.crimeNo) === String(crimeNo))
+      || (res.items || [])[0];
+    if (!hit) return null;
+    let detail = null;
+    let graph = null;
+    try { detail = queries.getCase(user, hit.caseMasterId); } catch { detail = null; }
+    try { graph = queries.graphForCase(user, hit.caseMasterId); } catch { graph = null; }
+    return { hit, detail, graph };
+  },
   emergingHotspots(user) {
     return queries.hotspots(user, { emerging: 'true' });
   },
@@ -69,6 +84,8 @@ function query(user, text, lang) {
   const citations = [];
   let answer = '';
   let action = null;
+  // Set by any branch whose exact wording is the answer. See the scope case below.
+  let noPhrase = false;
 
   const hasSlip = /slip|at.?risk|ageing|aging|pending|pendenc|ಜಾರುತ್ತಿರುವ|ವಿಳಂಬ/.test(t);
   const hasPast = /past case|previous case|history|prior|ಹಿಂದಿನ ಪ್ರಕರಣ|previous/.test(t);
@@ -81,6 +98,11 @@ function query(user, text, lang) {
   // fires on "accurate", stealing "how accurate is the forecast" from the branch above.
   const hasRate = /per.?capita|per 100|\brates?\b|literac|urbanis|urbaniz|densit|socio|ತಲಾ|ದರ/.test(t);
   const hasList = /fir|case|ಪ್ರಕರಣ|show|list|how many|count/.test(t);
+  // A crime number as written on the register: a long unbroken digit run. Matched on the raw
+  // text rather than the lowercased copy because digits are the whole pattern, and bounded at
+  // 10 so a year or a count cannot be mistaken for one.
+  const crimeNoMatch = String(text).match(/\b(\d{10,})\b/);
+  const crimeNoAsked = crimeNoMatch ? crimeNoMatch[1] : null;
 
   if (hasWhy && !hasForecast) {
     intent = 'socio_rates';
@@ -165,6 +187,53 @@ function query(user, text, lang) {
       ? `${res.hotspots.length} ಉದಯೋನ್ಮುಖ ಅಪರಾಧ ತಾಣಗಳು ಪತ್ತೆಯಾಗಿವೆ.`
       : `${res.hotspots.length} emerging hotspot(s) detected where recent activity far exceeds the historical baseline. See the Map.`;
     action = { type: 'open_map' };
+  } else if (crimeNoAsked) {
+    // A specific FIR, asked for by number. This must sit ABOVE the generic list branch: the
+    // phrasing that carries a case number ("tell me about FIR ...") also matches hasList, and
+    // whichever branch runs first decides whether the reader gets their case or a count.
+    intent = 'case_lookup';
+    const found = TOOLS.caseByNumber(user, { crimeNo: crimeNoAsked });
+    if (!found) {
+      // NOT RE-WORDED. "Not visible in your scope" and "does not exist" are different
+      // statements and the model collapses the first into the second -- which tells a station
+      // officer that a case they cannot see is a case that is not there. The distinction is
+      // the entire content of this answer, so it is returned exactly as written.
+      noPhrase = true;
+      answer = isKn
+        ? `${crimeNoAsked} ಸಂಖ್ಯೆಯ ಪ್ರಕರಣ ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಕಾಣಿಸುತ್ತಿಲ್ಲ. ಅದು ಅಸ್ತಿತ್ವದಲ್ಲಿ `
+          + `ಇಲ್ಲ ಎಂದಲ್ಲ — ಬೇರೆ ಜಿಲ್ಲೆಯ ಪ್ರಕರಣವಾಗಿರಬಹುದು. ಸಂಖ್ಯೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ಅಥವಾ ಆ ಜಿಲ್ಲೆಯ `
+          + 'ವ್ಯಾಪ್ತಿ ಇರುವವರನ್ನು ಕೇಳಿ.'
+        : `Case ${crimeNoAsked} is not visible in your scope. That is not the same as it not `
+          + 'existing — it may be registered in a district you do not read. Check the number, '
+          + 'or ask someone whose scope covers that district.';
+    } else {
+      const c = found.hit;
+      const d = found.detail || {};
+      const g = found.graph || { nodes: [], edges: [] };
+      citations.push({ type: 'case', id: String(c.caseMasterId), label: String(c.crimeNo) });
+      // The linked cases are the point of "and the network around it": name them so they are
+      // clickable rather than counted.
+      const linked = (g.nodes || [])
+        .filter((n) => n.type === 'case' && String(n.caseId) !== String(c.caseMasterId))
+        .slice(0, 6);
+      linked.forEach((n) => citations.push({ type: 'case', id: String(n.caseId), label: String(n.label) }));
+      const accused = (d.parties && d.parties.accused) || [];
+      const nLinks = (g.edges || []).length;
+      answer = isKn
+        ? `ಎಫ್‌ಐಆರ್ ${c.crimeNo} — ${c.crimeHead || ''}, ${c.districtName || ''} `
+          + `(${c.unitName || ''}), ಸ್ಥಿತಿ ${c.status || ''}. `
+          + `${accused.length} ಆರೋಪಿ(ಗಳು). ಸುತ್ತಲಿನ ಜಾಲದಲ್ಲಿ ${linked.length} ಸಂಬಂಧಿತ ಪ್ರಕರಣ`
+          + `${linked.length === 1 ? '' : 'ಗಳು'} ಮತ್ತು ${nLinks} ಕೊಂಡಿಗಳು.`
+        : `FIR ${c.crimeNo} — ${c.crimeHead || 'crime head not recorded'} in `
+          + `${c.districtName || 'an unrecorded district'}`
+          + `${c.unitName ? ` (${c.unitName})` : ''}, registered ${c.registrationDate || 'on an unrecorded date'}, `
+          + `status ${c.status || 'unrecorded'}. ${accused.length} accused recorded. `
+          + (linked.length
+            ? `The network around it holds ${linked.length} linked case`
+              + `${linked.length === 1 ? '' : 's'} across ${nLinks} links.`
+            : 'No linked cases were found around it.');
+      action = { type: 'open_case', id: String(c.caseMasterId) };
+    }
   } else if (hasList) {
     intent = 'cases_query';
     const head = detectHead(text, db);
@@ -189,7 +258,7 @@ function query(user, text, lang) {
   }
 
   return {
-    intent, lang: isKn ? 'kn' : 'en', answer, citations, action,
+    intent, lang: isKn ? 'kn' : 'en', answer, citations, action, noPhrase,
     fairness: queries.FAIRNESS_STATEMENT,
     grounded: true,
   };
@@ -271,6 +340,10 @@ async function queryEnhanced(user, text, lang, req) {
     base.answer,
     ...(base.citations || []).slice(0, 8).map((c) => `- ${c.type} ${c.label} (id ${c.id})`),
   ].join('\n');
+
+  // Some answers are their own wording. A branch that sets noPhrase has said something the
+  // model reliably degrades -- see the scope case in query() -- so it is returned verbatim.
+  if (base.noPhrase) return { ...base, llm: 'verbatim', timing: { baseMs } };
 
   // THE PHRASING IS COSMETIC AND MUST NEVER COST THE ANSWER.
   //
