@@ -65,14 +65,43 @@ function fallback(kind, facts) {
 // findings, unreadable as a headline paragraph. A surface that can phrase its own numbers
 // should, and then the model is an improvement on the floor rather than the only thing
 // standing between the reader and a key-value dump.
-async function generate(req, kind, facts, { maxTokens = 220, system = SYSTEM, fallbackText = null } = {}) {
+// WRITTEN IN KANNADA, NOT TRANSLATED INTO IT.
+//
+// This paragraph was the last English thing on a Kannada screen. The obvious fix was to send it
+// through the translator with everything else, and it is the wrong one: round-tripping prose
+// through a second model degrades it -- the same translator renders "which cases are slipping?"
+// as "Active cases" -- and it adds a round trip to the slowest panel on the page. The model
+// writing the sentence can simply be asked for Kannada.
+//
+// What must NOT turn over is everything the deterministic layer computed. A count in Kannada
+// numerals is unreadable next to the chart it describes, and a district name or an FIR number
+// rendered in another script is a corrupted record. So the instruction is explicit about the
+// split: Kannada prose, Latin digits, names exactly as given.
+const KANNADA_RULE = [
+  'WRITE THE PROSE IN KANNADA (ಕನ್ನಡ). Natural Kannada an officer would speak, not transliterated English.',
+  'BUT: keep every number in the digits given (16,136 not ೧೬,೧೩೬), and keep every district,',
+  'station, crime-head and FIR reference EXACTLY as written in the facts, in the Latin script.',
+  'Those are records, not words, and they must read identically in both languages.',
+].join(' ');
+
+async function generate(req, kind, facts, {
+  maxTokens = 220, system = SYSTEM, fallbackText = null, lang = 'en',
+} = {}) {
+  // Taken off the request unless a caller names it. There are ten call sites for this function
+  // and threading a parameter through each is the version of this that ships nine of them --
+  // the tenth is found later, in Kannada, by a reader.
+  const want = lang !== 'en' ? lang : String((req && req.query && req.query.lang) || 'en');
+  const kn = String(want).startsWith('kn');
+  const sys = kn ? `${system} ${KANNADA_RULE}` : system;
   const floor = () => ({ text: fallbackText || fallback(kind, facts), source: 'deterministic' });
   if (!quickml.configured()) return floor();
   try {
     const out = await quickml.complete(req, {
-      system,
+      system: sys,
       user: factsToPrompt(kind, facts),
-      maxTokens,
+      // Kannada takes more tokens per idea than English; the same cap truncates a sentence
+      // mid-clause, which reads as a bug rather than as brevity.
+      maxTokens: kn ? Math.round(maxTokens * 1.6) : maxTokens,
       temperature: 0.35,
     });
     const text = (out || '').trim();

@@ -77,6 +77,15 @@ async function request<T>(path: string, opts: RequestInit = {}, attempt = 0): Pr
   const d = districtParam();
   let url = `${BASE}${path}`;
   if (d && !/[?&]district=/.test(url)) url += `${url.includes('?') ? '&' : '?'}district=${encodeURIComponent(d)}`;
+  // Carry the reading language the same way the scope travels, for the same reason: the server
+  // holds no session, so anything it should know about this reader has to ride on the request.
+  // Only the surfaces that GENERATE prose act on it -- the narrative paragraphs, which are now
+  // written in Kannada rather than translated into it after the fact.
+  let lang: string | null = null;
+  try { lang = globalThis.localStorage?.getItem('kadi.lang') ?? null; } catch { lang = null; }
+  if (lang && lang !== 'en' && !/[?&]lang=/.test(url)) {
+    url += `${url.includes('?') ? '&' : '?'}lang=${encodeURIComponent(lang)}`;
+  }
   const res = await fetch(url, {
     ...opts,
     headers: {

@@ -825,3 +825,32 @@ test('a phrased answer may not contain a number its facts did not', () => {
     'a word-number is not caught by this guard — the prompt handles that, and the guard is '
     + 'the backstop for digits, which is where the damage is');
 });
+
+// The audit trail is read by an officer, so every action the server records must have a
+// sentence to show for it. The map on the Audit page covered five of twelve, and the seven it
+// missed printed raw: "install_model_key" where "Model endpoint key installed" belongs. Each
+// was added by a change that audited something new and did not know a label was owed.
+//
+// Asserted against the source rather than against a copy, so adding an audited action without
+// naming it fails here instead of surfacing later as a machine token on a police screen.
+test('every audited action has a human label on the Audit page', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..', '..');
+
+  const serverSrc = ['functions/api/app.js']
+    .concat(fs.readdirSync(path.join(root, 'functions/api/services'))
+      .filter((f) => f.endsWith('.js')).map((f) => `functions/api/services/${f}`))
+    .map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const recorded = new Set(
+    [...serverSrc.matchAll(/action:\s*'([a-z_]+)'/g)].map((m) => m[1]),
+  );
+
+  const audit = fs.readFileSync(path.join(root, 'client/src/pages/Audit.tsx'), 'utf8');
+  const block = audit.slice(audit.indexOf('ACTION_LABELS'), audit.indexOf('};', audit.indexOf('ACTION_LABELS')));
+  const labelled = new Set([...block.matchAll(/^\s{2}([a-z_]+):/gm)].map((m) => m[1]));
+
+  const missing = [...recorded].filter((a) => !labelled.has(a)).sort();
+  assert.deepStrictEqual(missing, [],
+    `these actions are recorded by the server and have no label on the Audit page: ${missing.join(', ')}`);
+});

@@ -74,6 +74,16 @@ for (const f of files) {
   for (const m of code.matchAll(/\btx\(\s*"((?:[^"\\]|\\.)*)"/g)) add(m[1], f);
   // Quoted strings assigned to obviously user-facing names
   for (const m of code.matchAll(/\b(label|title|hint|text|heading|caption|message|reason|note|placeholder)\s*:\s*'([^']{2,200})'/g)) add(m[2], f);
+  // Sentence-shaped values in ANY object literal, whatever the key is called.
+  //
+  // Label maps keyed by machine token -- view_case: 'Case viewed' -- were invisible to the rule
+  // above, which only recognises a handful of key names. That is how the whole audit action
+  // vocabulary stayed out of the Kannada dictionary while every JSX string went in: the strings
+  // were right there in client source, under keys nobody had thought to list.
+  //
+  // Kept tight by requiring a capitalised value of some length; keep() below still rejects
+  // class soup, identifiers and code fragments.
+  for (const m of code.matchAll(/^\s*[A-Za-z_][\w]*\s*:\s*'([A-Z][^']{3,200})'/gm)) add(m[1], f);
 }
 
 const out = [...found.entries()]

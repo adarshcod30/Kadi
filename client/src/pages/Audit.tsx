@@ -2,17 +2,39 @@ import { useMemo, useState } from 'react';
 import { useMe, useAudit, AUDIT_LIMIT } from '../api/hooks';
 import { Section, Chip, Skeleton, Empty, Mono, KpiCard } from '../components/ui';
 import { Select } from '../components/Select';
+import { useTx } from '../lib/i18n';
 
-const ACTION_LABELS: Record<string, string> = {
+// EVERY action the server can record, not the five somebody happened to name.
+//
+// The map covered five of twelve, so an officer reading the trail saw "install_model_key" and
+// "assistant_document_refused" printed raw — a machine token where a sentence belongs. The
+// missing seven were all recent: each new audited action added a row here that nobody added a
+// label for, which is the failure mode of any hand-kept list that is not asserted anywhere.
+// The test below fails the build if the server records an action this map does not name.
+//
+// These are also the strings that kept the Audit page in English while the rest of the
+// interface turned over: the extractor reads JSX text and known props, not object-literal
+// values, so none of them ever reached the Kannada dictionary. They go through tx() now.
+export const ACTION_LABELS: Record<string, string> = {
   view_case: 'Case viewed',
   view_graph: 'Case-linkage graph viewed',
   view_offender: 'Offender profile viewed',
   assistant_query: 'Assistant query (text)',
   assistant_voice: 'Assistant query (voice)',
+  assistant_transcribe: 'Assistant question spoken aloud',
+  assistant_document: 'Document read by the assistant',
+  assistant_document_refused: 'Document request refused',
+  install_model_key: 'Model endpoint key installed',
+  request_case_update: 'Case update requested',
+  submit_case: 'Case submitted for approval',
+  sign_in: 'Signed in',
 };
-const actionLabel = (a: string) => ACTION_LABELS[a] || a;
 
 export default function Audit() {
+  const tx = useTx();
+  // Translated through tx() rather than rendered raw: these are sentences, and they are the
+  // ones that kept this page in English.
+  const actionLabel = (a: string) => tx(ACTION_LABELS[a] || a);
   const { data: me } = useMe();
   const allowed = me?.capabilities.canViewAudit;
   const [actionFilter, setActionFilter] = useState('');
