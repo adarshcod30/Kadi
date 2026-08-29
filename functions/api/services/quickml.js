@@ -188,10 +188,17 @@ async function ragDocuments(req) {
   if (ragDocIds && Date.now() - ragDocsFetchedAt < RAG_DOCS_TTL_MS) return ragDocIds;
   const out = await listDocuments(req);
   if (out && out.ok && Array.isArray(out.documents) && out.documents.length) {
-    // Exclude documents that failed to index. Passing an id the retriever cannot serve adds
-    // nothing and muddies the diagnosis when an answer comes back empty.
+    // The status filter that used to live here is why the knowledge base has been dark.
+    //
+    // EVERY document in this store reports status "failed" -- and every one of them retrieves
+    // correctly. The field is the last SCHEDULED SYNC's status, and these documents have
+    // scheduleType "none", so there is no sync to succeed. Filtering on it removed all nine,
+    // ragAnswer then returned "knowledge base is empty", and the assistant answered every
+    // meaning-question from nothing. The guard was written to be careful and was the outage.
+    //
+    // Retrieval is the thing that decides whether an id is usable, so a caller cannot know in
+    // advance -- and the endpoint is happy to be handed an id it cannot serve. Pass them all.
     ragDocIds = out.documents
-      .filter((d) => !/fail/i.test(String(d.status)))
       .map((d) => String(d.documentId || d.id))
       .filter(Boolean);
     ragDocsFetchedAt = Date.now();
@@ -422,11 +429,12 @@ async function ragAnswer(req, { question, lang }) {
   try {
     const token = await accessToken(req);
     if (!token) return null;
-    const documents = await ragDocuments(req);
-    if (!documents || !documents.length) {
-      lastError = 'rag: knowledge base is empty';
-      return null;
-    }
+    // Not a precondition. The retriever searches the store whether or not it is handed a
+    // shortlist -- a probe with an empty documents array still came back with two retrieved
+    // nodes and a correct grounded answer -- so an empty list is a narrower search, not an
+    // impossible one. Refusing to call at all is what turned a listing quirk into no
+    // knowledge base at all.
+    const documents = (await ragDocuments(req)) || [];
     // The language hint rides in the query rather than a system prompt -- this endpoint takes
     // a bare question, not a message list, so there is nowhere else to put it.
     const query = lang && String(lang).startsWith('kn')

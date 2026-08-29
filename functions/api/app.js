@@ -25,6 +25,7 @@ const offenderrisk = require('./services/offenderrisk');
 const pendencyrisk = require('./services/pendencyrisk');
 const translate = require('./services/translate');
 const zianlp = require('./services/zianlp');
+const vlm = require('./services/vlm');
 const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
@@ -1158,6 +1159,106 @@ r.get('/analytics/outlook', handle(async (req) => {
         : { engine: 'browser-web-speech', reason: (spoken && spoken.reason) || 'Zia not configured' },
     };
   }));
+  // Speech in, on the server, with Zia's Audio-to-Text model.
+  //
+  // Voice input used to be browser Web Speech, which is Chrome and Edge only and whose Kannada
+  // support is patchy -- the interface literally had to tell a Firefox user to type instead.
+  // This takes the recorded bytes and returns a transcript for en, hi or kn, so the microphone
+  // works in every browser and in the language an officer actually speaks.
+  //
+  // Raw bytes rather than base64 in JSON: the global express.json parser is capped at 1mb and
+  // ignores non-JSON content types, so audio arrives here unread by it and is parsed by the
+  // raw parser below at a limit of its own. Base64 would also cost a third more bytes for
+  // nothing.
+  r.post(
+    '/assistant/transcribe',
+    express.raw({ type: () => true, limit: '12mb' }),
+    handle(async (req) => {
+      const lang = String((req.query && req.query.lang) || 'en');
+      const audio = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!audio || audio.length < 512) {
+        const e = new Error('No audio received. Hold the microphone button while speaking.');
+        e.status = 400; e.code = 'no_audio'; throw e;
+      }
+      const mime = String(req.headers['content-type'] || 'audio/wav');
+      const started = Date.now();
+      const text = await zianlp.transcribe(req, audio, {
+        lang,
+        filename: mime.includes('webm') ? 'speech.webm' : 'speech.wav',
+        mime,
+      });
+      audit.record({
+        user: req.user, action: 'assistant_transcribe', targetType: 'audio',
+        queryText: text || '', ip: req.clientIp, req,
+      });
+      if (!text) {
+        return {
+          text: '', ok: false, engine: 'zia-audio-to-text',
+          // The reason travels, because "nothing happened" after speaking is the least
+          // debuggable failure in the product.
+          detail: zianlp.status().lastError || 'no transcript returned',
+        };
+      }
+      return {
+        text, ok: true, lang, engine: 'zia-audio-to-text',
+        bytes: audio.length, ms: Date.now() - started,
+      };
+    }),
+  );
+
+  // Reading a document or photograph the officer is holding.
+  //
+  // Grounded in the ONE image in this request and labelled as such. It is deliberately not
+  // wired into the case database: mixing "what this photograph says" with "what the register
+  // says" into one answer would make the two indistinguishable, and only one of them is a
+  // record.
+  r.post(
+    '/assistant/document',
+    express.raw({ type: () => true, limit: '12mb' }),
+    handle(async (req) => {
+      const prompt = String((req.query && req.query.q) || 'What does this document say?');
+      const image = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!image || image.length < 256) {
+        const e = new Error('No image received.');
+        e.status = 400; e.code = 'no_image'; throw e;
+      }
+      // Refused before it costs a round trip, and refused in words rather than silently.
+      const refusal = vlm.refuse(prompt);
+      if (refusal) {
+        audit.record({
+          user: req.user, action: 'assistant_document_refused', targetType: 'image',
+          queryText: prompt, ip: req.clientIp, req,
+        });
+        return { ok: false, refused: true, answer: refusal, source: 'document' };
+      }
+      const started = Date.now();
+      const out = await vlm.readImage(req, image, prompt);
+      audit.record({
+        user: req.user, action: 'assistant_document', targetType: 'image',
+        queryText: prompt, ip: req.clientIp, req,
+      });
+      if (!out) {
+        return {
+          ok: false, answer: '', source: 'document',
+          detail: vlm.status().lastError || 'document reader unavailable',
+        };
+      }
+      return {
+        ok: true,
+        answer: out.answer,
+        source: 'document',
+        grounded: true,
+        model: out.model,
+        bytes: image.length,
+        ms: Date.now() - started,
+        // Said on every answer, not buried in a help panel: this came from a photograph the
+        // user just supplied, not from the register.
+        note: 'Read from the image you supplied. Nothing here is from the case database, and '
+          + 'the image is not stored.',
+      };
+    }),
+  );
+
   r.post('/assistant/export', handle(async (req) => {
     const { title, messages } = req.body || {};
     const html = renderBriefingHtml(title || 'KADI Briefing', messages || [], req.user);
@@ -1513,6 +1614,7 @@ r.get('/analytics/outlook', handle(async (req) => {
   }));
 
   r.get('/ai/status', handle(async () => ({
+    documentReader: vlm.status(),
     forecastModel: mlforecast.status(),
     quickml: quickml.status(),
     zia: zia.status(),
