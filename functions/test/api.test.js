@@ -687,3 +687,42 @@ test('a signed-in account cannot be widened by the URL', () => {
   assert.strictEqual(dgp.drilledFromState, true);
   assert.ok(!rbac.caseInScope(dgp, { unitId: '1', districtId: '9' }), 'and reads as that district while drilled');
 });
+
+// The pendency model's serving payload is computed by the PIPELINE, not by the API — the read model
+// carries no charge-sheet date, so the API cannot rebuild a backlog panel. That split is the model's
+// main structural risk: two pieces of code in two languages that must agree on 25 column names, where
+// disagreement produces a confidently wrong score rather than an error.
+test('the pendency serving rows match the trained feature contract exactly', () => {
+  const q = require('../api/services/queries');
+  const pendency = require('../api/services/pendencyrisk');
+  const meta = q.pendencySetMeta();
+  assert.ok(meta && meta.rows > 0, 'pendency_set_meta.json is missing — run the pipeline');
+
+  assert.deepStrictEqual(meta.features, pendency.FEATURES,
+    'the pipeline feature list and the serving feature list have drifted apart');
+
+  const rows = q.pendencyCurrent();
+  assert.ok(rows.length > 0, 'pendency_current.json is empty — run the pipeline');
+  for (const f of pendency.FEATURES) {
+    assert.ok(Number.isFinite(Number(rows[0][f])),
+      `serving row is missing a numeric ${f}, which the endpoint will reject`);
+  }
+  // Every row is one month, and it is the month after the last training row: training needs a future
+  // to label, serving needs the row that has none yet.
+  assert.strictEqual(new Set(rows.map((r) => r.as_of)).size, 1, 'serving rows span more than one month');
+  assert.ok(meta.servingMonth > meta.monthTo,
+    `serving month ${meta.servingMonth} should be later than the last labelled month ${meta.monthTo}`);
+});
+
+// Same rule as the offender family: a model is served only if it beat its baseline on both AUC and
+// average precision, read off the measurement rather than a hand-set flag.
+test('pendency is served only while its measured margins hold', () => {
+  const pendency = require('../api/services/pendencyrisk');
+  const m = pendency.MEASURED;
+  assert.strictEqual(pendency.configured(), m.auc > m.rule && m.ap > m.apRule);
+  // The scale test is what separates this from the station-surge candidate, which was rejected for
+  // scoring 0.738 and collapsing to 0.583 once absolute volumes were removed. If a future measurement
+  // ever puts the scale-free score below the baseline, the model is learning station size again.
+  assert.ok(m.scaleFreeAuc > m.rule,
+    'scale-free AUC has fallen to the baseline — the model may be learning station size, not pendency');
+});

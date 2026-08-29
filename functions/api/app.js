@@ -22,6 +22,7 @@ const agenda = require('./services/agenda');
 const submissions = require('./services/submissions');
 const mlforecast = require('./services/mlforecast');
 const offenderrisk = require('./services/offenderrisk');
+const pendencyrisk = require('./services/pendencyrisk');
 const translate = require('./services/translate');
 const zianlp = require('./services/zianlp');
 const smartbrowz = require('./services/smartbrowz');
@@ -912,6 +913,60 @@ function buildApp() {
     };
   }));
 
+  // Station pendency trajectory. The one model here that scores a REGISTER rather than a person, and
+  // the one the Indian literature actually asks for: Hazra (2020) and Dutta & Husain (2009) both find
+  // that charge-sheeting rate, conviction rate and pendency are the deterrence variables that move
+  // crime rates in India. Where hotspot forecasting is arithmetically out of reach on a state-wide
+  // register -- a 1 km cell in a week averages one case, so the Poisson floor on relative error is
+  // 78% -- a backlog STOCK averages 46 per station-month and is worth modelling.
+  r.get('/analytics/pendency-risk', handle(async (req) => {
+    const db = q.db();
+    const meta = q.pendencySetMeta() || {};
+    const cand = pendencyrisk.candidates(db, req.user, { limit: 24 });
+    if (!cand.items.length) {
+      return { month: cand.month, stations: 0, rankedBy: 'rule', items: [],
+        serving: pendencyrisk.status(), meta };
+    }
+    const scores = await pendencyrisk.score(req, cand.items).catch(() => null);
+    const rows = cand.items.map((c, i) => ({
+      unitId: c.unit_id,
+      unitName: c.unitName,
+      districtName: c.districtName,
+      backlog: c.backlog,
+      openCases: c.open_cases,
+      staleShare: c.stale_share,
+      growth3mo: c.growth_3mo,
+      clearanceRate: c.clearance_rate,
+      cleared: c.cleared,
+      inflow: c.inflow,
+      load: c.load,
+      heinousShare: c.heinous_share,
+      modelScore: scores && Number.isFinite(scores[i]) ? Math.round(scores[i] * 1000) / 1000 : null,
+    }));
+    const scored = rows.filter((r2) => r2.modelScore !== null);
+    if (scored.length) scored.sort((a, b) => b.modelScore - a.modelScore);
+    const m = pendencyrisk.MEASURED;
+    return {
+      month: cand.month,
+      horizonMonths: pendencyrisk.HORIZON_MONTHS,
+      growthThreshold: pendencyrisk.GROWTH_THRESHOLD,
+      stations: cand.total,
+      scored: scored.length || Math.min(cand.items.length, 24),
+      rankedBy: scored.length ? 'model' : 'rule',
+      items: (scored.length ? scored : rows).slice(0, 10),
+      serving: pendencyrisk.status(),
+      meta,
+      note: scored.length
+        ? `Ranked by the model for "will this register's past-window stock be at least `
+          + `${Math.round((pendencyrisk.GROWTH_THRESHOLD - 1) * 100)}% larger in `
+          + `${pendencyrisk.HORIZON_MONTHS} months". It scores ${m.auc} AUC on a time-ordered `
+          + `hold-out against ${m.ruleName}'s ${m.rule}, on ${m.testPositives} hold-out positives.`
+        : `Ranked by ${m.ruleName}, which is the baseline this model was measured against. The model `
+          + 'did not return a usable ranking (see serving.lastError), so the ordering falls back to a '
+          + 'known quantity rather than pretending.',
+    };
+  }));
+
 r.get('/analytics/outlook', handle(async (req) => {
     const { rows } = q.filterCases(req.user, req.query);
     const spots = q.hotspots(req.user, {});
@@ -1343,8 +1398,10 @@ r.get('/analytics/outlook', handle(async (req) => {
     }
     const file = offenderFile || (g === 'district' ? 'training_set_district.csv'
       : g === 'full' ? 'training_set.csv'
-        // Numeric-only spike rows, for the regression pipeline that replaces the classifier.
-        : g === 'spike-numeric' ? 'training_set_spike_numeric.csv' : 'training_set_spike.csv');
+        // The station pendency panel — the one model that scores a register rather than a person.
+        : g === 'pendency' ? 'training_set_pendency.csv'
+          // Numeric-only spike rows, for the regression pipeline that replaces the classifier.
+          : g === 'spike-numeric' ? 'training_set_spike_numeric.csv' : 'training_set_spike.csv');
     const p = path.join(derived, file);
     if (!fs.existsSync(p)) {
       return res.status(404).json({ ok: false, error: { code: 'not_found', message: 'Run the pipeline to build the training set.' } });
@@ -1385,7 +1442,10 @@ r.get('/analytics/outlook', handle(async (req) => {
     // Derived from the model registry rather than restated, so a model added in
     // offenderrisk.js gets a paste target without a matching edit here. A slot list that has
     // to be kept in step by hand is a slot list that will be one model short at some point.
-    const ALLOWED = { spike: 'quickml.spikeRegressorEndpointKey' };
+    const ALLOWED = {
+      spike: 'quickml.spikeRegressorEndpointKey',
+      pendency: 'quickml.pendencyEndpointKey',
+    };
     for (const [slug, m] of Object.entries(offenderrisk.MODELS)) ALLOWED[slug] = m.key;
     const which = String((req.body || {}).model || '');
     const value = String((req.body || {}).key || '').trim();

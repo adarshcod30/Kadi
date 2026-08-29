@@ -221,6 +221,14 @@ export const useOffenderRisk = (model = 'h180') =>
     queryFn: () => api.get<any>(`/analytics/offender-risk?model=${encodeURIComponent(model)}`),
     staleTime: 5 * 60 * 1000,
   });
+// The pendency model scores registers, not people, so it needs no model picker -- one question,
+// one endpoint.
+export const usePendencyRisk = () =>
+  useQuery({
+    queryKey: ['pendency-risk', role()],
+    queryFn: () => api.get<any>('/analytics/pendency-risk'),
+    staleTime: 5 * 60 * 1000,
+  });
 export const useAgenda = (params: Record<string, unknown> = {}) =>
   useQuery({
     queryKey: ['agenda', role(), params],

@@ -48,7 +48,11 @@ SMALL = ["socio", "forecast", "stats", "zones", "occasions", "district_stats", "
          # ML metadata. /ml/training-set publishes these, and the offender family's download
          # route resolves a slug to a filename through offender_set_meta -- without it every
          # grain 404s and the model registry has nothing to describe itself with.
-         "training_set_meta", "offender_set_meta"]
+         "training_set_meta", "offender_set_meta",
+         # The pendency model's metadata AND the rows serving scores from. The second is not metadata
+         # at all -- it is the model's input, and the API cannot rebuild it, so a bundle without it
+         # serves an empty pendency panel with no error to say why.
+         "pendency_set_meta", "pendency_current"]
 
 # The training files themselves, copied byte-for-byte. They are served as downloads rather
 # than parsed, so there is nothing to trim; the whole offender family is ~1.5MB.

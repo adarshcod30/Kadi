@@ -41,6 +41,7 @@ import socio
 import forecast
 import training_set
 import offender_set
+import pendency_set
 
 TODAY = date(2026, 7, 13)
 
@@ -308,6 +309,8 @@ def run(data_dir: str):
     # spike set.
     step("ML training set — offender risk")
     offender_meta = offender_set.compute(tables, unit_district, identities, TODAY, data_dir)
+    step('ML training set — station pendency')
+    pendency_meta = pendency_set.compute(tables, TODAY, data_dir)
 
     # ---------------- write artifacts ----------------
     step("writing derived artifacts")
@@ -333,6 +336,7 @@ def run(data_dir: str):
     common.write_json(data_dir, "forecast", forecast_ctx)
     common.write_json(data_dir, "training_set_meta", training_meta)
     common.write_json(data_dir, "offender_set_meta", offender_meta)
+    common.write_json(data_dir, "pendency_set_meta", pendency_meta)
 
     step("ground-truth evaluation")
     gt_path = os.path.join(data_dir, "_ground_truth.json")

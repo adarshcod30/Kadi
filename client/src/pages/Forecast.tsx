@@ -31,9 +31,9 @@ import {
 
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Flame, Clock, Network, AlertTriangle,
-  BarChart3, Cpu, Users2, CheckCircle2, XCircle,
+  BarChart3, Cpu, Users2, CheckCircle2, XCircle, Activity,
 } from 'lucide-react';
-import { useOutlook, useForecast, useAnomalies, useOffenderRisk, useMe } from '../api/hooks';
+import { useOutlook, useForecast, useAnomalies, useOffenderRisk, usePendencyRisk, useMe } from '../api/hooks';
 import { Skeleton, Empty, Section, TierChip } from '../components/ui';
 import { InfoDot, AiProvenanceInfo } from '../components/InfoDot';
 import { useNav } from '../lib/useNav';
@@ -110,6 +110,7 @@ const CANDIDATES = [
   { task: 'Next FIR recorded Heinous', model: 0.661, rule: 0.502, ruleName: 'recency', ship: true },
   { task: 'Next FIR a crime against women', model: 0.638, rule: 0.459, ruleName: 'recency', ship: true },
   { task: 'District × head spike next month', model: 0.677, rule: 0.620, ruleName: 'inverse recent level', ship: true },
+  { task: 'Station pendency +20% in 3 months', model: 0.870, rule: 0.701, ruleName: 'inflow over recent clearance', ship: true },
   { task: 'Station surge next month', model: 0.738, rule: 0.717, ruleName: 'inverse recent level', ship: false,
     why: 'Wins by +0.021 — but strip absolute volumes from the features and it falls to 0.583, below the rule. It was learning station size, not risk.' },
   { task: 'Location re-victimisation, 14 days', model: 0.621, rule: 0.632, ruleName: '26-week rate', ship: false,
@@ -157,6 +158,7 @@ export default function Forecast() {
   const { data: anom } = useAnomalies(8);
   const [model, setModel] = useState('h180');
   const { data: risk } = useOffenderRisk(model);
+  const { data: pend } = usePendencyRisk();
   const [head, setHead] = useState<'stat' | 'ml'>('stat');
 
   const caps = me?.capabilities;
@@ -537,7 +539,7 @@ export default function Forecast() {
       </>}
 
       {head === 'ml' && <MlHead risk={risk} spike={data.spikeRisk} tier={tier} nav={nav}
-        model={model} setModel={setModel} />}
+        model={model} setModel={setModel} pend={pend} />}
     </div>
   );
 }
@@ -584,8 +586,9 @@ function ShiftPanel({ data }: { data: any }) {
 // ---------------------------------------------------------------------------------------
 // The model head.
 // ---------------------------------------------------------------------------------------
-function MlHead({ risk, spike, tier, nav, model, setModel }: {
+function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
   risk: any; spike: any; tier: string; nav: any; model: string; setModel: (m: string) => void;
+  pend?: any;
 }) {
   const served = (s: any) => s?.rankedBy === 'model';
   // The row for whichever model the picker is on, from the server's own registry when it has
@@ -747,6 +750,74 @@ function MlHead({ risk, spike, tier, nav, model, setModel }: {
             ))}
           </div>
         </Section>
+      )}
+
+      {/* Station pendency. The only model here that scores a REGISTER, and the only one that came
+          from reading the Indian literature rather than the Western predictive-policing canon. */}
+      {pend?.items?.length > 0 && (
+      <Section title={<span className="flex items-center gap-2">
+        <Activity size={15} className="text-kadi-blue" /> Registers falling further behind
+        <span className="text-[12px] font-normal text-ink-muted">
+          {pend.stations} in scope · top {pend.scored} by {pend.serving?.ruleName?.split(' (')[0]},
+          re-ranked by {pend.rankedBy}
+        </span>
+        <InfoDot label="Why pendency" align="left" width="w-[26rem]">
+          <b className="block mb-1 text-kadi-navy">Why this question and not hotspots</b>
+          The Indian econometric literature is consistent that the deterrence variables which move
+          crime rates here are charge-sheeting rate, conviction rate and pendency — Hazra (2020) across
+          32 states, Dutta &amp; Husain (2009) on earlier panel data. That is a lever about disposal,
+          and a FIR register can speak to disposal.
+          <b className="block mt-1.5 text-kadi-navy">Why not "where will crime happen"</b>
+          At a 1&nbsp;km cell and a week this register averages one case, so the best possible predictor
+          of the count is still 78% out. A backlog averages 46 per station-month and is worth modelling.
+          <b className="block mt-1.5 text-kadi-navy">What it must not become</b>
+          It scores registers, not people. A station forecast to fall behind is somewhere to send help.
+          Note the failure mode honestly: the strongest feature is the stale share of the register, and
+          an officer could improve that by registering fewer cases.
+        </InfoDot>
+      </span>}>
+        <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">{pend.note}</p>
+        <div className="px-4 pb-2 pt-2 text-[12px] text-ink-subtle">
+          As at {pend.month} · asking whether the past-window stock will be at least
+          {' '}{Math.round((pend.growthThreshold - 1) * 100)}% larger in {pend.horizonMonths} months.
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide text-ink-subtle border-b border-line">
+                <th className="text-left font-medium px-4 py-2">Station</th>
+                <th className="text-right font-medium px-3 py-2">Past window</th>
+                <th className="text-right font-medium px-3 py-2">Share of register</th>
+                <th className="text-right font-medium px-3 py-2">Cleared / month</th>
+                <th className="text-right font-medium px-3 py-2">Arriving vs clearing</th>
+                <th className="text-right font-medium px-4 py-2">{pend.rankedBy === 'model' ? 'Score' : 'Rank by'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pend.items.map((r: any) => (
+                <tr key={r.unitId} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-2">
+                    <span className="text-ink">{r.unitName}</span>
+                    <span className="text-ink-subtle text-[11.5px] ml-1.5">{r.districtName}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right font-num">{r.backlog}<span className="text-ink-subtle"> of {r.openCases}</span></td>
+                  <td className="px-3 py-2 text-right font-num">{Math.round(r.staleShare * 100)}%</td>
+                  <td className="px-3 py-2 text-right font-num">{r.cleared}</td>
+                  <td className="px-3 py-2 text-right font-num">
+                    <span className={r.load >= 5 ? 'text-danger' : 'text-ink-muted'}>{r.load.toFixed(1)}×</span>
+                  </td>
+                  <td className="px-4 py-2 text-right font-num text-ink-muted">
+                    {r.modelScore != null ? `p ${r.modelScore}` : `${r.load.toFixed(1)}×`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="px-4 py-3 text-[11.5px] text-ink-subtle leading-relaxed border-t border-line">
+          {pend.serving?.caveat}
+        </p>
+      </Section>
       )}
 
       {/* The model family. Added after a second sweep, because "seven tasks measured" was

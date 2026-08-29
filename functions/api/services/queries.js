@@ -1100,6 +1100,12 @@ module.exports = {
     for (const d of ((db.socio && db.socio.districts) || [])) out[String(d.districtId)] = d;
     return out;
   },
+  // The pendency set's metadata and the current per-station rows serving scores. Both are written by
+  // the pipeline because the read model carries no charge-sheet date, so the API cannot rebuild the
+  // backlog panel itself.
+  pendencySetMeta: () => load().pendencySetMeta || null,
+  pendencyCurrent: () => load().pendencyCurrent || [],
+
   // The repeat-offending set's metadata, written by the pipeline beside its CSV.
   offenderSetMeta: () => {
     const db = load();

@@ -184,6 +184,8 @@ function ModelKeys() {
       config: 'quickml.offenderWomen365EndpointKey' },
     { key: 'spike', label: 'District × head spike', endpoint: 'kadi-spike-regressor-endpoint',
       config: 'quickml.spikeRegressorEndpointKey' },
+    { key: 'pendency', label: 'Station pendency trajectory', endpoint: 'kadi-pendency-endpoint',
+      config: 'quickml.pendencyEndpointKey' },
   ];
 
   const install = async (m: typeof MODELS[number]) => {
