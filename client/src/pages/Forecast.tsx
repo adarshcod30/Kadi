@@ -600,7 +600,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
     <>
       {/* What is actually serving, first and without decoration. A model page whose first
           panel is a result rather than a provenance statement is asking to be believed. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {/* Reads the model the picker is on rather than restating one model's numbers. The
             hard-coded version drifted the moment the measurement was corrected: this card said
             0.769 while the panel directly beneath it said 0.746, which is worse than either
@@ -616,6 +616,25 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
           question="Which district and crime head runs well above its own normal next month?"
           model={0.677} rule={0.620} ruleName="inverse recent level"
           serving={served(spike)} lastError={spike ? undefined : 'not computed at this rank'}
+        />
+        {/* The third family, and the one this row was missing: the header sentence above counts
+            the serving models off the registry and said EIGHT while this row showed two. A count
+            that is computed sitting next to a set of cards that is hand-maintained is the same
+            drift the counter was introduced to kill, one level up.
+
+            Its numbers come from the serving object rather than the page's own table, for the
+            reason the offender card does: when the measurement was corrected the hard-coded card
+            said 0.769 over a panel saying 0.746. The rule name is shortened the way the panel
+            subtitle below shortens it -- "load", not "load (inflow over recent clearance)" --
+            because at three columns the long form is what breaks the row. */}
+        <ModelCard
+          title="Station pendency"
+          question="Which registers are falling further behind over the next three months?"
+          model={pend?.serving?.modelAuc ?? 0.870}
+          rule={pend?.serving?.ruleAuc ?? 0.701}
+          ruleName={pend?.serving?.ruleName?.split(' (')[0] || 'load'}
+          serving={served(pend)}
+          lastError={pend ? pend.serving?.lastError : 'not loaded'}
         />
       </div>
 
