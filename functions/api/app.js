@@ -1327,6 +1327,134 @@ r.get('/analytics/outlook', handle(async (req) => {
   // One call to see whether the Catalyst AI services are actually wired.
   // One-shot bootstrap for tables the app writes to but the pipeline does not create.
   // Idempotent, admin-only, and reports what it found rather than what it assumed.
+  // WHAT AN ADMINISTRATOR ACTUALLY NEEDS TO SEE.
+  //
+  // The Administration screen used to report a "Pipeline status" of six rows that were all
+  // hard-coded to ok. It could not have said otherwise: nothing on the page read anything about
+  // the artifacts, so the panel was a picture of a healthy system rather than a reading of one.
+  // A status display that cannot report a fault is worse than no status display, because it is
+  // trusted and it is decorative.
+  //
+  // This returns the real thing: what each derived artifact contains and when it was built,
+  // which models are serving by model rather than by rule and whether their key is installed,
+  // and what privileged actions have been taken. All of it read off the files and the serving
+  // modules rather than restated.
+  r.get('/admin/overview', handle(async (req) => {
+    rbac.requireRole(req.user, ['Admin', 'DGP']);
+    // Required here rather than at module scope, matching how the download route below does
+    // it. Without these the route threw "path is not defined" on every call -- a 500 that the
+    // Administration screen showed as an empty panel, which is exactly the failure this route
+    // exists to stop the page having.
+    // eslint-disable-next-line global-require
+    const fs = require('fs');
+    // eslint-disable-next-line global-require
+    const path = require('path');
+    const derivedDir = path.join(require('./services/store.mock').DATA_DIR, 'derived');
+
+    // --- artifacts: size and mtime for every derived file, plus what the meta files declare
+    const artifacts = [];
+    let files = [];
+    try { files = fs.readdirSync(derivedDir); } catch { files = []; }
+    for (const f of files.sort()) {
+      try {
+        const st = fs.statSync(path.join(derivedDir, f));
+        artifacts.push({
+          file: f,
+          bytes: st.size,
+          builtAt: st.mtime.toISOString(),
+          ageDays: Math.round((Date.now() - st.mtimeMs) / 86400000),
+        });
+      } catch { /* a file that vanished between readdir and stat is not worth a 500 */ }
+    }
+
+    const readMeta = (name) => {
+      try { return JSON.parse(fs.readFileSync(path.join(derivedDir, name), 'utf8')); } catch { return null; }
+    };
+    const trainingMeta = readMeta('training_set_meta.json');
+    const offenderMeta = readMeta('offender_set_meta.json');
+    const pendencyMeta = readMeta('pendency_set_meta.json');
+
+    const trainingSets = [
+      trainingMeta && {
+        name: 'District × head spike', grain: trainingMeta.grain, rows: trainingMeta.rows,
+        from: trainingMeta.monthFrom, to: trainingMeta.monthTo,
+        features: (trainingMeta.features || []).length, builtOn: trainingMeta.builtOn,
+      },
+      offenderMeta && {
+        name: 'Repeat offending (6 targets)', grain: offenderMeta.grain, rows: offenderMeta.rows,
+        from: offenderMeta.monthFrom, to: offenderMeta.monthTo,
+        features: (offenderMeta.features || []).length, builtOn: offenderMeta.builtOn,
+        tasks: (offenderMeta.tasks || []).map((t) => ({ slug: t.slug, rows: t.rows, positives: t.positives })),
+      },
+      pendencyMeta && {
+        name: 'Station pendency', grain: pendencyMeta.grain, rows: pendencyMeta.rows,
+        from: pendencyMeta.monthFrom, to: pendencyMeta.monthTo,
+        features: (pendencyMeta.features || []).length, builtOn: pendencyMeta.builtOn,
+        servingMonth: pendencyMeta.servingMonth, stations: pendencyMeta.stations,
+      },
+    ].filter(Boolean);
+
+    // --- models: measured margins and whether a key is actually installed
+    const keyPresent = async (configKey) => {
+      try {
+        const rows = await datastore.query(req,
+          `SELECT configValue FROM AppConfig WHERE configKey = '${configKey}'`, 'AppConfig');
+        return Boolean(rows && rows[0] && String(rows[0].configValue || '').length >= 32);
+      } catch { return null; }
+    };
+    const models = [];
+    for (const [slug, m] of Object.entries(offenderrisk.MODELS)) {
+      models.push({
+        slug, family: 'Repeat offending', question: m.question,
+        auc: m.auc, rule: m.rule, ruleName: m.ruleName,
+        margin: Math.round((m.auc - m.rule) * 1000) / 1000,
+        configKey: m.key,
+        // eslint-disable-next-line no-await-in-loop
+        keyInstalled: await keyPresent(m.key),
+      });
+    }
+    const spikeSt = mlforecast.status();
+    models.push({
+      slug: 'spike', family: 'Spike risk', question: spikeSt.task,
+      auc: spikeSt.modelAuc, rule: spikeSt.ruleAuc, ruleName: spikeSt.ruleName,
+      margin: Math.round((spikeSt.modelAuc - spikeSt.ruleAuc) * 1000) / 1000,
+      configKey: 'quickml.spikeRegressorEndpointKey',
+      keyInstalled: await keyPresent('quickml.spikeRegressorEndpointKey'),
+    });
+    const pendSt = pendencyrisk.status();
+    models.push({
+      slug: 'pendency', family: 'Station pendency', question: pendSt.task,
+      auc: pendSt.modelAuc, rule: pendSt.ruleAuc, ruleName: pendSt.ruleName,
+      margin: pendSt.margin, configKey: pendSt.configKey,
+      keyInstalled: await keyPresent(pendSt.configKey),
+    });
+
+    // --- audit: what has actually been done, and by which role
+    const recent = audit.list({ limit: 40 });
+    const byAction = {};
+    for (const r of audit.list({ limit: 500 })) byAction[r.action] = (byAction[r.action] || 0) + 1;
+
+    return {
+      artifacts,
+      artifactBytes: artifacts.reduce((a, b) => a + b.bytes, 0),
+      trainingSets,
+      models,
+      ai: {
+        documentReader: vlm.status(),
+        knowledgeBase: quickml.status(),
+        nlp: zianlp.status(),
+      },
+      audit: {
+        recent: recent.map((r) => ({
+          at: r.at, action: r.action, role: r.role, user: r.user,
+          targetType: r.targetType, targetId: r.targetId,
+        })),
+        byAction,
+        buffered: recent.length,
+      },
+    };
+  }));
+
   r.post('/admin/bootstrap', handle(async (req) => {
     rbac.requireRole(req.user, ['Admin']);
     // The table now exists (created from the console). Add the columns it needs.
