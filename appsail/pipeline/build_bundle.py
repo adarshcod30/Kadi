@@ -17,6 +17,14 @@ What gets trimmed and why:
   link_edges       28MB -> not loaded by the API at all (adjacency covers it). Skipped.
   offender_map    5.6MB -> only the case->offender direction is read. Kept compact.
 
+The trimming is the interesting part, but the LIST is the load-bearing part: this script is
+the definition of what the deployed function contains. Copying data/output/derived across
+wholesale instead of running this is not a shortcut, it is a different bundle -- it ships the
+52MB uncompacted adjacency, and the read model then fails to load inside the function's
+execution limit. The failure is silent: every route that touches the store returns an empty
+HTTP 200, /health keeps answering because it never loads anything, and the deployment looks
+fine. If you add an artifact the API reads, add it here.
+
 Run:  python appsail/pipeline/build_bundle.py
 Out:  functions/api/data/
 """
@@ -36,7 +44,19 @@ OUT_DERIVED = os.path.join(OUT, "derived")
 # Copied through untouched — all small.
 SMALL = ["socio", "forecast", "stats", "zones", "occasions", "district_stats", "national", "alerts",
          "hotspots", "eval_report", "offenders", "anomalies", "clusters",
-         "case_linked_count", "offender_of_case", "stations", "link_summary"]
+         "case_linked_count", "offender_of_case", "stations", "link_summary",
+         # ML metadata. /ml/training-set publishes these, and the offender family's download
+         # route resolves a slug to a filename through offender_set_meta -- without it every
+         # grain 404s and the model registry has nothing to describe itself with.
+         "training_set_meta", "offender_set_meta"]
+
+# The training files themselves, copied byte-for-byte. They are served as downloads rather
+# than parsed, so there is nothing to trim; the whole offender family is ~1.5MB.
+#
+# Listed by glob rather than by name on purpose: the offender family gained four members in
+# one afternoon, and a hand-maintained list here would have been the thing that was one model
+# short. Anything the pipeline writes as training_set*.csv ships.
+TRAINING_GLOB = "training_set*.csv"
 LOOKUPS = ["District", "Unit", "CrimeHead", "CrimeSubHead", "CaseStatusMaster",
            "CaseCategory", "GravityOffence", "GenderMaster", "Court", "Section", "Act",
            "Rank", "Designation", "ArrestSurrenderType", "StationCategory"]
@@ -119,6 +139,20 @@ def main():
         a = write(os.path.join(OUT_DERIVED, f"{name}.json"), obj)
         total_before += b
         total_after += a
+
+    # ---- training files, verbatim ----
+    import glob as _glob
+    n_train = 0
+    for src in sorted(_glob.glob(os.path.join(DERIVED, TRAINING_GLOB))):
+        b = size_mb(src)
+        dst = os.path.join(OUT_DERIVED, os.path.basename(src))
+        with open(src, "rb") as fi, open(dst, "wb") as fo:
+            fo.write(fi.read())
+        total_before += b
+        total_after += size_mb(dst)
+        n_train += 1
+    if n_train:
+        print(f"  training sets    {n_train} files copied verbatim")
 
     # ---- adjacency ----
     # 70% of this file is the evidence blob, and most of that is redundant:
