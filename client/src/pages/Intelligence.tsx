@@ -578,7 +578,9 @@ function ZoneBoard({ zones }: { zones: any }) {
               <span className={`w-2 h-2 rounded-full shrink-0 ${ZONE_STYLE[d.zone]?.ring || ''}`}
                 style={{ background: ZONE_STYLE[d.zone]?.dot || '#3AA76D' }} />
               <span className="text-[13px] text-ink flex-1 truncate">
-                {d.districtName || `Station ${d.unitId}`}
+                {/* District rows carry a districtName; station rows carry a unitName. The id
+                    is the last resort, not the second one. */}
+                {d.unitId ? (d.unitName || `Station ${d.unitId}`) : (d.districtName || '—')}
               </span>
               <span className="text-[11.5px] text-ink-muted w-40 truncate hidden sm:block">{d.driverHead || ''}</span>
               <span className="font-num text-[12.5px] text-ink-muted w-24 text-right">{d.current} vs {d.baseline}</span>

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useMe, useAlerts, useLookups, useSubmissions } from '../api/hooks';
 import { useLang, useT } from '../lib/i18n';
-import { setRole, getRole, signOut as clearSession, Role } from '../lib/api';
+import { setRole, getRole, signOut as clearSession, districtParam, Role } from '../lib/api';
 import { SeverityDot } from './ui';
 import { Popover, usePopover } from '../lib/Popover';
 
@@ -50,6 +50,17 @@ export function Shell({ children }: { children: ReactNode }) {
   };
 
   const visibleNav = NAV.filter((n) => !n.roles || (me && n.roles.includes(me.user.role)));
+
+  // Scope lives in the URL (see lib/api.ts), which means a link that drops the query string
+  // silently widens what the reader is looking at. Drilling into Belagavi and clicking any
+  // sidebar item returned a state view under the same session -- no warning, and the scope
+  // chip in the header quietly flipped back to "All Karnataka". Carrying the parameter keeps
+  // the rail a way of changing SUBJECT while the scope stays where it was put.
+  const scopeQuery = (() => {
+    const d = districtParam();
+    return d ? `?district=${encodeURIComponent(d)}` : '';
+  })();
+  const withScope = (to: string) => (to === '/' ? `/${scopeQuery}` : `${to}${scopeQuery}`);
 
   // One destination, two meanings. A station officer files a case; an SP, the DGP or the
   // Administrator decides one. The approver also gets a count, because a queue you have to
@@ -140,7 +151,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           <nav className={`flex-1 py-2 space-y-0.5 overflow-y-auto ${collapsed ? 'px-1.5' : 'px-1.5 md:px-2'}`}>
             {visibleNav.map((n) => (
-              <NavLink key={n.key} to={n.to} end={n.end} title={t(n.key)}
+              <NavLink key={n.key} to={withScope(n.to)} end={n.end} title={t(n.key)}
                 className={({ isActive }) =>
                   // Pill-shaped active state rather than a full-bleed band with a right rule.
                   // The inset pill reads as a selected item; the edge-to-edge band read as a

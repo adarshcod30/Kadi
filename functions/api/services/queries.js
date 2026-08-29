@@ -1458,13 +1458,27 @@ module.exports = {
       ...c, districtId: d.districtId, districtName: d.districtName, month: d.month,
     }))).sort((a, b) => b.z - a.z);
 
+    // NAME THE STATIONS. db.zones.stations carries unitId and districtId and nothing else,
+    // because the pipeline writes it keyed rather than labelled. Passed through unjoined it
+    // surfaced as "Station 46" in the zone board and, worse, as "unit 46 with a change of
+    // 575%" in the AI reading -- a sentence addressed to an officer who cannot act on a
+    // number. The roster join is the same one anomalies() already does.
+    const roster = new Map();
+    for (const st of (db.stations || [])) roster.set(String(st.unitId), st);
+    const named = (rows) => (rows || []).map((s) => {
+      const st = roster.get(String(s.unitId));
+      return st
+        ? { ...s, unitName: st.unitName, districtName: st.districtName }
+        : { ...s, unitName: `Station ${s.unitId}`, districtName: s.districtName || '' };
+    });
+
     if (user.roleMeta.tier === 'state' && !user.drilledFromState) {
-      return { ...z, scope: 'state', alerts: alerts(z.districts) };
+      return { ...z, stations: named(z.stations), scope: 'state', alerts: alerts(z.districts) };
     }
 
     const did = String(user.districtId);
     const districts = z.districts.filter((d) => String(d.districtId) === did);
-    const stations = z.stations.filter((s) => String(s.districtId) === did);
+    const stations = named(z.stations.filter((s) => String(s.districtId) === did));
 
     // A district officer's summary must count THEIR STATIONS, not the one district they are.
     // Passing the state summary through is what made a drilled-in Shivamogga view report

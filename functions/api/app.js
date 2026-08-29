@@ -423,8 +423,10 @@ function buildApp() {
       stationsRed: s.red, stationsPulsing: s.red_pulsing, stationsYellow: s.yellow,
       stationsNormal: s.normal,
       categoryAlertsHere: alerts,
+      // Named, for the same reason the state branch is: this is the block a drilled-in SP
+      // reads, and "Unit 178 showing a 114.9% increase" names nowhere they can go.
       stationsAboveOwnBaseline: (z.stations || []).slice(0, 3).map((x) => ({
-        unitId: x.unitId, current: x.current, ownAverage: x.baseline,
+        station: x.unitName || `Station ${x.unitId}`, current: x.current, ownAverage: x.baseline,
         sigmasAboveOwnAverage: x.z, change: `${x.changePct}%`,
       })),
     } : {
@@ -437,7 +439,9 @@ function buildApp() {
         district: d.districtName, change: `${d.changePct}%`, driver: d.driverHead,
         current: d.current, ownAverage: d.baseline, sigmasAboveOwnAverage: d.z,
       })),
-      stationsPulsing: hot.map((x) => ({ unitId: x.unitId, current: x.current,
+      // The station's NAME, not its id. The model writes what it is given, and given a bare
+      // unitId it produced "the stations with the highest change are unit 46 and unit 294".
+      stationsPulsing: hot.map((x) => ({ station: x.unitName || `Station ${x.unitId}`, current: x.current,
         baseline: x.baseline, change: `${x.changePct}%` })),
     };
     const { text, source } = await insight.generate(
