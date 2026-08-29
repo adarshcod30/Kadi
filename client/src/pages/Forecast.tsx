@@ -838,17 +838,24 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
       {active === 'offender' && (
       <Section
         action={
-          <div className="flex items-center gap-1 flex-wrap justify-end">
-            {(risk?.models || MODEL_FAMILY.map((m) => ({ slug: m.slug, short: m.label }))).map((m: any) => (
-              <button key={m.slug} onClick={() => setModel(m.slug)} title={m.question || m.short}
-                className={`text-[11.5px] rounded-full px-2.5 py-1 border transition-colors ${
-                  model === m.slug
-                    ? 'bg-kadi-navy text-white border-kadi-navy'
-                    : 'bg-surface border-line text-ink-muted hover:bg-kadi-blue50'}`}>
-                {m.short}
-              </button>
-            ))}
-          </div>
+          /* SIX CHIPS BECAME A NAMED CONTROL.
+             Wrapped onto two rows at most widths, and read as filter tags rather than as one
+             choice of six — nothing said these were mutually exclusive, or that the panel below
+             was answering whichever was dark. A labelled select says both: this is a choice,
+             and this is what it currently is. */
+          <label className="flex items-center gap-2 text-[12px] text-ink-muted">
+            <span className="whitespace-nowrap">Question</span>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              aria-label="Which repeat-offending question to rank by"
+              className="input text-[12.5px] py-1 pr-8 max-w-[17rem] font-medium text-ink">
+              {(risk?.models || MODEL_FAMILY.map((m) => ({ slug: m.slug, short: m.label })))
+                .map((m: any) => (
+                  <option key={m.slug} value={m.slug}>{m.short}</option>
+                ))}
+            </select>
+          </label>
         }
         title={<span className="flex items-center gap-2">
         <Users2 size={15} className="text-kadi-blue" /> {(risk?.question || 'back on a new FIR within 180 days')

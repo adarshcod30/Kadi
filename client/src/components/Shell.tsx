@@ -158,7 +158,16 @@ export function Shell({ children }: { children: ReactNode }) {
           {/* The collapse control belongs at the top of the rail, next to what it collapses --
               not buried at the foot beneath the account row, which is where people looked for
               sign-out and found a chevron instead. */}
-          <div className={`hidden md:flex items-center border-b border-line h-9 ${collapsed ? 'justify-center px-1' : 'justify-end px-2'}`}>
+          {/* The rail's own heading. This strip held a lone chevron and a lot of nothing, directly
+              under the masthead — the first thing a reader's eye lands on when it drops into the
+              sidebar. Naming what the list below IS costs nothing and stops the column starting
+              on an empty note. Hidden when collapsed, where there is no room for a word. */}
+          <div className={`hidden md:flex items-center border-b border-line h-9 ${collapsed ? 'justify-center px-1' : 'justify-between pl-3 pr-2'}`}>
+            {!collapsed && (
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-subtle">
+                {t('navHeading')}
+              </span>
+            )}
             <button onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className="grid place-items-center w-7 h-7 rounded-ctl text-ink-muted hover:bg-kadi-blue50 hover:text-kadi-blue transition-colors">

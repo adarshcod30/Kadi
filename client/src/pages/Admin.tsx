@@ -6,6 +6,26 @@ import { Section, Empty, Chip } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { api } from '../lib/api';
 
+// Written against rbac.js ROLES, which is where the tiers actually live. Each row says what
+// the rank can SEE, because scope is the only thing that differs between them and the only
+// question an administrator opens this panel with.
+const ROLE_NOTES: { key: string; title: string; tier: string; sees: string }[] = [
+  { key: 'DGP', title: 'Director General of Police', tier: 'state',
+    sees: 'All 31 districts. May drill into any one and back out again — the whole point of holding the state view. Reads the audit trail and the administration overview.' },
+  { key: 'Admin', title: 'System Administrator', tier: 'state',
+    sees: 'Everything the DGP reads, plus the controls that refresh what the app reads and the slots where model endpoint keys are installed.' },
+  { key: 'Analyst', title: 'SCRB Analyst', tier: 'state',
+    sees: 'All 31 districts, read-only. The analytical surfaces — forecasts, models, linkage — without the administrative controls.' },
+  { key: 'SP', title: 'Superintendent of Police', tier: 'district',
+    sees: 'One district: its registers, its stations, its offenders. Never more than one at a time.' },
+  { key: 'DSP', title: 'DySP / ACP', tier: 'district',
+    sees: 'The same district view as an SP, at sub-division rank.' },
+  { key: 'SHO', title: 'Station House Officer', tier: 'station',
+    sees: 'One register — their own station. The tier this product argues from: stand in it and see how little is visible from a single desk.' },
+  { key: 'SI', title: 'Sub-Inspector (Investigating Officer)', tier: 'station',
+    sees: 'The station register from the investigating officer’s side: the cases on their desk and the clock running on each.' },
+];
+
 export default function Admin() {
   const { data: me } = useMe();
   const { data: ev } = useEval();
@@ -71,9 +91,40 @@ export default function Admin() {
 
         <ModelKeys />
 
-        <Section title="Roles">
-          <div className="p-4 flex flex-wrap gap-2">
-            {me.roles.map((r) => <Chip key={r} color="navy" className="!bg-surface-3 !text-ink">{r}</Chip>)}
+        {/* The roles panel was seven bare chips and a lot of white space — it named the ranks
+            and said nothing about what any of them can do, which is the only question an
+            administrator opens this panel with. Scope is the thing that differs, so scope is
+            what each row states. */}
+        <Section title={<span className="flex items-center gap-2">
+          Roles and what each one sees
+          <InfoDot label="How scope works" align="left" width="w-80">
+            <b className="block mb-1 text-kadi-navy">Enforced on the server, every request</b>
+            Scope is re-derived from the request each time — there is no session holding it. A
+            signed-in account is pinned to the district and station in its token, and
+            <code className="font-mono text-[11px]"> ?district=</code> in the URL is ignored for
+            anything below state tier.
+          </InfoDot>
+        </span>}>
+          <div className="divide-y divide-line/70">
+            {ROLE_NOTES.map((r) => {
+              // me.roles is the list of roles a demo session may ASSUME, not the one it holds —
+              // matching against it marked five ranks at once as "your role". The role actually
+              // in force is on the user object.
+              const held = (me as any).user?.role === r.key;
+              return (
+                <div key={r.key} className={`px-4 py-2.5 flex items-start gap-3 ${held ? 'bg-kadi-blue50/40' : ''}`}>
+                  <Chip color="navy" className="!bg-surface-3 !text-ink shrink-0 mt-0.5">{r.key}</Chip>
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-ink">
+                      {r.title}
+                      <span className="text-ink-subtle"> · {r.tier}</span>
+                      {held && <span className="ml-2 text-[11px] text-kadi-blue">your role</span>}
+                    </div>
+                    <div className="text-[11.5px] text-ink-muted mt-0.5 leading-relaxed">{r.sees}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Section>
       </div>

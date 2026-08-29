@@ -948,5 +948,21 @@
  "English voice": "ಇಂಗ್ಲಿಷ್ ಧ್ವನಿ",
  "Which stations in this district sit above their own baseline, and what is driving it.": "ಈ ಜಿಲ್ಲೆಯ ಯಾವ ನಿಲ್ದಾಣಗಳು ತಮ್ಮದೇ ಆದ ಬೇಸ್ಲೈನ್ಗಿಂತ ಮೇಲಿವೆ ಮತ್ತು ಅದನ್ನು ಯಾವುದು ಚಾಲನೆ ಮಾಡುತ್ತಿದೆ.",
  "Wins by +0.021 — but strip absolute volumes from the features and it falls to 0.583, below the rule. It was learning station size, not risk.": "0.021 ರಿಂದ ಜಯಗಳು - ಆದರೆ ಲಕ್ಷಣಗಳಿಂದ ನಿಜವಾದ ಪ್ರಮಾಣಗಳನ್ನು ತೆಗೆದುಹಾಕಿದರೆ ಅದು 0.583 ಗೆ ಇಳಿಯುತ್ತದೆ, ನಿಯಮಕ್ಕಿಂತ ಕೆಳಗೆ. ಅದು ಅಪಾಯವನ್ನು ಅಲ್ಲ, ಸ್ಟೇಶನ್ ಗಾತ್ರವನ್ನು ಕಲಿತಿತ್ತು.",
- "Worth knowing: a console Connection cannot be read by the SDK’s app.connection(), which expects a self-managed connector and errors with \"client_id cannot be null\".": "ತಿಳಿಯಲು ಯೋಗ್ಯ: ಒಂದು ಕನ್ಸೋಲ್ ಸಂಪರ್ಕವನ್ನು SDK ನ ಅಪ್ಲಿಕೇಶನ್.ಕನೆಕ್ಷನ್() ಓದಲು ಸಾಧ್ಯವಿಲ್ಲ, ಇದು ಸ್ವಯಂ ನಿರ್ವಹಿಸಲ್ಪಡುವ ಕನೆಕ್ಟರ್ ಅನ್ನು ನಿರೀಕ್ಷಿಸುತ್ತದೆ ಮತ್ತು \"client_id cannot be null\" ಎಂಬ ದೋಷವನ್ನು ನೀಡುತ್ತದೆ."
+ "Worth knowing: a console Connection cannot be read by the SDK’s app.connection(), which expects a self-managed connector and errors with \"client_id cannot be null\".": "ತಿಳಿಯಲು ಯೋಗ್ಯ: ಒಂದು ಕನ್ಸೋಲ್ ಸಂಪರ್ಕವನ್ನು SDK ನ ಅಪ್ಲಿಕೇಶನ್.ಕನೆಕ್ಷನ್() ಓದಲು ಸಾಧ್ಯವಿಲ್ಲ, ಇದು ಸ್ವಯಂ ನಿರ್ವಹಿಸಲ್ಪಡುವ ಕನೆಕ್ಟರ್ ಅನ್ನು ನಿರೀಕ್ಷಿಸುತ್ತದೆ ಮತ್ತು \"client_id cannot be null\" ಎಂಬ ದೋಷವನ್ನು ನೀಡುತ್ತದೆ.",
+ "One district: its registers, its stations, its offenders. Never more than one at a time.": "ಒಂದು ಜಿಲ್ಲೆಃ ಅದರ ಠಾಣೆಗಳು ಅದರ ಅಪರಾಧಿಗಳನ್ನು ನೋಂದಾಯಿಸುತ್ತವೆ. ಒಂದು ಸಮಯದಲ್ಲಿ ಒಂದಕ್ಕಿಂತ ಹೆಚ್ಚು.",
+ "One register — their own station. The tier this product argues from: stand in it and see how little is visible from a single desk.": "ಒಬ್ಬರು ತಮ್ಮ ಸ್ವಂತ ನಿಲ್ದಾಣವನ್ನು ನೋಂದಾಯಿಸಿಕೊಳ್ಳುತ್ತಾರೆ. ಈ ಉತ್ಪನ್ನವು ಯಾವ ಶ್ರೇಣಿಯಿಂದ ವಾದಿಸುತ್ತದೆ ಎಂದರೆಃ ಅದರಲ್ಲಿ ನಿಂತುಕೊಳ್ಳಿ ಮತ್ತು ಒಂದೇ ಮೇಜಿನಿಂದ ಎಷ್ಟು ಕಡಿಮೆ ಗೋಚರಿಸುತ್ತದೆ ಎಂಬುದನ್ನು ನೋಡಿ.",
+ "Question": "ಪ್ರಶ್ನೆ",
+ "Serves the React SPA at /app.": "/app ನಲ್ಲಿ React SPA ಅನ್ನು ನೀಡುತ್ತದೆ.",
+ "Severity rather than frequency. Survives the test that killed the crime-family models: conditioned on the offender returning at all, it still beats the rule by +0.121.": "ತೀವ್ರತೆ ಮತ್ತು ಆವರ್ತನ. ಅಪರಾಧ ಕುಟುಂಬದ ಮಾದರಿಗಳನ್ನು ಕೊಲ್ಲುವ ಪರೀಕ್ಷೆಗೆ ಉಳಿದುಕೊಂಡಿದೆ: ಅಪರಾಧಿ ಮರಳಿದರೂ, ಇದು ನಿಯಮವನ್ನು +0.121 ರಷ್ಟು ಮುಂದಿಡುತ್ತದೆ.",
+ "Shared offender": "ಹಂಚಿಕೊಳ್ಳಲಾದ ಅಪರಾಧಿ",
+ "Signed in": "ಸಹಿ ಹಾಕಿದರು.",
+ "Speed": "ವೇಗ.",
+ "Sub-Inspector (Investigating Officer)": "ಉಪ-ಅಧಿಕಾರಿ (ತನಿಖಾ ಅಧಿಕಾರಿ)",
+ "System Administrator": "ವ್ಯವಸ್ಥೆಯ ನಿರ್ವಾಹಕ",
+ "The 400 PATTERN_NOT_MATCHED that blocked this for months was the model id: the console sample reads crm-di-glm47b_30b_it with UNDERSCORES, and we were sending hyphens.": "ಇದನ್ನು ತಡೆದಿದ್ದ ತಿಂಗಳುಗಳ ಕಾರಣ 400 PATTERN_NOT_MATCHED ಆಗಿತ್ತು: ಕನ್ಸೋಲ್ ಮಾದರಿಯು crm-di-glm47b_30b_it ಅನ್ನು ಓದುತ್ತದೆ ಮತ್ತು UNDERSCORES ಇದೆ, ಮತ್ತು ನಾವು ಹೈಫನ್‌ಗಳನ್ನು ಕಳುಹಿಸುತ್ತಿದ್ದೆವು.",
+ "The default, and the widest margin on average precision — which is the number that matters for a list read from the top.": "ಡೀಫಾಲ್ಟ್ ಮತ್ತು ಸರಾಸರಿ ನಿಖರತೆಯ ಮೇಲೆ ವಿಶಾಲವಾದ ಅಂಚು ಇದು ಮೇಲಿನಿಂದ ಓದುವ ಪಟ್ಟಿಗೆ ಮುಖ್ಯವಾದ ಸಂಖ್ಯೆಯಾಗಿದೆ.",
+ "The FIR schema is genuinely relational, so a relational store is the honest fit. Queried live with ZCQL.": "FIR ಸ್ಕೀಮಾ ನಿಜವಾಗಿಯೂ ಸಂಬಂಧಿತ, ಆದ್ದರಿಂದ ಸಂಬಂಧಿತ ಶೇಖರಣೆ ಸರಿಯಾದ ಹೊಂದಾಣಿಕೆ. ZCQL ನೊಂದಿಗೆ ನೇರವಾಗಿ ಪ್ರಶ್ನಿಸಲಾಗಿದೆ.",
+ "The knowledge base answers questions of meaning; GLM-4.7 phrases answers of fact.": "ಜ್ಞಾನ ಮೂಲ GLM-4.7 ವಾಕ್ಯಗಳು ಸತ್ಯದ ಉತ್ತರಗಳನ್ನು ನೀಡುತ್ತವೆ.",
+ "The mandate is to deploy on Catalyst. Hosting the front end here keeps the client on the same origin as the API, so no cross-origin setup is needed for the demo.": "ಕರ್ಯಾಚರಣೆಯ ಮಿಷನ್ Catalyst ನಲ್ಲಿ ಸ್ಥಾಪಿಸುವುದು. ಮುಂಭಾಗವನ್ನು ಇಲ್ಲಿ ಹೋಸ್ಟ್ ಮಾಡುವುದರಿಂದ ಕ್ಲೈಂಟ್ ಮತ್ತು API ನಲ್ಲಿ ಒಂದೇ ಮೂಲದಲ್ಲಿರುತ್ತದೆ, ಹಾಗಾಗಿ ಪ್ರದರ್ಶನಕ್ಕೆ ಕ್ರಾಸ್-ಆರ್ಗಿನ್ ಸೆಟಪ್ ಅಗತ್ಯವಿಲ್ಲ.",
+ "The quarterly control strategy — which districts become priorities, and what each is tasked with. The projections behind it live in Forecast.": "ತ್ರೈಮಾಸಿಕ ನಿಯಂತ್ರಣ ಕಾರ್ಯತಂತ್ರವು ಯಾವ ಜಿಲ್ಲೆಗಳು ಆದ್ಯತೆಯಾಗುತ್ತವೆ ಮತ್ತು ಪ್ರತಿಯೊಂದಕ್ಕೂ ಏನು ವಹಿಸಲಾಗಿದೆ. ಅದರ ಹಿಂದಿನ ಅಂದಾಜುಗಳು ಮುನ್ಸೂಚನೆಯಲ್ಲಿ ವಾಸಿಸುತ್ತವೆ."
 }
