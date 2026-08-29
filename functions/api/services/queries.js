@@ -1070,7 +1070,13 @@ function hotspots(user, q = {}) {
 
 // ---------------- vulnerability (analyst/ACP) ----------------
 function vulnerability(user) {
-  rbac.requireRole(user, ['ACP', 'Analyst', 'Admin']);
+  // DGP was missing from this list. 'ACP' expands to DSP and SP, so the effective allow-list
+  // read DSP, SP, Analyst, Admin -- and the State DGP, who may read the audit log and the
+  // administration overview, was refused the victim-vulnerability aggregate that a
+  // Superintendent can open. Nothing calls this route from the client today, so the 403 was
+  // never seen; it was still wrong, and a route is public surface whether or not this
+  // codebase happens to use it.
+  rbac.requireRole(user, ['ACP', 'Analyst', 'Admin', 'DGP']);
   const db = load();
   // victim-side aggregates only (age band x crime head). Framed as victim-support.
   const bands = ['0-17', '18-30', '31-45', '46-60', '60+'];

@@ -109,6 +109,21 @@ async function request<T>(path: string, opts: RequestInit = {}, attempt = 0): Pr
   // every call that reaches this transport is a read. A real API error carries ok:false and a
   // code, and is thrown immediately without a retry -- resending a request the server has
   // already refused would only be slower at saying no.
+  // A 5xx FROM THIS PLATFORM UNDER CONCURRENCY IS TRANSIENT, AND RETRYING ONE IS SAFE.
+  //
+  // A page opening fires around fifteen requests at once and the platform drops some of them:
+  // agenda, outlook, offender-risk and a case graph all returned 500 in one burst, and the
+  // same endpoints answered 200 seconds later untouched. The reader saw a panel fail on first
+  // load that worked if they navigated back — which is the worst kind of fault, because it
+  // does not reproduce when anyone goes looking for it.
+  //
+  // Retried once, alongside the empty-body case below, and only for 5xx: a 4xx is a considered
+  // refusal — a 403 on the audit log for a station officer is the system working — and asking
+  // again would only be slower at hearing no.
+  if (res.status >= 500 && attempt === 0) {
+    await new Promise((r) => { setTimeout(r, 500); });
+    return request<T>(path, opts, attempt + 1);
+  }
   const text = await res.text();
   if (!text.trim() && attempt === 0) {
     await new Promise((r) => { setTimeout(r, 400); });
