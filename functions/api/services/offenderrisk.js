@@ -351,4 +351,6 @@ async function score(req, rows, model = DEFAULT_MODEL) {
   return out;
 }
 
-module.exports = { FEATURES, candidates, score, configured, status, resolve, MODELS, DEFAULT_MODEL };
+module.exports = {
+  FEATURES, candidates, score, configured, status, resolve, MODELS, DEFAULT_MODEL, MAX_SCORED,
+};

@@ -887,6 +887,12 @@ function buildApp() {
         testPositives: m.testPositives, use: m.use,
       })),
       candidates: cand.total,
+      // How many of those candidates the model actually saw. Serving does not score everyone in
+      // scope: the recency rule supplies the recall by taking the cheapest top slice, and the
+      // model re-ranks it. Publishing the number keeps the page from implying the model chose
+      // its ten from all of them -- and explains why two models' visible lists overlap more
+      // than the measured figure, which was taken over the whole hold-out.
+      scored: scoredRows.length || Math.min(cand.items.length, offenderrisk.MAX_SCORED),
       rankedBy: scoredRows.length ? 'model' : 'rule',
       items: (scoredRows.length ? scoredRows : rows).slice(0, 10),
       serving: offenderrisk.status(),

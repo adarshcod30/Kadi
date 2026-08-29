@@ -635,7 +635,8 @@ function MlHead({ risk, spike, tier, nav, model, setModel }: {
         <Users2 size={15} className="text-kadi-blue" /> {(risk?.question || 'back on a new FIR within 180 days')
           .replace(/^./, (c: string) => c.toUpperCase())}
         <span className="text-[12px] font-normal text-ink-muted">
-          {risk?.candidates || 0} on the watchlist · ranked by {risk?.rankedBy || 'rule'}
+          {risk?.candidates || 0} on the watchlist · top {risk?.scored || 24} by recency,
+          re-ranked by {risk?.rankedBy || 'rule'}
         </span>
         <InfoDot label="How this is ranked" align="left" width="w-96">
           <b className="block mb-1 text-kadi-navy">Behaviour and evidence only</b>
@@ -760,10 +761,22 @@ function MlHead({ risk, spike, tier, nav, model, setModel }: {
           means choosing an endpoint rather than rebuilding the question.
         </p>
         <p className="px-4 pt-2 text-[12.5px] text-ink-muted leading-relaxed">
-          It is also what makes them worth having separately. <b>Their top-20 shortlists share at
-          most one person.</b> Rank correlation across the whole panel runs 0.33 to 0.46, which
-          reads like "much the same model" and is misleading — correlation is dominated by the
-          vast middle of the list nobody acts on. The top twenty is the product.
+          It is also what makes them worth having separately. Measured across the hold-out —
+          every repeat offender, not a shortlist — <b>their top-20 lists share at most one
+          person.</b> Rank correlation over the whole panel runs 0.33 to 0.46, which reads like
+          "much the same model" and is misleading: correlation is dominated by the vast middle
+          of the list nobody acts on. The top twenty is the product.
+        </p>
+        <p className="px-4 pt-2 text-[12.5px] text-ink-muted leading-relaxed">
+          The lists <i>on this page</i> overlap more than that, and it is worth saying why rather
+          than letting the two numbers look like a contradiction. Serving does not score all
+          {' '}{risk?.candidates || 200} offenders in scope: the recency rule takes the top
+          {' '}{risk?.scored || 24} — it is cheap and it supplies the recall — and the model
+          re-ranks those. So every model here is ordering the same two dozen people, and
+          typically shares three to six of ten with its neighbours. The measured figure is what
+          the models do when each picks freely from everyone; this page is what they do inside a
+          shared shortlist. Both are true, and the first is the one that says whether the models
+          are different.
         </p>
         <div className="p-3 space-y-1.5">
           {MODEL_FAMILY.map((m) => (
