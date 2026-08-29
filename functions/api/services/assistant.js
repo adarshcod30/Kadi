@@ -277,8 +277,38 @@ async function queryEnhanced(user, text, lang, req) {
   // computed correctly. Knowing which half spent the time is the difference between fixing
   // that and guessing at it.
   const t0 = Date.now();
-  const base = query(user, text, lang);
+
+  // A KANNADA QUESTION IS READ IN ENGLISH BEFORE IT IS ROUTED.
+  //
+  // Every intent pattern in query() is written against English phrasing, with a handful of
+  // Kannada words bolted on beside each one. That works for the exact wordings someone thought
+  // to add and fails for every inflection they did not: "ಯಾವ ಪ್ರಕರಣಗಳು ಜಾರುತ್ತಿವೆ?" missed the
+  // slipping pattern, which carries ಜಾರುತ್ತಿರುವ, and fell through to the generic case list --
+  // answering "no cases are reported as slipping" over sixteen thousand of them.
+  //
+  // Worse, the existing rescue only fired on intent 'unknown', and a Kannada question rarely
+  // reaches 'unknown': the word ಪ್ರಕರಣ alone matches the catch-all list branch, so the question
+  // lands on a confidently wrong answer instead of an admission.
+  //
+  // Translating first costs about 140ms and makes every intent reachable in Kannada rather
+  // than the subset somebody hand-listed. The ANSWER is still built in Kannada -- query() takes
+  // its language from the lang argument, not from the text it was handed.
+  let routed = text;
+  let interpretedAs = null;
+  const asksInKannada = KN.test(text) || lang === 'kn';
+  if (asksInKannada) {
+    // eslint-disable-next-line global-require
+    const translate = require('./translate');
+    const en = await translate.translateOne(req, text, 'en').catch(() => null);
+    if (en && en.translated && en.text && en.text !== text) {
+      routed = en.text;
+      interpretedAs = en.text;
+    }
+  }
+
+  const base = query(user, routed, asksInKannada ? 'kn' : lang);
   const baseMs = Date.now() - t0;
+  if (interpretedAs) base.interpretedAs = interpretedAs;
   if (!quickml.configured()) return { ...base, llm: 'disabled', timing: { baseMs } };
 
   // Questions the case database cannot answer go to the knowledge base.
@@ -303,24 +333,9 @@ async function queryEnhanced(user, text, lang, req) {
     // have answered exactly. Translating the QUESTION costs one model call and recovers the
     // deterministic answer; the ANSWER still comes back in Kannada, because base.lang decides
     // that and is taken from the original.
-    if (base.lang === 'kn') {
-      // eslint-disable-next-line global-require
-      const translate = require('./translate');
-      const en = await translate.translateOne(req, text, 'en').catch(() => null);
-      if (en && en.translated && en.text && en.text !== text) {
-        const retry = query(user, en.text, 'kn');
-        if (retry.intent !== 'unknown') {
-          return {
-            ...retry,
-            lang: 'kn',
-            llm: 'intent-via-translation',
-            // Surfaced rather than hidden: the reader should be able to see that the question
-            // was re-read in English, in case the translation changed what was asked.
-            interpretedAs: en.text,
-          };
-        }
-      }
-    }
+    // (The Kannada re-read used to live here, after the fact. It now happens before
+    // routing, above, so a Kannada question reaches every intent rather than only the
+    // ones that failed loudly enough to reach 'unknown'.)
     const rag = await quickml.ragAnswer(req, { question: text, lang: base.lang });
     if (rag && rag.answer) {
       return {
