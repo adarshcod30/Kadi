@@ -79,16 +79,27 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="h-full flex flex-col">
       {/* Top bar */}
       {/* KSP chrome: navy-teal bar with their signature gold rule beneath */}
-      <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-4 shrink-0 z-20 border-b-[3px] border-kadi-gold">
-        <div className="flex items-center gap-2.5">
+      {/* A non-wrapping flex row in which nothing was allowed to shrink. At 768px its children
+          measured 791px against a 656px budget, so the document scrolled sideways on every page
+          -- the search box is a fixed w-64 and the scope chip renders at its natural width, and
+          neither would give. The row now has exactly ONE elastic child, the search, and every
+          other item is pinned; the gap tightens below lg, where the pressure is. */}
+      <header className="h-14 bg-kadi-navy text-white flex items-center px-4 gap-2 lg:gap-4 shrink-0 z-20 border-b-[3px] border-kadi-gold">
+        <div className="flex items-center gap-2.5 shrink-0">
           <img src={`${import.meta.env.BASE_URL}seal-karnataka.svg`} alt="Government of Karnataka" className="h-9 w-9 rounded-full bg-white/95 p-0.5 shrink-0" />
           <span className="font-semibold tracking-tight">{t('appName')}</span>
-          <span className="hidden md:inline text-white/70 text-sm font-normal ml-1 border-l border-white/20 pl-3">{t('ksp')}</span>
+          {/* "Karnataka State Police — Crime Intelligence" is a 290px subtitle. Shown from md it
+              took the whole middle of the row and squeezed the search to 51px; it is masthead
+              decoration, so it waits until there is genuinely room for it. */}
+          <span className="hidden xl:inline text-white/70 text-sm font-normal ml-1 border-l border-white/20 pl-3">{t('ksp')}</span>
         </div>
-        <form onSubmit={doSearch} className="ml-auto relative hidden sm:block">
+        {/* The one thing that gives. flex-1 lets it absorb the slack at wide widths and shrink
+            first at narrow ones; max-w-64 stops it stretching across a large monitor; min-w-0 is
+            what actually permits a flex child to go below its content width. */}
+        <form onSubmit={doSearch} className="ml-auto relative hidden sm:block flex-1 min-w-0 max-w-64">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search')}
-            className="bg-white/10 placeholder-white/50 text-white text-sm rounded-ctl pl-9 pr-3 py-1.5 w-64 focus:bg-white/20 outline-none" />
+            className="bg-white/10 placeholder-white/50 text-white text-sm rounded-ctl pl-9 pr-3 py-1.5 w-full focus:bg-white/20 outline-none" />
         </form>
         {/* The write path lives in the top bar, not the sidebar, and it is icon-only.
             It is one screen that means two different things: a station officer FILES a case
@@ -98,7 +109,7 @@ export function Shell({ children }: { children: ReactNode }) {
             it once, and the badge does the rest. */}
         {writePath && (
           <NavLink to="/register"
-            className={({ isActive }) => `relative grid place-items-center w-9 h-9 rounded-ctl transition-colors ${
+            className={({ isActive }) => `relative grid place-items-center w-9 h-9 shrink-0 rounded-ctl transition-colors ${
               isActive ? 'bg-kadi-gold text-kadi-navy' : 'bg-white/10 text-white hover:bg-white/20'}`}
             title={writePath.label} aria-label={writePath.label}>
             <writePath.icon size={17} />
@@ -110,21 +121,25 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
           </NavLink>
         )}
+        {/* Icon-only below lg. The label is the widest piece of optional text in this row, and
+            dropping it there is what buys the search box a usable width at 640-1023px. The
+            tooltip and aria-label carry the meaning when the word is not on screen. */}
         <NavLink to="/assistant"
-          className={({ isActive }) => `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-ctl transition-colors ${
+          className={({ isActive }) => `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 shrink-0 rounded-ctl transition-colors ${
             isActive ? 'bg-kadi-gold text-kadi-navy' : 'bg-white/10 text-white hover:bg-white/20'}`}
-          title="Ask KADI anything about a case, offender, or district">
-          <MessageSquare size={16} /> <span className="hidden sm:inline">{t('assistant')}</span>
+          title="Ask KADI anything about a case, offender, or district"
+          aria-label={t('assistant')}>
+          <MessageSquare size={16} /> <span className="hidden lg:inline">{t('assistant')}</span>
         </NavLink>
         <button onClick={() => setLang(lang === 'en' ? 'kn' : 'en')}
-          className="text-sm px-2 py-1 rounded hover:bg-white/10" title="Language">
+          className="text-sm px-2 py-1 shrink-0 rounded hover:bg-white/10" title="Language">
           {lang === 'en' ? 'ಕನ್ನಡ' : 'EN'}
         </button>
         <ScopeBadge me={me} />
         <button ref={alertsPop.anchorRef as React.RefObject<HTMLButtonElement>}
           onClick={alertsPop.toggle} {...alertsPop.holdProps}
           aria-expanded={alertsPop.open} title={t('alerts')}
-          className="relative p-1.5 rounded hover:bg-white/10">
+          className="relative p-1.5 shrink-0 rounded hover:bg-white/10">
           <Bell size={18} />
           {alerts && alerts.length > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-kadi-gold text-kadi-navy font-semibold text-[10px] rounded-full w-4 h-4 grid place-items-center">{alerts.length}</span>
@@ -231,7 +246,7 @@ function ScopeBadge({ me }: { me: any }) {
   // picker that cannot go anywhere.
   if (cap.effectiveScope === 'district' && !cap.canSwitchDistrict) {
     return (
-      <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-gold/20 border-kadi-gold/40"
+      <div className="hidden sm:flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-gold/20 border-kadi-gold/40"
         title={`${cap.districtName || 'Your district'} — this is the whole of your read scope`}>
         <MapPin size={13} />
         <span className="truncate max-w-[150px]">{cap.districtName || current?.name || 'Your district'}</span>
@@ -240,7 +255,7 @@ function ScopeBadge({ me }: { me: any }) {
   }
   if (cap.effectiveScope === 'unit') {
     return (
-      <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-teal/20 border-kadi-teal/40"
+      <div className="hidden sm:flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border bg-kadi-teal/20 border-kadi-teal/40"
         title={`${cap.unitName} — this is the whole of your read scope`}>
         <Building2 size={13} />
         <span className="truncate max-w-[150px]">{cap.unitName}</span>
@@ -258,15 +273,19 @@ function ScopeBadge({ me }: { me: any }) {
   };
 
   return (
-    <div className="hidden sm:block">
+    <div className="hidden sm:block shrink-0">
       <button ref={p.anchorRef as React.RefObject<HTMLButtonElement>}
         onClick={p.toggle} {...p.holdProps} aria-expanded={p.open}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] border transition-colors ${
           atState ? 'bg-white/10 border-white/20 hover:bg-white/20'
                   : 'bg-kadi-gold/20 border-kadi-gold/40 hover:bg-kadi-gold/30'}`}>
-        {atState ? <Globe size={13} /> : <MapPin size={13} />}
-        {atState ? 'All Karnataka' : (current?.name || `District ${cap.districtId}`)}
-        {atState && <span className="text-white/55">· 31 districts</span>}
+        {atState ? <Globe size={13} className="shrink-0" /> : <MapPin size={13} className="shrink-0" />}
+        <span className="truncate max-w-[9rem]">
+          {atState ? 'All Karnataka' : (current?.name || `District ${cap.districtId}`)}
+        </span>
+        {/* The count is a decoration, not the scope. It is the first thing to go when the row
+            is tight -- "All Karnataka" alone still says everything the chip has to say. */}
+        {atState && <span className="hidden lg:inline text-white/55 shrink-0">· 31 districts</span>}
         <ChevronDown size={12} className="opacity-70" />
       </button>
 
