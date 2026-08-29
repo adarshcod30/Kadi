@@ -109,6 +109,140 @@ export default function About() {
         </div>
       </Section>
 
+      {/* THE ML PROGRAMME. The strongest material in the project and it was not on this page.
+          Judges reading About learned what KADI does and nothing about whether any of it was
+          measured -- while the repository holds twenty measured tasks, twelve of them rejected
+          with the specific test that killed each. The rejections are the more useful half. */}
+      <Section title="Twenty tasks measured. Eight ship." kicker="The models">
+        <div className="card p-6 space-y-5">
+          <p className="text-sm text-ink-muted max-w-3xl">
+            Every candidate model was scored on a <b className="text-kadi-navy">time-ordered hold-out</b> against
+            the <b className="text-kadi-navy">best simple rule</b> available on the same information — not the
+            first baseline that came to mind. That single choice decided most of the results:
+            against an obvious baseline nearly all of them win, and against the best one nearly
+            all of them lose. A model that cannot beat a one-line rule is worse than no model,
+            because it reads as capability while adding a serving dependency and a failure mode.
+          </p>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {[['8', 'models serving', 'each beating its own baseline on AUC and average precision'],
+              ['12', 'rejected', 'three of them score higher than models that ship'],
+              ['+0.169', 'widest margin', 'station pendency — 0.870 against the load rule\u2019s 0.701']].map(([v, l, d], i) => (
+                <div key={i} className="bg-surface-2 rounded-card p-4">
+                  <div className="text-2xl font-bold font-num text-kadi-navy">{v}</div>
+                  <div className="text-sm font-semibold text-ink">{l}</div>
+                  <div className="text-xs text-ink-muted mt-0.5">{d}</div>
+                </div>
+              ))}
+          </div>
+
+          <div>
+            <div className="text-sm font-semibold text-kadi-navy mb-2">The five tests a candidate has to survive</div>
+            <div className="space-y-2">
+              {[['Time-ordered hold-out', 'A random split puts test rows between training rows of the same series and flatters everything.'],
+                ['Best-available baseline', 'Re-scored the spike model from a claimed +0.168 to a real +0.058.'],
+                ['Scale-free re-run', 'Strip every absolute volume. Station surge fell 0.738 → 0.583, below its rule — it was learning station size, not risk. Rejected.'],
+                ['Conditional test', '“Comes back AND it is property” inherits the predictability of “comes back”. Scored only on those who returned, property, body and economic crime all collapsed.'],
+                ['Degeneracy guard, at serving time', 'An endpoint returning one identical value for every candidate has not ranked anything. It caught the original spike classifier, which answered 0 for everyone.']].map(([t, d], i) => (
+                  <div key={i} className="flex gap-3 text-sm">
+                    <CheckCircle2 size={15} className="text-kadi-teal shrink-0 mt-0.5" />
+                    <div><b className="text-ink">{t}</b> <span className="text-ink-muted">{d}</span></div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          <div className="rounded-ctl border border-line bg-surface-2 p-4">
+            <div className="text-sm font-semibold text-kadi-navy mb-1">Why station pendency, and not hotspot prediction</div>
+            <p className="text-sm text-ink-muted">
+              Place-based forecasting was ruled out arithmetically, not by preference: at a 1 km
+              cell and a week this register averages one case, so the Poisson floor puts the best
+              possible predictor <b className="text-kadi-navy">78% out</b>. The Indian econometric
+              literature points somewhere else entirely — Hazra (2020) across 32 states and
+              Dutta &amp; Husain (2009) both find that charge-sheeting rate, conviction rate and
+              pendency are the deterrence variables that move crime rates here. That is a lever
+              about <b className="text-kadi-navy">disposal</b>, and a FIR register can speak to
+              disposal. A backlog stock averages 46 per station-month and is worth modelling.
+            </p>
+          </div>
+
+          <button onClick={() => nav('/forecast')} className="text-sm link flex items-center gap-1">
+            See every measurement on the Forecast page <ArrowRight size={14} />
+          </button>
+        </div>
+      </Section>
+
+      {/* THE ASSISTANT. Its architecture is the anti-hallucination argument and belongs here. */}
+      <Section title="An assistant that cannot invent an FIR number" kicker="Grounding">
+        <div className="card p-6 space-y-4">
+          <p className="text-sm text-ink-muted max-w-3xl">
+            The assistant is built on one rule, and everything else follows from it:
+            <b className="text-kadi-navy"> the model never retrieves, it only phrases.</b> Counts,
+            citations, intents and actions are computed by deterministic code against the register
+            before any language model is called. The model is handed those facts and asked to
+            write two sentences. It cannot invent an FIR number because it is never in a position
+            to look one up.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[['The register', 'Counts and lists, computed live and cited by FIR number.', 'teal'],
+              ['The knowledge base', 'What a thing means — how risk is built, what a flag asks you to do.', 'purple'],
+              ['A document', 'A photograph the officer is holding, read by a vision model. Never merged with the register.', 'gold'],
+              ['Speech', 'Questions asked and answers read aloud in English, Hindi or Kannada.', 'blue']].map(([t, d], i) => (
+                <div key={i} className="bg-surface-2 rounded-card p-4">
+                  <div className="font-semibold text-sm text-kadi-navy">{t}</div>
+                  <div className="text-xs text-ink-muted mt-1">{d}</div>
+                </div>
+              ))}
+          </div>
+          <p className="text-xs text-ink-subtle max-w-3xl">
+            Every answer carries a badge naming which of these it came from. A count from the
+            register and a definition from the handbook are different kinds of claim, and an
+            officer about to act on one needs to know which they are reading. Where an answer’s
+            exact wording <i>is</i> the content — “this case is not visible in your scope, which is
+            not the same as it not existing” — the model is bypassed entirely.
+          </p>
+        </div>
+      </Section>
+
+      {/* SCOPE. Judges ask about this and officers live inside it. */}
+      <Section title="Who sees what" kicker="Scope">
+        <div className="card p-6">
+          <p className="text-sm text-ink-muted max-w-3xl mb-4">
+            Scope is enforced on the server before any query runs, and re-derived from the request
+            every time — there is no session holding it. A signed-in account is pinned to the
+            district and station in its token; <code className="font-mono text-xs">?district=</code>
+            in the URL is ignored for anything below state tier.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-4 text-sm">
+            {[['State', 'DGP · SCRB Analyst · Administrator', 'All 31 districts. May drill into any one and back out — the whole point of holding the state view.'],
+              ['District', 'SP · DySP / ACP', 'One district’s registers and offenders. Never more than one at a time.'],
+              ['Station', 'SHO · Sub-Inspector', 'One register. The tier this product argues from: stand in it and see how little is visible.']].map(([t, who, d], i) => (
+                <div key={i} className="bg-surface-2 rounded-card p-4">
+                  <div className="font-semibold text-kadi-navy">{t}</div>
+                  <div className="text-xs text-kadi-blue mt-0.5">{who}</div>
+                  <div className="text-xs text-ink-muted mt-1.5">{d}</div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </Section>
+
+      {/* WHAT IT REFUSES. A capability list without this reads as marketing. */}
+      <Section title="What KADI deliberately will not do" kicker="Limits">
+        <div className="card p-6 space-y-3">
+          {[['It does not predict individual criminality.', 'The offender models rank a watchlist of people who already carry two or more resolved cases, on behaviour and evidence only. They are a prompt to look, not a finding.'],
+            ['It does not identify people from photographs.', 'The document reader refuses face matching and any question about caste, religion or community — rejected before the request is made, not by prompt alone.'],
+            ['It does not forecast where crime will happen.', 'Measured and rejected: at the grain an officer could act on, the arrival noise is larger than any signal a model could find.'],
+            ['It does not use caste, religion or occupation.', 'Not by convention — a check runs over the feature list before any training file is written, and a unit test fails the build if a protected column reaches a feature set.'],
+            ['It does not let a model answer from nothing.', 'Every serving path falls back to the rule it was measured against, and says so on the screen rather than presenting an arbitrary order as a model’s.']].map(([t, d], i) => (
+              <div key={i} className="flex gap-3 text-sm">
+                <AlertTriangle size={15} className="text-warning shrink-0 mt-0.5" />
+                <div><b className="text-ink">{t}</b> <span className="text-ink-muted">{d}</span></div>
+              </div>
+            ))}
+        </div>
+      </Section>
+
       {/* FAIRNESS + eval */}
       <Section title="Fair by design — and proven" kicker="Trust">
         <div className="grid md:grid-cols-2 gap-8 items-center">

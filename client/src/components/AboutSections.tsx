@@ -61,6 +61,30 @@ const USED = [
     why: 'RBAC scoping is enforced server-side on every query.',
     detail: 'Honest caveat: the identity binding is not wired. The API still trusts a role header rather than verifying a Catalyst JWT, so sign-in is a role chooser.',
   },
+  {
+    icon: <Cpu size={16} />, name: 'QuickML — prediction endpoints',
+    what: 'Eight published endpoints scoring the offender, spike and pendency models.',
+    why: 'A trained model has to be reachable from a request to be worth training.',
+    detail: 'The console is the only way in — QuickML exposes no REST surface for creating datasets, pipelines or endpoints — so the pipeline, the schema, the measurement and the serving contract live in the repository and the console step is manual.',
+  },
+  {
+    icon: <Boxes size={16} />, name: 'QuickML — GLM-4.7 and RAG',
+    what: 'The knowledge base answers questions of meaning; GLM-4.7 phrases answers of fact.',
+    why: 'A count is computed, never generated. The model is handed the facts and writes two sentences.',
+    detail: 'The 400 PATTERN_NOT_MATCHED that blocked this for months was the model id: the console sample reads crm-di-glm47b_30b_it with UNDERSCORES, and we were sending hyphens.',
+  },
+  {
+    icon: <Boxes size={16} />, name: 'Zia — Trained NLP models',
+    what: 'Text translation across 11 languages, text-to-audio in en/hi/kn, and audio-to-text.',
+    why: 'Kannada read-aloud and Kannada voice input, on any browser rather than only Chrome.',
+    detail: 'These are not on the Zia SDK — an earlier probe of catalyst.zia() found no translate method and concluded the platform had none. It ships them as QuickML Trained NLP Models on a different host path entirely.',
+  },
+  {
+    icon: <Globe size={16} />, name: 'SmartBrowz',
+    what: 'Renders a briefing to PDF server-side.',
+    why: 'An officer forwarding a briefing should send a document, not a web page.',
+    detail: 'Falls back to styled HTML if unreachable: a briefing an officer cannot open is worse than one in the wrong format.',
+  },
 ];
 
 const NOT_USED = [
@@ -69,20 +93,8 @@ const NOT_USED = [
       'The adapter is written and a segment is provisioned, but writes from inside a deployed function return 401 PERMISSION_NEEDED. Ruled out: wrong segment id, missing SDK, wrong scope API, and table permissions. The credential Catalyst injects into a function simply lacks Cache scope. Impact is nil — the KPI query recomputes in about a millisecond.',
   },
   {
-    name: 'QuickML (GLM-4.7 + RAG)', reason:
-      'Endpoint, model id, org header and a valid OAuth token are all in place, but the endpoint rejects our request body with 400 PATTERN_NOT_MATCHED ("error processing zoho-inputstream"). Non-ASCII content, a manual Content-Length, a missing token and the auth prefix were each ruled out by test. Gated behind an env flag so it costs nothing. The assistant therefore runs a deterministic intent engine, which cannot hallucinate an FIR number.',
-  },
-  {
-    name: 'Zia (STT / TTS / translate)', reason:
-      'Not enabled on this project. The adapter exists and includes the degradation the Zoho AI team recommended — if Kannada TTS is unavailable, translate to English and speak that. Voice today runs on the browser Web Speech API, client-side, which needs no credentials and works offline.',
-  },
-  {
     name: 'NoSQL', reason:
       'Never provisioned. The graph read-model is served from the function bundle instead. NoSQL would be the right home for it at production scale, when the adjacency outgrows what a function can carry.',
-  },
-  {
-    name: 'SmartBrowz', reason:
-      'Not wired. Briefing export returns styled HTML that prints cleanly to PDF from the browser, rather than claiming a PDF pipeline that does not exist.',
   },
   {
     name: 'API Gateway', reason:
