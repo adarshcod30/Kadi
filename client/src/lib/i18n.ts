@@ -124,7 +124,10 @@ let inFlight = false;
 async function flush() {
   timer = null;
   if (inFlight || !queue.size) return;
-  const batch = [...queue].slice(0, 60);
+  // Twenty-four rather than sixty. The server translates in sequential groups of eight and a
+  // group that falls through to the slower model costs seconds, so a sixty-string ask was
+  // reliably past the function's budget. Smaller calls converge; one large call died whole.
+  const batch = [...queue].slice(0, 24);
   batch.forEach((t) => queue.delete(t));
   inFlight = true;
   try {

@@ -25,6 +25,18 @@ const cache = require('./cache');
 // beat one large call: the first pass at 25 strings returned nothing usable for 567 of 570.
 const MAX_BATCH = 8;              // strings per model call
 const MAX_CHARS = 900;            // and a character ceiling, whichever binds first
+// HOW LONG THE WHOLE REQUEST MAY SPEND TRANSLATING BEFORE IT ANSWERS WITH WHAT IT HAS.
+//
+// The page walker asks for every untranslated string it can see. On a screen of new copy that
+// is a hundred and sixty of them, processed here in sequential groups of eight -- and any group
+// that falls through to the LLM costs a 12s timeout. The request passed thirty seconds, the
+// platform killed it with EXECUTION_TIME_EXCEEDED, and EVERY string was lost including the
+// hundred that had already come back. The interface stayed English and nothing said why.
+//
+// Partial results are safe here in a way they are not elsewhere: tx() returns the English on a
+// miss, and the client re-queues whatever did not arrive. So the honest budget is "translate
+// what fits, return it, let the next call continue" rather than "finish or fail".
+const DEADLINE_MS = Number(process.env.TRANSLATE_DEADLINE_MS || 12000);
 const MIN_SPLIT = 1;              // recurse down to single strings before giving up
 
 const LANGS = { kn: 'Kannada', en: 'English' };
@@ -263,7 +275,10 @@ async function translateMany(req, texts, to = 'kn', opts = {}) {
   }
 
   let engine = hits ? 'cache' : 'none';
+  const startedAt = Date.now();
+  let ranOutOfTime = 0;
   for (let start = 0; start < pending.length;) {
+    if (Date.now() - startedAt > DEADLINE_MS) { ranOutOfTime = pending.length - start; break; }
     const group = [];
     let chars = 0;
     while (start < pending.length && group.length < MAX_BATCH && chars < MAX_CHARS) {
@@ -314,6 +329,9 @@ async function translateMany(req, texts, to = 'kn', opts = {}) {
     total: result.length,
     translated: result.filter((r) => r.translated).length,
     cacheHits: hits,
+    // Said out loud rather than looking like a translation that simply did not exist. The
+    // client re-queues these, so a screen converges over two or three calls instead of one.
+    deferred: ranOutOfTime,
     // How much the masking bought. Sixty worklist rows collapsing to two templates is the
     // difference between this being usable and not.
     templates: byTemplate.size,
