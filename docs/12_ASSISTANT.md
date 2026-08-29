@@ -51,17 +51,35 @@ question (text or speech, en or kn)
         deadline 5 s — past it, the computed answer is returned as-is
 ```
 
-### Why Kannada is translated *before* routing, not after failing
+### How a Kannada question is routed
 
 Every intent pattern is written against English phrasing with a handful of Kannada words bolted
-on. That covers the wordings someone thought to add and nothing else. `ಯಾವ ಪ್ರಕರಣಗಳು ಜಾರುತ್ತಿವೆ?`
-missed the slipping pattern — which carries `ಜಾರುತ್ತಿರುವ` — and fell into the generic case list,
-answering *"no cases are reported as slipping"* over sixteen thousand of them.
+on, which covers the wordings someone thought to add and nothing else. So a Kannada question is
+also read in English — but the order matters, and it took two attempts to get right.
 
-The rescue that used to exist fired only on intent `unknown`, and a Kannada question rarely gets
-there: the word `ಪ್ರಕರಣ` alone matches the catch-all branch, so the question landed on a
-confidently wrong answer rather than an admission. **A fallback positioned after the failure it
-was meant to catch.** Translating first makes every intent reachable in Kannada.
+**The native patterns get first refusal.** When `ಜಾರುತ್ತಿರುವ` matches the slipping pattern, that
+is certain: the word is actually there. The translation is consulted only when the native pass
+returns `unknown`, or returns the catch-all list branch that any sentence containing `ಪ್ರಕರಣ`
+falls into.
+
+Translating *first* was tried and was wrong. Zia renders `ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?` — which
+asks which cases are **slipping** — as *"Active cases"*, dropping the only word carrying the
+question. Routing on that sent the reader to the generic list: they asked which cases were in
+trouble and were told how many cases exist in the state.
+
+A second fault sat underneath it. Question translation used the shared **UI-string cache**, which
+is keyed on text and shared across directions — so a screen label translated *into* Kannada
+becomes a reverse entry *out* of it. That is right for forty fixed strings and wrong for free
+text. Questions now pass `noCache` and pay the 140 ms. Fixing it moved the Bengaluru cyber-crime
+count from **6** to **4337**.
+
+| Kannada question | routes to |
+|---|---|
+| `ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?` | `slipping_cases` — native pattern beat the translation |
+| `ಬೆಂಗಳೂರಿನಲ್ಲಿ ಸೈಬರ್ ಅಪರಾಧ ಪ್ರಕರಣಗಳು ಎಷ್ಟು?` | `cases_query` |
+| `ಮುಂದಿನ ತಿಂಗಳ ಮುನ್ಸೂಚನೆ` | `forecast` |
+| `ಉದಯೋನ್ಮುಖ ಅಪರಾಧ ತಾಣಗಳು` | `hotspots` |
+| `ಯಾವ ಜಿಲ್ಲೆಯಲ್ಲಿ ತಲಾ ಅಪರಾಧ ದರ ಹೆಚ್ಚು?` | `socio_rates` |
 
 ### Answers that are never re-worded
 
