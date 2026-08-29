@@ -505,11 +505,14 @@ export default function Assistant() {
           if (!audioRef.current) break;
         }
         setSpeakingIdx(null);
-      } catch {
+      } catch (err) {
         setSpeakingIdx(null);
         setNotice({
           kind: 'warn',
-          text: tx('Read-aloud is unavailable right now. The text above is complete.'),
+          // The reason travels. "Read-aloud is unavailable" over a blocked autoplay, a 400 from
+          // a speaker name and a network drop are three different problems and were one message.
+          text: `${tx('Read-aloud is unavailable right now. The text above is complete.')}`
+            + (err && (err as Error).message ? ` (${(err as Error).message})` : ''),
         });
       }
       return;

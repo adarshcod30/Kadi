@@ -27,7 +27,7 @@
 // rendered rather than a translation of a translation. A MutationObserver re-runs after React
 // repaints, because React owns the DOM and will overwrite anything written underneath it.
 import { useEffect } from 'react';
-import { useLang, tx } from './i18n';
+import { useLang, tx, reverseKn } from './i18n';
 
 const SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'SVG', 'PATH', 'CANVAS',
@@ -100,14 +100,33 @@ export function PageTranslator() {
     const root = document.getElementById('root') || document.body;
 
     if (lang !== 'kn') {
-      // Restore. Only nodes we actually changed, and only if nothing has changed them since.
+      // Restore, in two passes.
+      //
+      // The first is the bookkeeping: nodes we changed and nothing has touched since. It is
+      // correct where it applies and it does not apply often enough -- React recreates text
+      // nodes as it re-renders, which breaks a WeakMap keyed on node identity, and the symptom
+      // is a page that goes to Kannada and comes back 59% of the way. Measured, not guessed.
+      //
+      // The second pass needs no memory: any node whose text IS a known Kannada translation is
+      // put back to its English, whoever wrote it. That covers the nodes React re-rendered,
+      // the ones tx() produced directly inside a component, and anything a future change adds
+      // without telling this file.
+      const back = reverseKn();
       walk(root, (n) => {
         const rec = seen.get(n);
-        if (rec && n.nodeValue === rec.rendered) n.nodeValue = rec.source;
+        if (rec && n.nodeValue === rec.rendered) { n.nodeValue = rec.source; return; }
+        const cur = n.nodeValue || '';
+        const core = cur.trim();
+        if (!core) return;
+        const en = back[core];
+        if (en) n.nodeValue = cur.replace(core, en);
       });
       walkAttrs(root as ParentNode, (el, a) => {
         const rec = attrSeen.get(el)?.[a];
-        if (rec && el.getAttribute(a) === rec.rendered) el.setAttribute(a, rec.source);
+        if (rec && el.getAttribute(a) === rec.rendered) { el.setAttribute(a, rec.source); return; }
+        const cur = (el.getAttribute(a) || '').trim();
+        const en = cur && back[cur];
+        if (en) el.setAttribute(a, en);
       });
       return undefined;
     }

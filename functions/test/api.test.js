@@ -901,3 +901,29 @@ test('splitting an answer by script loses no characters', () => {
   assert.strictEqual(segments(cases[1]).length, 3, 'a mixed sentence should split into runs');
   assert.strictEqual(segments(cases[4]).length, 1, 'pure English should stay one run');
 });
+
+// THE SUITE PASSED 39/39 WHILE THE DEPLOYED FUNCTION WAS UNLOADABLE.
+//
+// An edit to a prompt string introduced an unescaped apostrophe -- "QUESTION's" inside a
+// single-quoted literal -- and quickml.js stopped parsing. Every route on the deployment
+// returned 408 EXECUTION_TIME_EXCEEDED, including /me, which does almost nothing: the module
+// never loaded, so there was no app to answer with.
+//
+// The tests missed it because none of them required the entry point. They exercised services
+// directly, so a file that could not be parsed was simply never asked for. This asserts the
+// one thing every other test silently assumes.
+test('the API entry point and every service module actually parse', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const api = path.join(__dirname, '..', 'api');
+
+  assert.doesNotThrow(() => { require(path.join(api, 'app.js')); },
+    'functions/api/app.js failed to load — the deployment would answer nothing at all');
+
+  const services = fs.readdirSync(path.join(api, 'services')).filter((f) => f.endsWith('.js'));
+  assert.ok(services.length > 10, 'expected the service directory to be populated');
+  for (const f of services) {
+    assert.doesNotThrow(() => { require(path.join(api, 'services', f)); },
+      `functions/api/services/${f} failed to load`);
+  }
+});

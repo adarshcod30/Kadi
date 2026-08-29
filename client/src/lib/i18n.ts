@@ -185,6 +185,27 @@ export const useTx = () => {
   return (text: string) => tx(text, lang);
 };
 
+/**
+ * Kannada -> English, built by inverting the dictionary.
+ *
+ * The restore path cannot rely on remembering which text nodes it changed. React owns those
+ * nodes and recreates them whenever a component re-renders, which silently breaks a WeakMap
+ * keyed on node identity -- and the symptom is a page that goes to Kannada and only half comes
+ * back. Matching on the TEXT instead needs no memory at all: if a node says
+ * "ವರದಿ ರಫ್ತು ಮಾಡಿ" and the dictionary says that is "Export briefing", it can be put back
+ * whoever wrote it and however many times React has re-rendered since.
+ *
+ * Rebuilt on demand rather than cached, because the runtime half grows as strings are
+ * translated and a stale inverse would strand exactly the newest ones.
+ */
+export function reverseKn(): Record<string, string> {
+  const out: Record<string, string> = {};
+  // Built first, runtime second: where both know a phrase, the reviewed translation wins.
+  for (const [en, kn] of Object.entries(runtime)) if (kn && kn !== en) out[kn] = en;
+  for (const [en, kn] of Object.entries(BUILT)) if (kn && kn !== en) out[kn] = en;
+  return out;
+}
+
 /** How much of the interface is actually turning over, for the About page to state honestly. */
 export const dictionaryStats = () => ({
   built: Object.keys(BUILT).length,
