@@ -947,3 +947,191 @@ test('evidence image reading is state tier only', () => {
     assert.ok(!guard.includes(`'${denied}'`), `${denied} must NOT be permitted to read uploads`);
   }
 });
+
+// ---- evidence readings filed against a case ------------------------------------------------
+// These routes had no coverage at all when they shipped. The access boundary above is the one
+// that matters most, but the filing path carries the two invariants that are silent when they
+// break: scope taken from the register rather than the body, and a note that is withdrawn
+// rather than deleted.
+
+test('evidence notes: only the ranks that can read an image can file one', () => {
+  const notes = require('../api/services/evidencenote');
+  for (const role of ['DGP', 'Admin', 'Analyst']) {
+    assert.ok(notes.canFile({ role }), `${role} may file a reading`);
+  }
+  // Filing a note is proof somebody read an uploaded image. If this list ever grew past the
+  // route's, a district account could file readings it was never allowed to take.
+  for (const role of ['SP', 'DSP', 'SHO', 'SI']) {
+    assert.ok(!notes.canFile({ role }), `${role} may NOT file a reading`);
+  }
+});
+
+test('evidence notes: a filing takes scope from the register, never the body', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const original = datastore.insertRows;
+  let written = null;
+  datastore.insertRows = async (_req, _table, rows) => { [written] = rows; return true; };
+  try {
+    const out = await notes.file(
+      {},
+      { role: 'Analyst', email: 'a@ksp' },
+      {
+        capability: 'ocr', extract: 'SEIZURE MEMO',
+        // The lie a caller would tell. Every one of these must be ignored.
+        caseMasterId: 'FORGED', crimeNo: '999', districtId: '9', unitId: '99',
+      },
+      { caseMasterId: 'REAL-1', crimeNo: '100010064202600099', districtId: '1', unitId: '55' },
+    );
+    assert.ok(out.ok, out.error);
+    assert.strictEqual(written.caseMasterId, 'REAL-1', 'case id comes from the register');
+    assert.strictEqual(written.districtId, '1', 'district comes from the register');
+    assert.strictEqual(written.unitId, '55', 'station comes from the register');
+    assert.strictEqual(written.crimeNo, '100010064202600099', 'crime number comes from the register');
+    assert.strictEqual(written.noteStatus, 'filed');
+  } finally {
+    datastore.insertRows = original;
+  }
+});
+
+test('evidence notes: an empty reading is refused rather than filed', async () => {
+  const notes = require('../api/services/evidencenote');
+  // The barcode scanner answers `content: ""` on an image with no code in it. That is a
+  // correct answer and a useless attachment: filing it puts a blank entry on the case that a
+  // reader has to open to discover says nothing.
+  const out = await notes.file({}, { role: 'Analyst' }, { capability: 'barcode', extract: '   ' },
+    { caseMasterId: 'REAL-1' });
+  assert.ok(!out.ok);
+  assert.strictEqual(out.status, 400);
+});
+
+test('evidence notes: an unknown capability is refused', async () => {
+  const notes = require('../api/services/evidencenote');
+  const out = await notes.file({}, { role: 'DGP' }, { capability: 'faces', extract: 'two people' },
+    { caseMasterId: 'REAL-1' });
+  assert.ok(!out.ok, 'a capability this screen does not offer must not become a note');
+  assert.strictEqual(out.status, 400);
+});
+
+test('evidence notes: withdrawal is an UPDATE, never a DELETE', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const original = datastore.query;
+  const statements = [];
+  datastore.query = async (_req, sql) => {
+    statements.push(sql);
+    if (/^SELECT/i.test(sql)) return [{ noteKey: 'e1', createdBy: 'a@ksp', noteStatus: 'filed', caseMasterId: 'REAL-1' }];
+    return [];
+  };
+  try {
+    const out = await notes.withdraw({}, { role: 'Analyst', email: 'a@ksp' }, 'e1', 'attached to the wrong case');
+    assert.ok(out.ok, out.error);
+    const write = statements.find((s) => !/^SELECT/i.test(s));
+    assert.match(write, /^UPDATE/i, 'a withdrawal must not remove the row');
+    assert.match(write, /noteStatus='withdrawn'/);
+    assert.match(write, /withdrawnBy=/, 'the withdrawal must name who did it');
+    assert.match(write, /withdrawReason=/, 'and why');
+    // A record that can be made to have never said something is worse than a wrong record.
+    assert.ok(!statements.some((s) => /^\s*DELETE/i.test(s)), 'nothing is deleted');
+  } finally {
+    datastore.query = original;
+  }
+});
+
+test('evidence notes: only the author or an Administrator may withdraw', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const original = datastore.query;
+  datastore.query = async (_req, sql) => (/^SELECT/i.test(sql)
+    ? [{ noteKey: 'e1', createdBy: 'analyst@ksp', noteStatus: 'filed', caseMasterId: 'REAL-1' }]
+    : []);
+  try {
+    // Letting the case's own station retract a reading filed against it would let the subject
+    // of a record remove the record.
+    const other = await notes.withdraw({}, { role: 'DGP', email: 'dgp@ksp' }, 'e1', 'not mine to pull');
+    assert.ok(!other.ok);
+    assert.strictEqual(other.status, 403);
+    const admin = await notes.withdraw({}, { role: 'Admin', email: 'admin@ksp' }, 'e1', 'records correction');
+    assert.ok(admin.ok, 'an Administrator may withdraw anyone’s');
+  } finally {
+    datastore.query = original;
+  }
+});
+
+test('evidence notes: the case view lists filed notes and hides withdrawn ones', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const original = datastore.query;
+  let seen = '';
+  datastore.query = async (_req, sql) => { seen = sql; return []; };
+  try {
+    await notes.forCase({}, 'REAL-1');
+    assert.match(seen, /noteStatus = 'filed'/, 'a withdrawn note must not appear on the case');
+    await notes.forCase({}, 'REAL-1', { includeWithdrawn: true });
+    assert.ok(!/noteStatus = 'filed'/.test(seen), 'the audit view can see everything');
+  } finally {
+    datastore.query = original;
+  }
+});
+
+test('evidence routes are wired and the read follows the case rather than the rank', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  for (const route of ["'/evidence/note'", "'/cases/:id/evidence'", "'/evidence/note/:id/withdraw'"]) {
+    assert.ok(app.includes(route), `${route} must be registered`);
+  }
+  // The read is deliberately NOT role-gated: the station whose register holds the case needs
+  // the transcription, and getCase already throws for a case out of their scope. A
+  // requireRole here would silently take that away.
+  const read = app.slice(app.indexOf("r.get('/cases/:id/evidence'"));
+  const body = read.slice(0, read.indexOf('}));'));
+  assert.ok(!/requireRole/.test(body), 'the case-scoped read must not carry a rank gate');
+  assert.match(body, /q\.getCase\(req\.user/, 'and must resolve the case through the register');
+  // getCase does NOT enforce scope -- its comment describes a check that was never written,
+  // and probing found a station SI able to open cases in every other district sampled. A
+  // filed reading is a transcription of a photographed document and must not travel further
+  // than the case does, so this route checks scope itself. Deleting that line would silently
+  // publish every seizure memo in the state to every account.
+  assert.match(body, /rbac\.caseInScope\(req\.user, c\)/,
+    'the evidence read must check scope itself rather than inherit a check that does not exist');
+});
+
+test('the literal evidence routes are declared before the :capability wildcard', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  // Express matches in declaration order. With ':capability' first, POST /evidence/note
+  // resolves as "read an image using the capability named note" and answers 400 -- which is
+  // what it did on the first deploy, in a file that already carries this same warning above
+  // '/cases/:id'. Learning it twice is enough.
+  // Anchored to the declaration -- with a trailing comma -- rather than to the path alone.
+  // The path also appears in the prose above the routes explaining this very ordering, and
+  // matching that made the assertion measure a comment instead of the code.
+  const wildcard = app.indexOf("'/evidence/:capability',");
+  assert.ok(wildcard > 0, 'the capability route must exist');
+  for (const literal of ["r.post('/evidence/note'", "r.get('/evidence/notes'", "r.post('/evidence/note/:id/withdraw'"]) {
+    const at = app.indexOf(literal);
+    assert.ok(at > 0, `${literal} must exist`);
+    assert.ok(at < wildcard, `${literal} must be declared before '/evidence/:capability'`);
+  }
+});
+
+test('a reading can be filed against a case registered today', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  // Live rows -- approved but not yet analysed by the overnight pipeline -- are attached to
+  // req.user only on the paths LIVE_PATHS names. The filing route resolves the case through
+  // the scoped lookup, so a route missing from that list answers "case not found" for every
+  // case registered since the last pipeline run. That is the seizure-memo case exactly: the
+  // memo and the FIR arrive on the same afternoon.
+  const m = app.match(/const LIVE_PATHS = (\/\^[^\n;]+\/);/);
+  assert.ok(m, 'LIVE_PATHS must be findable');
+  // eslint-disable-next-line no-eval
+  const re = eval(m[1]);
+  assert.ok(re.test('/evidence/note'), 'filing must see live cases');
+  assert.ok(re.test('/cases/LIVE-abc/evidence'), 'and so must reading them back');
+  assert.ok(!re.test('/evidence/notes'), 'the history list needs no register lookup');
+  assert.ok(!re.test('/evidence/ocr'), 'nor does reading an image');
+});

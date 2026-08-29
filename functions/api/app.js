@@ -27,6 +27,7 @@ const translate = require('./services/translate');
 const zianlp = require('./services/zianlp');
 const vlm = require('./services/vlm');
 const ziavision = require('./services/ziavision');
+const evidencenote = require('./services/evidencenote');
 const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
@@ -91,7 +92,12 @@ function buildApp() {
   // the same contract every other adapter here keeps.
   // /command is here because the station view reports a register total, and a register total
   // that excludes just-approved cases contradicts the /stats cards rendered above it.
-  const LIVE_PATHS = /^\/(cases|case-updates|stats|command|geo\/points|analytics\/(worklist|agenda|outlook))/;
+  // /evidence/note is here because a reading is most often filed against a case that was
+  // registered TODAY -- the seizure memo and the FIR arrive together. Without this the
+  // filing route cannot see live rows and answers "case not found" for exactly the cases
+  // the feature exists for. The lookahead keeps /evidence/notes (a history list that needs
+  // no register lookup) off this path rather than paying a Data Store round trip for it.
+  const LIVE_PATHS = /^\/(cases|case-updates|stats|command|evidence\/note(?!s)|geo\/points|analytics\/(worklist|agenda|outlook))/;
   app.use(async (req, _res, next) => {
     if (LIVE_PATHS.test(req.path)) {
       req.user._live = await submissions.liveCases(req, q.db()).catch(() => []);
@@ -1272,6 +1278,88 @@ r.get('/analytics/outlook', handle(async (req) => {
       };
     }),
   );
+
+  // ---- filing a reading against a case -------------------------------------------------
+  //
+  // REGISTERED BEFORE '/evidence/:capability' ON PURPOSE, and the ordering is load-bearing.
+  // Express matches in declaration order, so with ':capability' first a POST to
+  // /evidence/note resolves as "read an image with the capability named note" and answers
+  // 400 -- which is exactly what it did, on a codebase that already carries this same warning
+  // above '/cases/:id'. There is a test asserting the order below.
+  // The reading is the point; the image is not. Everything above this line reads a photograph
+  // and throws it away, which made the Evidence screen a demonstration rather than a step in
+  // anybody's day: an officer watched a seizure memo transcribe correctly and then had to
+  // retype it somewhere else anyway.
+  //
+  // A filed note closes that loop, and it stores the TRANSCRIPTION rather than the
+  // PHOTOGRAPH. That asymmetry is deliberate: the image is the part carrying whoever else was
+  // in frame, and the text is the part with evidentiary value.
+  r.post('/evidence/note', handle(async (req) => {
+    // Scope from the register, not the body. getCase throws for a case this account may not
+    // see, so the lookup IS the permission check, and crimeNo/districtId/unitId are read off
+    // the register rather than trusted from the request -- otherwise a note could be filed
+    // into another district's case and every scoped read would honour the lie.
+    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''));
+    const out = await evidencenote.file(req, req.user, req.body || {}, target);
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'file_evidence_note', targetType: 'case',
+      targetId: target.caseMasterId, queryText: (req.body || {}).capability, ip: req.clientIp, req });
+    return out;
+  }));
+
+  // Readings filed against one case.
+  //
+  // NO ROLE GATE HERE, AND THAT IS THE DESIGN. Producing a note needs state tier because it
+  // needs the ability to read an uploaded image. Reading one back follows the CASE: the
+  // station whose register holds the case is exactly who needs the memo transcription, and
+  // they get it without ever being able to upload an image themselves.
+  r.get('/cases/:id/evidence', handle(async (req) => {
+    const c = q.getCase(req.user, req.params.id);
+    // SCOPE IS CHECKED HERE RATHER THAN INHERITED, because getCase does not check it.
+    //
+    // Its comment says detail is visible "if in scope OR linked into an in-scope
+    // investigation", but no code implements that: the register LIST is scoped and the
+    // register DETAIL is open to any authenticated officer. Probing found an SI at one
+    // Bengaluru station able to open cases in every other district sampled.
+    //
+    // That is a pre-existing property of the register and not something to change from here.
+    // But a filed reading is not a case row. It is a transcription of a document somebody
+    // photographed -- property lists, IMEIs, witness counts, whatever else was on the page --
+    // and it is exactly the kind of content that should not travel further than the case does.
+    // Seeing that a case in another district is LINKED to yours is the product's whole thesis;
+    // reading the seizure memo filed against it is not part of that thesis.
+    if (!rbac.caseInScope(req.user, c)) {
+      return {
+        items: [], caseMasterId: c.caseMasterId, visible: false, canFile: false,
+        reason: 'Readings filed against a case are visible at that case\'s own scope.',
+      };
+    }
+    const items = await evidencenote.forCase(req, c.caseMasterId);
+    return { items, caseMasterId: c.caseMasterId, visible: true, canFile: evidencenote.canFile(req.user) };
+  }));
+
+  // What this officer has filed lately, so the Evidence screen can show that the loop closed
+  // rather than only claiming it did.
+  r.get('/evidence/notes', handle(async (req) => {
+    rbac.requireRole(req.user, ['DGP', 'Admin', 'Analyst']);
+    const mine = String(req.query.mine || '') !== 'false';
+    const items = await evidencenote.recent(req, {
+      createdBy: mine ? (req.user.email || req.user.appUserId || req.user.role) : '',
+      limit: req.query.limit,
+    });
+    return { items, mine };
+  }));
+
+  // Withdrawn, not deleted. Attaching a reading to the wrong case is a one-click mistake and
+  // needs an undo, but a police record that can be made to have never said something is a
+  // worse problem than a wrong note -- so the row survives and carries who withdrew it and why.
+  r.post('/evidence/note/:id/withdraw', handle(async (req) => {
+    const out = await evidencenote.withdraw(req, req.user, req.params.id, (req.body || {}).reason);
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'withdraw_evidence_note', targetType: 'case',
+      targetId: out.caseMasterId, queryText: (req.body || {}).reason, ip: req.clientIp, req });
+    return out;
+  }));
 
   // Reading an evidence image. One capability per call, chosen by the caller, so a reader is
   // never handed four analyses of a photograph they asked one question about.

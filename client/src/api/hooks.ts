@@ -312,6 +312,51 @@ export const useDecideUpdate = () =>
       api.post<{ ok: boolean; status: string }>(`/case-updates/${v.id}/decide`, { decision: v.decision, note: v.note || '' }),
   });
 
+// ---- evidence readings filed against a case ----------------------------------------------
+// Writing one needs state tier (it needs the ability to read an uploaded image at all).
+// Reading them back follows the CASE, so the station that registered it sees the memo
+// transcription without ever being able to upload an image.
+export type EvidenceNoteRow = {
+  id: string; caseMasterId: string; crimeNo: string | null;
+  capability: 'ocr' | 'barcode' | 'read'; capabilityLabel: string; engine: string;
+  question: string; extract: string; confidence: string | null;
+  filename: string | null; bytes: number | null;
+  status: 'filed' | 'withdrawn';
+  createdBy: string; creatorRole: string; createdAt: string;
+  withdrawnBy: string | null; withdrawnAt: string | null; withdrawReason: string | null;
+};
+export const useCaseEvidence = (caseId: string, enabled = true) =>
+  useQuery({
+    queryKey: ['case-evidence', role(), caseId],
+    queryFn: () => api.get<{
+      items: EvidenceNoteRow[]; caseMasterId: string; canFile: boolean;
+      // False when the case is outside this officer's own scope. The register's DETAIL view
+      // is open to any account (its scope check was never implemented), but a transcription
+      // of a photographed document must not travel further than the case does.
+      visible?: boolean; reason?: string;
+    }>(
+      `/cases/${encodeURIComponent(caseId)}/evidence`),
+    enabled: enabled && Boolean(caseId),
+    staleTime: 30 * 1000,
+  });
+export const useMyEvidenceNotes = (enabled = true) =>
+  useQuery({
+    queryKey: ['evidence-notes', role()],
+    queryFn: () => api.get<{ items: EvidenceNoteRow[]; mine: boolean }>('/evidence/notes?limit=12'),
+    enabled,
+    staleTime: 15 * 1000,
+  });
+export const useFileEvidenceNote = () =>
+  useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post<{ ok: boolean; id: string; caseMasterId: string; crimeNo: string | null }>('/evidence/note', body),
+  });
+export const useWithdrawEvidenceNote = () =>
+  useMutation({
+    mutationFn: (v: { id: string; reason: string }) =>
+      api.post<{ ok: boolean; id: string }>(`/evidence/note/${v.id}/withdraw`, { reason: v.reason }),
+  });
+
 // ---- translation ------------------------------------------------------------------------
 // Zia does not translate on this project (a live probe returns vision and text analytics and
 // nothing linguistic), so this runs on the QuickML LLM server-side, batched and cached, with

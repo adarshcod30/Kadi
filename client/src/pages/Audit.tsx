@@ -29,6 +29,8 @@ export const ACTION_LABELS: Record<string, string> = {
   submit_case: 'Case submitted for approval',
   sign_in: 'Signed in',
   evidence_image: 'Evidence image read',
+  file_evidence_note: 'Reading filed against a case',
+  withdraw_evidence_note: 'Reading withdrawn',
 };
 
 export default function Audit() {

@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles, Clock, Hourglass, Check,
+  ScanText, Paperclip,
 } from 'lucide-react';
 import {
-  useCase, useCaseEntities, useMe, useCaseUpdates, useRequestUpdate,
+  useCase, useCaseEntities, useMe, useCaseUpdates, useRequestUpdate, useCaseEvidence,
 } from '../api/hooks';
 import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } from '../components/ui';
 import { Select } from '../components/Select';
@@ -124,6 +125,7 @@ export default function CaseDetail() {
         <div className="lg:col-span-2 space-y-4">
           <Section title="Brief facts (MO)"><p className="p-4 text-sm leading-relaxed">{c.briefFacts}</p></Section>
           <CaseLifecycle caseId={String(c.caseMasterId)} crimeNo={c.crimeNo} statusName={c.status} />
+          <FiledReadings caseId={String(c.caseMasterId)} />
           <NarrativeEntities id={String(c.caseMasterId)} />
 
           <Section title="Parties">
@@ -220,6 +222,68 @@ function PartyList({ title, items }: { title: string; items: string[] }) {
       <div className="label mb-1">{title}</div>
       {items.length ? <ul className="text-sm space-y-0.5">{items.map((x, i) => <li key={i}>{x}</li>)}</ul> : <div className="text-sm text-ink-muted">—</div>}
     </div>
+  );
+}
+
+// ---- readings filed against this case --------------------------------------------------------
+// What a machine read off a photograph somebody was holding: a seizure memo, a notice, a
+// property tag.
+//
+// THE ASYMMETRY HERE IS THE WHOLE POINT. Uploading an image is a state-tier permission, so
+// only the DGP, the Administrator and the SCRB Analyst can produce one of these. Reading one
+// back follows the CASE — which means the station whose register holds this case sees the memo
+// transcription without ever having had access to the photograph it came from. The
+// photograph is not stored at all: it carries whoever else was in frame, and the text is the
+// part with evidentiary value.
+function FiledReadings({ caseId }: { caseId: string }) {
+  const { data } = useCaseEvidence(caseId);
+  const items = data?.items || [];
+  // Absent rather than empty. A case with no readings filed against it is the normal case,
+  // and an empty panel on every case would train a reader to skip the section on the one case
+  // where it says something.
+  if (!items.length) return null;
+
+  return (
+    <Section title={<span className="flex items-center gap-2">
+      <ScanText size={15} className="text-kadi-teal" /> Readings filed against this case
+      <InfoDot label="Where these came from">
+        <b className="block mb-1 text-kadi-navy">A machine read a photograph</b>
+        Each of these is what an OCR engine, a barcode scanner or a vision model read off an
+        image an officer photographed — a seizure memo, a notice, a property tag. It is a
+        transcription, not a finding, and it carries the name of the engine that produced it so
+        you know how much to re-check.
+        <b className="block mt-1.5 text-kadi-navy">The image is not here</b>
+        Only the text was stored. The photograph carries whoever else happened to be in frame
+        and has no evidentiary value the transcription lacks.
+        <b className="block mt-1.5 text-kadi-navy">Who could file one</b>
+        Uploading an image is a state-tier permission. You are seeing this because it was
+        filed against a case in your scope, not because you can read images yourself.
+      </InfoDot>
+    </span>}>
+      <div className="divide-y divide-line">
+        {items.map((n) => (
+          <div key={n.id} className="p-4">
+            <div className="flex items-center gap-2 flex-wrap text-[11px] mb-1.5">
+              <span className="chip border border-line bg-surface-2 text-ink-muted">
+                <Paperclip size={11} className="mr-1" />{n.capabilityLabel}
+              </span>
+              <span className="text-ink-subtle">{n.engine}</span>
+              {n.confidence && <span className="text-ink-subtle font-num">{n.confidence}% confidence</span>}
+              {n.filename && <span className="text-ink-subtle truncate max-w-[12rem]">{n.filename}</span>}
+            </div>
+            {n.question && (
+              <p className="text-[12px] text-ink-muted italic mb-1.5">&ldquo;{n.question}&rdquo;</p>
+            )}
+            <pre className="text-[12.5px] whitespace-pre-wrap leading-relaxed rounded-ctl border border-line bg-surface-2 p-3 max-h-56 overflow-y-auto text-ink">
+              {n.extract}
+            </pre>
+            <div className="text-[11px] text-ink-subtle mt-1.5">
+              Filed by {n.createdBy} ({n.creatorRole}) on {String(n.createdAt).slice(0, 10)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
