@@ -59,7 +59,12 @@ async function listPersisted(req, { limit = 100, action } = {}) {
   const rows = await datastore.query(
     req,
     `SELECT appUserId, userName, role, action, targetType, targetId, queryText, ip, ts `
-      + `FROM AuditLog${where} ORDER BY ROWID DESC LIMIT ${Math.min(Number(limit) || 100, 500)}`,
+      // 300, not 500. ZCQL REFUSES any LIMIT above 300 -- it answers "ZCQL CANNOT HAVE MORE
+      // THAN 300 ROWS in LIMIT" rather than truncating, so the whole query fails and this
+      // returns null. The caller then falls back to the in-memory buffer, and an administrator
+      // who asked for 400 entries of history was handed ONE. Asking for more quietly gave less,
+      // which is the worst way for an audit log to be wrong.
+      + `FROM AuditLog${where} ORDER BY ROWID DESC LIMIT 0, ${Math.min(Number(limit) || 100, 300)}`,
     'AuditLog',
   );
   if (rows === null) return null;

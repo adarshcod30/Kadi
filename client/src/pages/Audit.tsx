@@ -34,6 +34,8 @@ export const ACTION_LABELS: Record<string, string> = {
   retain_evidence_page: 'Page image kept with a reading',
   view_evidence_page: 'Kept page viewed',
   reread_evidence_page: 'Kept page read again',
+  correct_translation: 'Kannada wording corrected',
+  revert_translation: 'Kannada wording put back to the machine version',
 };
 
 export default function Audit() {

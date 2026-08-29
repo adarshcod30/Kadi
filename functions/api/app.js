@@ -29,6 +29,7 @@ const vlm = require('./services/vlm');
 const ziavision = require('./services/ziavision');
 const evidencenote = require('./services/evidencenote');
 const filestore = require('./services/filestore');
+const translationfix = require('./services/translationfix');
 const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
@@ -1510,6 +1511,53 @@ r.get('/analytics/outlook', handle(async (req) => {
       };
     }),
   );
+
+  // ---- correcting the machine's Kannada -------------------------------------------------
+  //
+  // Every Kannada string in this product was written by a model and none had been read by a
+  // native speaker. That was listed as a known limitation, which is honest and changes nothing:
+  // a limitation only fixable by an offline review nobody has scheduled is a limitation that
+  // stays. These routes make the review something that happens a sentence at a time, by the
+  // officers already reading the Kannada interface, at the moment they notice a word is wrong.
+
+  // The corrections in force, laid over the built dictionary by the client. Open to any
+  // signed-in account because every account can switch the interface to Kannada.
+  r.get('/translations/overrides', handle(async (req) => translationfix.overrides(req)));
+
+  // Write a correction. Any signed-in officer, deliberately: the people reading the Kannada
+  // interface all day are station officers, and they are the ones who know that a word is
+  // technically a translation and not what anybody in a police station calls that thing.
+  r.post('/translations', handle(async (req) => {
+    const out = await translationfix.submit(req, req.user, req.body || {});
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'correct_translation', targetType: 'translation',
+      targetId: translationfix.hash(out.source).slice(0, 16),
+      queryText: String((req.body || {}).source || '').slice(0, 120), ip: req.clientIp, req });
+    return out;
+  }));
+
+  // Put a string back to the machine wording.
+  r.post('/translations/revert', handle(async (req) => {
+    const out = await translationfix.revert(req, req.user, (req.body || {}).source);
+    if (!out.ok) fail(out);
+    audit.record({ user: req.user, action: 'revert_translation', targetType: 'translation',
+      targetId: translationfix.hash(out.source).slice(0, 16),
+      queryText: String(out.source).slice(0, 120), ip: req.clientIp, req });
+    return out;
+  }));
+
+  // Everything ever written for one string, newest first — who changed it and what it said
+  // before. The accountability that replaces an approval queue.
+  r.get('/translations/history', handle(async (req) => ({
+    items: await translationfix.historyFor(req, String(req.query.source || '')),
+  })));
+
+  // The latest corrections across all strings, so the review screen can show that other people
+  // are doing this too. A review nobody can see the progress of is a review nobody joins.
+  r.get('/translations/recent', handle(async (req) => ({
+    items: await translationfix.recent(req, { limit: req.query.limit }),
+    status: translationfix.status(),
+  })));
 
   // What the file store actually said. Same discipline as /diag/zia-vision: the REST surface
   // is established by asking rather than by reading, because the documented shape and the

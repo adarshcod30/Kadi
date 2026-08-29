@@ -22,6 +22,9 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   // The sidebar's own heading. Named here so it turns over with everything else.
   navHeading: { en: 'Workspace', kn: 'ಕಾರ್ಯಕ್ಷೇತ್ರ' },
   evidence: { en: 'Evidence', kn: 'ಸಾಕ್ಷ್ಯ' },
+  // Written by hand rather than by the model, because a machine-written label on the screen
+  // for fixing machine-written labels would be a small joke at the reviewer's expense.
+  kannada: { en: 'Kannada review', kn: 'ಕನ್ನಡ ಪರಿಶೀಲನೆ' },
   appName: { en: 'KADI', kn: 'ಕಡಿ' },
   tagline: { en: 'Connecting the links', kn: 'ಕೊಂಡಿಗಳನ್ನು ಜೋಡಿಸುವುದು' },
   ksp: { en: 'Karnataka State Police — Crime Intelligence', kn: 'ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್ — ಅಪರಾಧ ಗುಪ್ತಚರ' },
@@ -100,14 +103,59 @@ export const DICT: Record<string, { en: string; kn: string }> = {
   exploreNetwork: { en: 'Explore the network', kn: 'ಜಾಲವನ್ನು ಅನ್ವೇಷಿಸಿ' },
 };
 
+// ---- layer 0: corrections written by people ----------------------------------------------
+// Highest priority, above both the built dictionary and anything fetched at runtime, because
+// every string in those two was written by a model and none of it was read by a Kannada speaker
+// before it shipped. A human correction is the only entry here with an author.
+//
+// Cached in localStorage so a reload does not render the machine wording for a beat before the
+// corrections arrive — that flicker is what makes somebody think their fix did not take.
+const FIX_KEY = 'kadi.kn.fixes';
+let fixes: Record<string, string> = (() => {
+  try { return JSON.parse(localStorage.getItem(FIX_KEY) || '{}'); } catch { return {}; }
+})();
+let fixesLoaded = false;
+
+/** Pull the corrections in force. Called once at startup and again after one is written. */
+export async function loadFixes(): Promise<number> {
+  try {
+    const { api } = await import('./api');
+    const out = await api.get<{ map: Record<string, string>; count: number }>('/translations/overrides');
+    fixes = out.map || {};
+    fixesLoaded = true;
+    try { localStorage.setItem(FIX_KEY, JSON.stringify(fixes)); } catch { /* quota */ }
+    notify();
+    return out.count || 0;
+  } catch {
+    // The built dictionary still renders. A failed correction fetch must never blank the UI.
+    return -1;
+  }
+}
+export const fixesReady = () => fixesLoaded;
+export const currentFixes = () => fixes;
+
 export function tr(key: string, lang: Lang): string {
   const e = DICT[key];
-  return e ? e[lang] : key;
+  if (!e) return key;
+  // CORRECTIONS HAVE TO REACH THIS LAYER TOO, and it is the layer that matters most: DICT holds
+  // the navigation labels, which are the Kannada strings every officer sees on every screen.
+  // Correcting "Evidence" and watching the sidebar keep the machine's word is exactly how
+  // somebody concludes the review screen does not work.
+  //
+  // Keyed by the entry's ENGLISH rather than by its DICT key, so one correction covers both
+  // layers: the same string reached through tx() and through tr() gets the same wording.
+  if (lang === 'kn') {
+    const fixed = fixes[e.en];
+    if (fixed) return fixed;
+  }
+  return e[lang];
 }
 
 // ---- layer 2: translate by English source text -------------------------------------------
 const BUILT: Record<string, string> = KN as Record<string, string>;
 const RUNTIME_KEY = 'kadi.kn.runtime';
+
+
 
 function loadRuntime(): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(RUNTIME_KEY) || '{}'); } catch { return {}; }
@@ -164,7 +212,10 @@ async function flush() {
  */
 export function tx(text: string, lang: Lang): string {
   if (lang !== 'kn' || !text) return text;
-  const hit = BUILT[text] || runtime[text];
+  // Human first. A correction somebody wrote beats anything the model produced — and putting
+  // it last would mean every corrected string reverts, since a correction starts from the
+  // machine entry and the machine entry therefore always exists.
+  const hit = fixes[text] || BUILT[text] || runtime[text];
   if (hit) return hit;
   // Do not queue data. Numbers, ids and single tokens are values, not interface copy, and
   // sending an FIR number to a translator is how a record gets corrupted.
@@ -203,9 +254,16 @@ export const useTx = () => {
  */
 export function reverseKn(): Record<string, string> {
   const out: Record<string, string> = {};
-  // Built first, runtime second: where both know a phrase, the reviewed translation wins.
+  // Written in ascending order of authority, so the last writer wins: runtime guesses, then
+  // the built dictionary, then human corrections.
+  //
+  // The corrections MUST be in here. Switching back to English works by looking up the Kannada
+  // on screen and restoring its English — so a string somebody corrected would be Kannada this
+  // map has never seen, and it would stay Kannada while everything around it turned over. That
+  // is precisely the half-switched page this reverse map was built to stop.
   for (const [en, kn] of Object.entries(runtime)) if (kn && kn !== en) out[kn] = en;
   for (const [en, kn] of Object.entries(BUILT)) if (kn && kn !== en) out[kn] = en;
+  for (const [en, kn] of Object.entries(fixes)) if (kn && kn !== en) out[kn] = en;
   return out;
 }
 
@@ -213,7 +271,24 @@ export function reverseKn(): Record<string, string> {
 export const dictionaryStats = () => ({
   built: Object.keys(BUILT).length,
   runtime: Object.keys(runtime).length,
+  corrected: Object.keys(fixes).length,
 });
+
+/**
+ * Every machine-written Kannada string in the product, as { english: kannada }.
+ *
+ * BOTH LAYERS, not just the big one. DICT is only ~70 entries against kn.json's 1,100, but it
+ * holds the navigation labels — the strings every officer sees on every screen, and therefore
+ * the ones most worth getting right. A review screen that offered the 1,100 and quietly omitted
+ * the 70 would leave the most-read Kannada in the product unreviewable.
+ */
+export const builtDictionary = (): Record<string, string> => {
+  const out: Record<string, string> = { ...BUILT };
+  for (const e of Object.values(DICT)) {
+    if (e.en && e.kn && e.en !== e.kn) out[e.en] = e.kn;
+  }
+  return out;
+};
 
 export const LangContext = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({
   lang: 'en', setLang: () => {},

@@ -6,11 +6,15 @@ the transcription against the case it belongs to.
 
 It is built on one asymmetry, and most of what follows is a consequence of it:
 
-> **The reading is stored. The photograph never is.**
+> **The reading is always stored. The photograph only when somebody says to keep it.**
 
 The image is the part carrying whoever else happened to be in frame. The text is the part with
-evidentiary value. There is no blob column in this feature, and that is a decision rather than
-an omission.
+evidentiary value.
+
+This originally said the image was **never** stored. That was too strong, and it cost something
+real: a reading nobody can check against its page is a records loss dressed as a privacy win.
+The default is unchanged — nothing is kept unless an officer ticks the box — and §7 sets out
+what retention actually guarantees.
 
 ---
 
@@ -130,6 +134,9 @@ exists to avoid.
 | `GET /cases/:id/evidence` | scoped `getCase` + `rbac.caseInScope` |
 | `GET /evidence/notes` | `requireRole(['DGP','Admin','Analyst'])` |
 | `POST /evidence/note/:id/withdraw` | author, or Administrator |
+| `POST /evidence/note/:id/page` | author (or Admin) — keeps the page |
+| `GET /evidence/note/:id/page` | scoped `getCase` + `rbac.caseInScope` — streams the image |
+| `POST /evidence/note/:id/reread` | `requireRole(['DGP','Admin','Analyst'])` + scope |
 
 **The literal routes are declared before `/evidence/:capability`.** Express matches in
 declaration order, so with the wildcard first a `POST /evidence/note` resolves as "read an image
@@ -144,16 +151,93 @@ which is the seizure-memo case exactly: the memo and the FIR arrive on the same 
 
 ---
 
-## 5. What this still cannot do
+## 5. More than one page
 
-- **One image per reading.** No PDF, no multi-page. A three-page case diary is three uploads.
-- **No re-reading a filed note.** The transcription is stored; the image is gone, so a better
-  OCR engine later cannot be run over the same page.
-- **`kn.json` has not had a native-speaker review.** The Kannada is machine-produced.
+A PDF or a set of photographs is rendered page by page **in the browser**, read one page at a
+time, and filed as one reading with page markers. A single photograph is a list of one page, so
+nothing downstream carries a special case.
+
+A three-page case diary read **3/3 at 98% in 9.1 s**.
+
+- **pdf.js is loaded on the first PDF**, not on every page load. It is about a megabyte and the
+  overwhelming majority of readings are a phone photograph that never touches it.
+- **Capped at 10 pages**, and the cap is *reported* — a truncated read that presents itself as a
+  whole document is the kind of quiet wrongness that ends up in a case file.
+- **Two file inputs, not one.** `capture` is ignored the moment the accept list is not purely
+  images, so a single input that accepts PDFs silently loses the camera on a phone — the device
+  an officer standing over a seizure is actually holding.
+
+### Built assets may not be `.mjs`
+
+Catalyst serves `.js` as `application/javascript` and `.mjs` as `application/octet-stream`, and
+a browser refuses to execute an ES module with a non-JavaScript MIME type. pdf.js ships its
+worker as `pdf.worker.mjs`, so the page **200s on the worker and then dies** with "failed to
+fetch dynamically imported module" — a failure that reads like a missing file and is actually a
+content type. `vite.config.ts` renames `.mjs` assets to `.js` on the way out, and a test fails if
+any asset is emitted as `.mjs` again.
 
 ---
 
-## 6. Data
+## 6. Reading the same page again
+
+Two different needs, solved two different ways.
+
+**Before filing** the extracted pages stay in memory, so switching engine or asking a new
+question costs no second upload. This is what made "Ask about it" worth its name.
+
+**After filing**, only if the page was kept: `POST /evidence/note/:id/reread` runs any reader
+over the stored image. A note filed by Zia OCR was put to the vision model and answered
+correctly in 666 ms.
+
+A re-read **does not overwrite the original and does not file itself.** It returns what the
+second engine said and leaves the officer to file it separately. Comparing two engines on one
+page only means something if both readings survive and stay separately attributable.
+
+---
+
+## 7. What retention actually guarantees
+
+| | |
+|---|---|
+| **Default** | off, on every reading |
+| **Choice** | per reading, next to a sentence saying what it means |
+| **Scope** | the case's own scope — same check as the transcription |
+| **Deletion** | the page is deleted when the reading is withdrawn |
+| **Audit** | on write, on read, and on re-read |
+| **Never exposed** | the file id. Only *whether* a page exists reaches the browser |
+
+The asymmetry that makes this acceptable: **withdrawing a reading keeps the text and deletes the
+photograph.** The text is the record — keeping it is what stops a note being made to have never
+existed. The image is the thing this feature never wanted to be holding.
+
+Filing and retention are **separate calls**, deliberately. If retention were part of filing, an
+upload that timed out would take a correct transcription down with it and send the officer back
+to retyping the memo — the exact problem the feature exists to remove.
+
+### The upload response's file id is wrong
+
+Catalyst's file-upload endpoint returns an id the file does not settle at: it answered
+`…205060` for a file that listed as `…205058`. This is the same lie the row-insert endpoint
+tells — `submissions.js` documents rows drifting **+3**, this file drifted **−2** — so there is
+nothing to correct for.
+
+Rows solved it by minting their own key. A file id belongs to Catalyst and cannot be minted, so
+the file is found by **name** instead: the page is uploaded as `<noteKey>.png`, the note key is
+unique, and the listing is newest-first.
+
+---
+
+## 8. What this still cannot do
+
+- **No PDF text layer.** Pages are rasterised and OCR'd, so a PDF that already contains text is
+  read as a picture of that text rather than having it extracted directly.
+- **Only the first page is retained**, not all of them, when a multi-page document is filed.
+- **`kn.json` has not had a native-speaker review** — but it can now get one a string at a time.
+  See `docs/14_KANNADA.md`.
+
+---
+
+## 9. Data
 
 `EvidenceNote`, table `55468000000214044`, created through the Catalyst API rather than from the
 function: the deployed credential can read and write **rows** but not change **schema** —

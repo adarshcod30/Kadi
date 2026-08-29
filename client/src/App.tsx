@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { setRole, getRole, normaliseRole } from './lib/api';
-import { LangContext, Lang } from './lib/i18n';
+import { LangContext, Lang, loadFixes } from './lib/i18n';
 import { PageTranslator } from './lib/PageTranslator';
 import About from './pages/About';
 import Dashboard from './pages/Dashboard';
@@ -21,11 +21,18 @@ import Register from './pages/Register';
 import Assistant from './pages/Assistant';
 import Audit from './pages/Audit';
 import Admin from './pages/Admin';
+import Kannada from './pages/Kannada';
 import Login from './pages/Login';
 
 export default function App() {
   const [lang, setLang] = useState<Lang>((localStorage.getItem('kadi.lang') as Lang) || 'en');
   const setLangP = (l: Lang) => { setLang(l); localStorage.setItem('kadi.lang', l); };
+
+  // Human corrections to the machine's Kannada, pulled once at startup and laid over the built
+  // dictionary. Fetched even in English mode: the switch to Kannada has to be instant, and a
+  // fetch started at the moment somebody presses the toggle renders the machine wording first
+  // and corrects it a beat later, which reads as the correction not having taken.
+  useEffect(() => { loadFixes(); }, []);
 
   // Login renders standalone (no shell chrome), and a first-time visitor lands there so
   // the role model is the first thing seen rather than something buried in a menu.
@@ -55,6 +62,7 @@ export default function App() {
       <Shell>
         <Routes>
           <Route path="/about" element={<About />} />
+          <Route path="/kannada" element={<Kannada />} />
           <Route path="/" element={<Dashboard />} />
           <Route path="/cases" element={<Cases />} />
           <Route path="/cases/:id" element={<CaseDetail />} />

@@ -132,8 +132,21 @@ export function PageTranslator() {
     }
 
     let queued = false;
+    // The pending timer and a cancelled flag, both cleared on teardown.
+    //
+    // WITHOUT THESE THE TRANSLATOR NEVER STOPS. schedule() arms a setTimeout that the cleanup
+    // did not clear, and run() ENDS by calling observer.observe() -- so a single timer left in
+    // flight when the language switches to English re-attaches the observer that cleanup had
+    // just disconnected, and every later mutation is translated back into Kannada. The symptom
+    // is a page that reports English, renders Kannada, and quietly accumulates fresh runtime
+    // translations while it does it; the nav read 431 runtime entries in English mode when this
+    // was found.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
     const run = () => {
       queued = false;
+      timer = null;
+      if (cancelled) return;
       observer.disconnect();
       walk(root, (n) => {
         const current = n.nodeValue || '';
@@ -168,10 +181,10 @@ export function PageTranslator() {
       observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
     };
     const schedule = () => {
-      if (queued) return;
+      if (queued || cancelled) return;
       queued = true;
       // One frame plus a beat: React commits, then we translate what it committed.
-      setTimeout(run, 60);
+      timer = setTimeout(run, 60);
     };
     const observer = new MutationObserver(schedule);
 
@@ -182,6 +195,8 @@ export function PageTranslator() {
     const poll = setInterval(schedule, 1200);
 
     return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
       observer.disconnect();
       clearInterval(poll);
     };

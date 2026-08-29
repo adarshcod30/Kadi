@@ -1321,3 +1321,142 @@ test('no built asset is emitted as .mjs', () => {
   assert.deepStrictEqual(mjs, [],
     `these assets will be served as application/octet-stream and will not execute: ${mjs.join(', ')}`);
 });
+
+// ---- human corrections to the machine's Kannada --------------------------------------------
+
+test('a correction must actually contain Kannada', async () => {
+  const fix = require('../api/services/translationfix');
+  // Latin script in this box is somebody typing in the wrong field. Catching it here costs
+  // nothing; catching it after it is live for every Kannada reader costs a lot more.
+  const out = await fix.submit({}, { role: 'SI' }, { source: 'Cases', kannada: 'Prakaranagalu' });
+  assert.ok(!out.ok);
+  assert.strictEqual(out.status, 400);
+});
+
+test('a correction supersedes rather than overwrites', async () => {
+  const fix = require('../api/services/translationfix');
+  const datastore = require('../api/services/datastore');
+  const oq = datastore.query;
+  const oi = datastore.insertRows;
+  const statements = [];
+  let written = null;
+  datastore.query = async (_r, sql) => { statements.push(sql); return []; };
+  datastore.insertRows = async (_r, _t, rows) => { [written] = rows; return true; };
+  try {
+    const out = await fix.submit({}, { role: 'SI', email: 'si@ksp' },
+      { source: 'Cases', kannada: 'ಪ್ರಕರಣಗಳು', machineText: 'ಕೇಸುಗಳು', note: 'what a station calls it' });
+    assert.ok(out.ok, out.error);
+    // The old row must be marked, not replaced: an interface string whose history is "it says
+    // this now" cannot answer who changed it or what it said before.
+    const update = statements.find((s) => /^UPDATE/i.test(s));
+    assert.match(update, /fixStatus='superseded'/);
+    assert.ok(!statements.some((s) => /^\s*DELETE/i.test(s)), 'nothing is deleted');
+    assert.strictEqual(written.fixStatus, 'active');
+    assert.strictEqual(written.machineText, 'ಕೇಸುಗಳು', 'what the machine said is kept for comparison');
+    assert.strictEqual(written.fixedBy, 'si@ksp');
+  } finally {
+    datastore.query = oq;
+    datastore.insertRows = oi;
+  }
+});
+
+test('a long string is keyed by hash, because the text column caps at 255', async () => {
+  const fix = require('../api/services/translationfix');
+  const datastore = require('../api/services/datastore');
+  const oq = datastore.query;
+  const oi = datastore.insertRows;
+  let written = null;
+  datastore.query = async () => [];
+  datastore.insertRows = async (_r, _t, rows) => { [written] = rows; return true; };
+  // Deliberately ends in a space. The source is a lookup KEY, so trimming it would store a
+  // correction against a string the interface never asks for -- saved, reported as saved, and
+  // silently matching nothing.
+  const long = 'Insights use evidence and behaviour only. '.repeat(12); // ~500 chars, trailing space
+  try {
+    await fix.submit({}, { role: 'SI' }, { source: long, kannada: 'ಒಳನೋಟಗಳು' });
+    // Long paragraphs are exactly where machine translation goes wrong most, so keying on the
+    // truncated column would exclude the strings that most need reviewing.
+    assert.ok(long.length > 255);
+    assert.strictEqual(written.sourceHash, fix.hash(long));
+    assert.strictEqual(written.sourceFull, long, 'the whole string is kept');
+    assert.ok(written.sourceText.length <= 255, 'and the capped column is only a display copy');
+  } finally {
+    datastore.query = oq;
+    datastore.insertRows = oi;
+  }
+});
+
+test('overrides return the newest correction per string', async () => {
+  const fix = require('../api/services/translationfix');
+  const datastore = require('../api/services/datastore');
+  const oq = datastore.query;
+  // Ordered newest-first by the query. Two rows for one string means an older correction that
+  // a newer one superseded, and serving the older one would silently undo somebody's fix.
+  datastore.query = async () => ([
+    { sourceHash: 'h1', sourceFull: 'Cases', kannada: 'ಪ್ರಕರಣಗಳು', fixStatus: 'active' },
+    { sourceHash: 'h1', sourceFull: 'Cases', kannada: 'ಹಳೆಯದು', fixStatus: 'active' },
+    { sourceHash: 'h2', sourceFull: 'Health', kannada: 'ಆರೋಗ್ಯ', fixStatus: 'active' },
+  ]);
+  try {
+    const out = await fix.overrides({});
+    assert.strictEqual(out.map.Cases, 'ಪ್ರಕರಣಗಳು');
+    assert.strictEqual(out.map.Health, 'ಆರೋಗ್ಯ');
+    assert.strictEqual(out.count, 2);
+  } finally {
+    datastore.query = oq;
+  }
+});
+
+test('corrections are the highest-priority translation layer, and are in the reverse map', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'client', 'src', 'lib', 'i18n.ts'), 'utf8');
+  // A correction always starts from a string the built dictionary already holds, so if `fixes`
+  // were not first in this chain then every correction would be dead on arrival.
+  assert.match(src, /const hit = fixes\[text\] \|\| BUILT\[text\] \|\| runtime\[text\]/,
+    'human corrections must win over both machine layers');
+  // Switching back to English works by looking up the Kannada on screen. A corrected string
+  // missing from the reverse map stays Kannada while everything around it turns over.
+  const rev = src.slice(src.indexOf('export function reverseKn'));
+  assert.match(rev.slice(0, rev.indexOf('\n}')), /Object\.entries\(fixes\)/,
+    'corrected strings must be restorable to English');
+});
+
+test('no ZCQL query asks for more than 300 rows', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', 'api', 'services');
+  const offenders = [];
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    // Literal limits: `LIMIT 400`, and the second half of `LIMIT 0, 400`.
+    for (const m of src.matchAll(/LIMIT\s+(?:\d+\s*,\s*)?(\d+)/g)) {
+      if (Number(m[1]) > 300) offenders.push(`${f}: LIMIT ${m[1]}`);
+    }
+    // Clamped limits: Math.min(x, 400) sitting inside a template literal that builds a LIMIT.
+    for (const m of src.matchAll(/LIMIT[^`\n]*Math\.min\(\s*[^,)]+,\s*(\d+)\s*\)/g)) {
+      if (Number(m[1]) > 300) offenders.push(`${f}: clamped to ${m[1]}`);
+    }
+  }
+  // ZCQL answers "ZCQL CANNOT HAVE MORE THAN 300 ROWS in LIMIT" -- an ERROR, not a truncation,
+  // so the whole query returns nothing. /audit?limit=400 fell back to the in-memory buffer and
+  // served ONE row: asking for more history quietly gave less.
+  assert.deepStrictEqual(offenders, [],
+    `these queries exceed ZCQL's hard limit and will return nothing: ${offenders.join('; ')}`);
+});
+
+test('the page translator cannot outlive a switch back to English', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'client', 'src', 'lib', 'PageTranslator.tsx'), 'utf8');
+  // run() ends by calling observer.observe(). So a timer still in flight when the language
+  // switches RE-ATTACHES the observer that cleanup just disconnected, and the Kannada
+  // translator runs forever: the app reports English, renders Kannada, and keeps fetching new
+  // runtime translations. It read 431 runtime entries in English mode when this was found.
+  const cleanup = src.slice(src.lastIndexOf('return () => {'));
+  assert.match(cleanup, /clearTimeout\(timer\)/, 'the pending translate timer must be cleared');
+  assert.match(cleanup, /cancelled = true/, 'and a queued run must be told not to proceed');
+  assert.match(src, /if \(cancelled\) return;/, 'run’s first act is to check it');
+  assert.match(src, /timer = setTimeout\(run, 60\)/, 'the timer handle must be kept, not discarded');
+});
