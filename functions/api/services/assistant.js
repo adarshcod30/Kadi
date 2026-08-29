@@ -299,14 +299,36 @@ async function queryEnhanced(user, text, lang, req) {
   if (asksInKannada) {
     // eslint-disable-next-line global-require
     const translate = require('./translate');
-    const en = await translate.translateOne(req, text, 'en').catch(() => null);
+    // noCache: this is a question, not an interface label. See the note in translate.js --
+    // the shared cache answered this one with a nearby UI string and sent the router to the
+    // wrong intent.
+    const en = await translate.translateOne(req, text, 'en', { noCache: true }).catch(() => null);
     if (en && en.translated && en.text && en.text !== text) {
       routed = en.text;
       interpretedAs = en.text;
     }
   }
 
-  const base = query(user, routed, asksInKannada ? 'kn' : lang);
+  // ROUTE ON THE NATIVE TEXT FIRST, AND USE THE TRANSLATION ONLY TO RESCUE IT.
+  //
+  // Translating first was the right instinct and the wrong order. Zia renders
+  // "ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?" -- which asks which cases are SLIPPING -- as "Active
+  // cases", and routing on those two words sent it to the catch-all list branch: the reader
+  // asked which cases are in trouble and was told how many cases exist. The Kannada word
+  // ಜಾರುತ್ತಿರುವ is in the slipping pattern already and matches the original exactly.
+  //
+  // So the hand-written Kannada patterns get first refusal, because when they match they are
+  // certain, and the translation is consulted only when they do not -- when intent came back
+  // 'unknown', or came back as the catch-all list branch that any sentence containing ಪ್ರಕರಣ
+  // falls into. That keeps the coverage the translation buys for phrasings nobody listed,
+  // without letting a loose rendering overrule a word that was actually there.
+  let base = query(user, text, asksInKannada ? 'kn' : lang);
+  const weak = (i) => i === 'unknown' || i === 'cases_query';
+  if (routed !== text && weak(base.intent)) {
+    const viaEnglish = query(user, routed, asksInKannada ? 'kn' : lang);
+    if (!weak(viaEnglish.intent)) base = viaEnglish;
+    else if (base.intent === 'unknown') base = viaEnglish;
+  }
   const baseMs = Date.now() - t0;
   if (interpretedAs) base.interpretedAs = interpretedAs;
   if (!quickml.configured()) return { ...base, llm: 'disabled', timing: { baseMs } };

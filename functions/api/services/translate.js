@@ -203,7 +203,8 @@ async function translateBatchSplit(req, texts, to) {
  * comes back as its source with translated:false, so a caller can always render something --
  * a half-translated interface is bad, a blank one is worse.
  */
-async function translateMany(req, texts, to = 'kn') {
+// `opts.noCache` skips the shared string cache for this call. See the note at the read below.
+async function translateMany(req, texts, to = 'kn', opts = {}) {
   const list = (Array.isArray(texts) ? texts : [texts]).map((t) => String(t || ''));
   if (!LANGS[to]) return { items: list.map((s) => ({ source: s, text: s, translated: false })), reason: 'unsupported language' };
 
@@ -238,11 +239,26 @@ async function translateMany(req, texts, to = 'kn') {
     // the template is poison from an older masking scheme, and serving it would drop numbers
     // out of an officer's reading. Discard and re-translate rather than trust the cache.
     const usable = (v) => v && slots(v) === slots(t);
-    if (memo.has(rec.key) && usable(memo.get(rec.key))) {
-      settle(t, memo.get(rec.key)); hits += rec.indices.length; continue;
+    // THE CACHE IS FOR INTERFACE STRINGS, NOT FOR WHAT A PERSON TYPED.
+    //
+    // It is keyed on the text and shared across directions, so a label translated INTO Kannada
+    // becomes a reverse entry out of it. That is exactly right for the forty-odd fixed strings
+    // on a screen and wrong for a free-text question: "ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು ಯಾವುವು?" -- which
+    // asks which cases are SLIPPING -- came back from the cache as "Active cases", because
+    // some label had gone the other way and landed near it.
+    //
+    // The assistant then routed on those two words: "cases" matched the catch-all list branch,
+    // "slip" matched nothing, and the reader was told how many cases exist in the state when
+    // they had asked which ones are in trouble. A confidently wrong answer, from a cache hit.
+    //
+    // So a caller translating a question passes noCache and pays the 140ms.
+    if (!opts.noCache) {
+      if (memo.has(rec.key) && usable(memo.get(rec.key))) {
+        settle(t, memo.get(rec.key)); hits += rec.indices.length; continue;
+      }
+      const cached = await cache.get(req, rec.key).catch(() => null);
+      if (usable(cached)) { memo.set(rec.key, cached); settle(t, cached); hits += rec.indices.length; continue; }
     }
-    const cached = await cache.get(req, rec.key).catch(() => null);
-    if (usable(cached)) { memo.set(rec.key, cached); settle(t, cached); hits += rec.indices.length; continue; }
     pending.push(t);
   }
 
@@ -305,8 +321,8 @@ async function translateMany(req, texts, to = 'kn') {
 }
 
 /** One string, for the places that only need one. */
-async function translateOne(req, text, to = 'kn') {
-  const out = await translateMany(req, [text], to);
+async function translateOne(req, text, to = 'kn', opts = {}) {
+  const out = await translateMany(req, [text], to, opts);
   return out.items[0];
 }
 
