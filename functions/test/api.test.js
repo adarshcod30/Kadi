@@ -1135,3 +1135,189 @@ test('a reading can be filed against a case registered today', () => {
   assert.ok(!re.test('/evidence/notes'), 'the history list needs no register lookup');
   assert.ok(!re.test('/evidence/ocr'), 'nor does reading an image');
 });
+
+// ---- retained pages ------------------------------------------------------------------------
+// Retention reverses a rule this feature originally stated absolutely ("the image is NEVER
+// stored"). Reversing it is defensible only while the guarantees that replaced it hold, so they
+// are asserted rather than described.
+
+test('retention is off by default on every filed reading', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const original = datastore.insertRows;
+  let written = null;
+  datastore.insertRows = async (_r, _t, rows) => { [written] = rows; return true; };
+  try {
+    // Note the body ASKS to retain. Filing must ignore it: the bytes are not in this request,
+    // and a row claiming to hold a page it never received would point at nothing.
+    await notes.file({}, { role: 'Analyst', email: 'a@ksp' },
+      { capability: 'ocr', extract: 'memo', retain: true, imageFileId: 'FORGED' },
+      { caseMasterId: 'C1' });
+    assert.strictEqual(written.imageFileId, '', 'a fresh note never references a stored page');
+    assert.strictEqual(written.retainedBy, '');
+    assert.strictEqual(written.pageCount, '1', 'one page unless told otherwise');
+  } finally {
+    datastore.insertRows = original;
+  }
+});
+
+test('withdrawing a reading keeps the text and deletes the page', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const filestore = require('../api/services/filestore');
+  const oq = datastore.query;
+  const orm = filestore.remove;
+  const statements = [];
+  let deleted = null;
+  datastore.query = async (_r, sql) => {
+    statements.push(sql);
+    return /^SELECT/i.test(sql)
+      ? [{ noteKey: 'e1', createdBy: 'a@ksp', noteStatus: 'filed', caseMasterId: 'C1', imageFileId: 'F9' }]
+      : [];
+  };
+  filestore.remove = async (_r, id) => { deleted = id; return { ok: true }; };
+  try {
+    const out = await notes.withdraw({}, { role: 'Analyst', email: 'a@ksp' }, 'e1', 'wrong case');
+    assert.ok(out.ok, out.error);
+    const write = statements.find((s) => /^UPDATE/i.test(s));
+    // The asymmetry that makes retention acceptable: the record survives, the photograph does
+    // not. A withdrawal that left the image behind would mean an officer who pulled a mis-filed
+    // reading is still holding the page it came from.
+    assert.match(write, /noteStatus='withdrawn'/);
+    assert.ok(!/extract=/.test(write), 'the reading text is never cleared');
+    assert.match(write, /imageFileId=''/, 'the note must stop pointing at the page');
+    assert.strictEqual(deleted, 'F9', 'and the page itself must be deleted');
+    assert.strictEqual(out.pageDeleted, true);
+  } finally {
+    datastore.query = oq;
+    filestore.remove = orm;
+  }
+});
+
+test('a failed page upload never costs the filed reading', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const filestore = require('../api/services/filestore');
+  const oq = datastore.query;
+  const op = filestore.put;
+  datastore.query = async (_r, sql) => (/^SELECT/i.test(sql)
+    ? [{ noteKey: 'e1', createdBy: 'a@ksp', imageFileId: '', caseMasterId: 'C1' }] : []);
+  filestore.put = async () => ({ ok: false, error: 'timeout' });
+  try {
+    const out = await notes.retain({}, { role: 'Analyst', email: 'a@ksp' }, 'e1', Buffer.alloc(1024));
+    // The reading is the record; the page is a convenience. This has to fail on its own so the
+    // officer keeps the transcription rather than being sent back to retype the memo.
+    assert.ok(!out.ok);
+    assert.strictEqual(out.status, 503);
+  } finally {
+    datastore.query = oq;
+    filestore.put = op;
+  }
+});
+
+test('a stored page with no note pointing at it is cleaned up, not left behind', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const filestore = require('../api/services/filestore');
+  const oq = datastore.query;
+  const op = filestore.put;
+  const orm = filestore.remove;
+  let removed = null;
+  datastore.query = async (_r, sql) => (/^SELECT/i.test(sql)
+    ? [{ noteKey: 'e1', createdBy: 'a@ksp', imageFileId: '', caseMasterId: 'C1' }]
+    // The UPDATE fails, so nothing will ever reference the file that was just uploaded.
+    : null);
+  filestore.put = async () => ({ ok: true, fileId: 'ORPHAN', bytes: 10 });
+  filestore.remove = async (_r, id) => { removed = id; return { ok: true }; };
+  try {
+    const out = await notes.retain({}, { role: 'Analyst', email: 'a@ksp' }, 'e1', Buffer.alloc(1024));
+    assert.ok(!out.ok);
+    assert.strictEqual(removed, 'ORPHAN',
+      'an unreferenced photograph must not be left in the store forever');
+  } finally {
+    datastore.query = oq;
+    filestore.put = op;
+    filestore.remove = orm;
+  }
+});
+
+test('the file id of a retained page never reaches the browser', async () => {
+  const notes = require('../api/services/evidencenote');
+  const datastore = require('../api/services/datastore');
+  const oq = datastore.query;
+  datastore.query = async () => [{
+    noteKey: 'e1', caseMasterId: 'C1', capability: 'ocr', extract: 'memo',
+    imageFileId: 'SECRET-FILE-ID', retainedBy: 'a@ksp', noteStatus: 'filed', pageCount: '3',
+  }];
+  try {
+    const [n] = await notes.forCase({}, 'C1');
+    // A handle in a list response is a handle somebody can try. The page is fetched through the
+    // note's own scoped route instead, which re-checks the case.
+    assert.strictEqual(JSON.stringify(n).includes('SECRET-FILE-ID'), false,
+      'the file id must not be serialised to a client');
+    assert.strictEqual(n.retained, true, 'only WHETHER a page exists is exposed');
+    assert.strictEqual(n.pages, 3);
+  } finally {
+    datastore.query = oq;
+  }
+});
+
+test('the kept-page routes are scoped to the case, not to a rank', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  for (const route of ["'/evidence/note/:id/page'", "'/evidence/note/:id/reread'"]) {
+    assert.ok(app.includes(route), `${route} must be registered`);
+  }
+  // Both fetch the note, resolve its case, and check scope. Skipping that on the page route
+  // would publish a photograph to anyone holding a note id.
+  const page = app.slice(app.indexOf("r.get('/evidence/note/:id/page'"));
+  const body = page.slice(0, page.indexOf('}));'));
+  assert.match(body, /q\.getCase\(req\.user, n\.caseMasterId\)/, 'the page route must resolve the case');
+  assert.match(body, /rbac\.caseInScope\(req\.user, c\)/, 'and must check scope before sending bytes');
+});
+
+test('a stored page is found by name, because the upload response id is wrong', async () => {
+  const filestore = require('../api/services/filestore');
+  const https = require('https');
+  const realRequest = https.request;
+  // The upload claims one id; the listing shows the file actually took another. This is the
+  // same lie Catalyst's row-insert endpoint tells (submissions.js documents rows drifting +3;
+  // this file drifted -2), and it is silent: the row stores a plausible id that 404s forever.
+  https.request = (opts, cb) => {
+    const res = { statusCode: 200, headers: {}, on: (e, f) => { res[`_${e}`] = f; return res; } };
+    const body = opts.method === 'POST'
+      ? '{"data":{"id":"55468000000205060"}}'
+      : '{"data":[{"id":"55468000000205058","file_name":"note-1.png","file_size":10}]}';
+    setImmediate(() => { cb(res); res._data(body); res._end(); });
+    return { on: () => {}, write: () => {}, end: () => {} };
+  };
+  try {
+    const out = await filestore.put(
+      { headers: { 'x-zc-admin-cred-token': 't', 'x-zc-project-secret-key': 's', 'x-zc-projectid': 'p' } },
+      Buffer.alloc(64), 'note-1.png', 'image/png',
+    );
+    assert.ok(out.ok);
+    assert.strictEqual(out.fileId, '55468000000205058', 'the id must come from the listing');
+    assert.notStrictEqual(out.fileId, '55468000000205060', 'never from the upload response');
+    assert.strictEqual(out.resolved, true);
+  } finally {
+    https.request = realRequest;
+  }
+});
+
+test('no built asset is emitted as .mjs', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', '..', 'client', 'dist', 'assets');
+  let files = [];
+  try { files = fs.readdirSync(dir); } catch { return; } // no build present; nothing to check
+  // Catalyst serves .js as application/javascript and .mjs as application/octet-stream, and a
+  // browser refuses to execute an ES module with a non-JavaScript MIME type. pdf.js ships its
+  // worker as .mjs, so the page 200s on the worker and dies with "Failed to fetch dynamically
+  // imported module" -- a failure that reads like a missing file and is actually a content
+  // type. vite.config.ts renames these on the way out; this fails if that stops working.
+  const mjs = files.filter((f) => f.endsWith('.mjs'));
+  assert.deepStrictEqual(mjs, [],
+    `these assets will be served as application/octet-stream and will not execute: ${mjs.join(', ')}`);
+});

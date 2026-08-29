@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Share2, MessageSquare, MapPin, ArrowLeft, AlertTriangle, Sparkles, Clock, Hourglass, Check,
-  ScanText, Paperclip,
+  ScanText, Paperclip, Image as ImageIcon,
 } from 'lucide-react';
 import {
   useCase, useCaseEntities, useMe, useCaseUpdates, useRequestUpdate, useCaseEvidence,
@@ -12,6 +12,7 @@ import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } fro
 import { Select } from '../components/Select';
 import { InfoDot } from '../components/InfoDot';
 import { useNav } from '../lib/useNav';
+import { API_BASE } from '../lib/api';
 
 
 // Zia reads the FIR's own narrative and returns the entities and phrases in it. This is the
@@ -269,6 +270,7 @@ function FiledReadings({ caseId }: { caseId: string }) {
               </span>
               <span className="text-ink-subtle">{n.engine}</span>
               {n.confidence && <span className="text-ink-subtle font-num">{n.confidence}% confidence</span>}
+              {n.pages > 1 && <span className="text-ink-subtle">{n.pages} pages</span>}
               {n.filename && <span className="text-ink-subtle truncate max-w-[12rem]">{n.filename}</span>}
             </div>
             {n.question && (
@@ -277,13 +279,46 @@ function FiledReadings({ caseId }: { caseId: string }) {
             <pre className="text-[12.5px] whitespace-pre-wrap leading-relaxed rounded-ctl border border-line bg-surface-2 p-3 max-h-56 overflow-y-auto text-ink">
               {n.extract}
             </pre>
+            {/* The page the reading came from, when the officer chose to keep it. This is the
+                whole payoff of retention for the station: the transcription and the photograph
+                side by side, so a doubtful line can be checked rather than trusted. Fetched
+                through the note's own scoped route -- the file id never reaches the browser. */}
+            {n.retained && <KeptPage noteId={n.id} />}
             <div className="text-[11px] text-ink-subtle mt-1.5">
               Filed by {n.createdBy} ({n.creatorRole}) on {String(n.createdAt).slice(0, 10)}
+              {n.retained && <> · page kept by {n.retainedBy}</>}
+              {n.rereads > 0 && <> · read again {n.rereads}×</>}
             </div>
           </div>
         ))}
       </div>
     </Section>
+  );
+}
+
+// The retained page, shown next to the reading it produced.
+//
+// Collapsed by default. A case with four readings would otherwise load four full-size
+// photographs nobody asked for, and the transcription is what most readers came for -- the
+// image is what they open when a line looks wrong.
+function KeptPage({ noteId }: { noteId: string }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="mt-2 text-[11.5px] text-kadi-blue hover:underline inline-flex items-center gap-1">
+        <ImageIcon size={12} /> Show the page this was read from
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2">
+      <img src={`${API_BASE}/evidence/note/${encodeURIComponent(noteId)}/page`}
+        alt="The page this reading was taken from"
+        className="w-full rounded-card border border-line bg-surface-2 object-contain max-h-96" />
+      <button onClick={() => setOpen(false)}
+        className="mt-1 text-[11.5px] text-ink-subtle hover:text-ink">Hide the page</button>
+    </div>
   );
 }
 

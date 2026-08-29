@@ -31,6 +31,9 @@ export const ACTION_LABELS: Record<string, string> = {
   evidence_image: 'Evidence image read',
   file_evidence_note: 'Reading filed against a case',
   withdraw_evidence_note: 'Reading withdrawn',
+  retain_evidence_page: 'Page image kept with a reading',
+  view_evidence_page: 'Kept page viewed',
+  reread_evidence_page: 'Kept page read again',
 };
 
 export default function Audit() {

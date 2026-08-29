@@ -25,11 +25,21 @@
 //      own scope check and nothing else. An SHO sees the memo text filed against their case
 //      without ever being able to upload an image.
 //
-//   3. THE IMAGE IS NOT STORED. ONLY THE READING IS. The photograph is the part carrying
-//      privacy weight — faces in a scene, a bystander's number plate, whatever else was in
-//      frame. The transcription is the part with evidentiary value. Storing the second and
-//      discarding the first is not a limitation worked around; it is the point, and it is why
-//      this table has no blob column.
+//   3. THE IMAGE IS NOT STORED BY DEFAULT, AND RETENTION IS A CHOICE RATHER THAN A BEHAVIOUR.
+//      The photograph is the part carrying privacy weight — faces in a scene, a bystander's
+//      number plate, whatever else was in frame. The transcription is the part with
+//      evidentiary value.
+//
+//      This file originally said the image was NEVER stored. That was too strong. It cost
+//      something real: a reading could not be checked against the page it came from, and a
+//      better OCR engine next year could not be run over it. For a seizure memo an officer
+//      deliberately chose to keep, that is a records loss dressed as a privacy win.
+//
+//      So the default is unchanged — nothing is kept unless somebody says to keep it — and
+//      retention is an explicit per-reading choice, scoped like the note, deleted when the note
+//      is withdrawn, and audited on write, on read and on re-read. The incidental-content risk
+//      the original rule was about is handled by it being a decision: nobody retains a crowd
+//      photograph by accident.
 //
 //   4. NOTES ARE WITHDRAWN, NEVER DELETED. Attaching a reading to the wrong case is a
 //      one-click mistake and needs an undo. But a police record with a hard delete is a
@@ -38,6 +48,7 @@
 //      view and visible in the audit trail, which is the correct asymmetry.
 const crypto = require('crypto');
 const datastore = require('./datastore');
+const filestore = require('./filestore');
 
 const TABLE = 'EvidenceNote';
 
@@ -108,6 +119,12 @@ async function file(req, user, body = {}, caseFacts = null) {
     confidence: trim(body.confidence, 8),
     filename: trim(body.filename, 200),
     imageBytes: trim(body.bytes, 16),
+    // 1 for a photograph, N for a PDF or a set of pages read as one document.
+    pageCount: trim(body.pageCount, 8) || '1',
+    // Retention is arranged AFTER the row exists, by a separate call carrying the bytes. It is
+    // never part of filing: the reading is the record and the page is a convenience, so an
+    // upload that fails must leave a filed note rather than losing it.
+    imageFileId: '', retainedBy: '', rereadCount: '0',
     noteStatus: 'filed',
     createdBy: trim(user.email || user.appUserId || user.role, 160),
     creatorRole: user.role,
@@ -120,7 +137,8 @@ async function file(req, user, body = {}, caseFacts = null) {
 }
 
 const SELECT = 'SELECT ROWID, noteKey, caseMasterId, crimeNo, districtId, unitId, capability, '
-  + 'engine, question, extract, confidence, filename, imageBytes, noteStatus, createdBy, '
+  + 'engine, question, extract, confidence, filename, imageBytes, pageCount, imageFileId, '
+  + 'retainedBy, rereadCount, noteStatus, createdBy, '
   + `creatorRole, createdAt, withdrawnBy, withdrawnAt, withdrawReason FROM ${TABLE}`;
 
 function map(r) {
@@ -137,6 +155,13 @@ function map(r) {
     confidence: r.confidence || null,
     filename: r.filename || null,
     bytes: r.imageBytes ? Number(r.imageBytes) : null,
+    pages: Number(r.pageCount || 1),
+    // The id itself is never sent to the browser -- only whether a page is there. A file id in
+    // a list response is a handle somebody can try, and the page is fetched through the note's
+    // own scoped route instead.
+    retained: Boolean(r.imageFileId),
+    retainedBy: r.retainedBy || null,
+    rereads: Number(r.rereadCount || 0),
     status: r.noteStatus || 'filed',
     createdBy: r.createdBy,
     creatorRole: r.creatorRole,
@@ -177,6 +202,64 @@ async function recent(req, { createdBy = '', limit = 25 } = {}) {
   return rows.map(map);
 }
 
+/** One note by key, unmapped, for the routes that need its file id or its scope. */
+async function getOne(req, id) {
+  const key = trim(id, 40);
+  if (!key) return null;
+  const rows = await datastore.query(req, `${SELECT} WHERE noteKey = '${esc(key)}'`, TABLE);
+  return rows && rows.length ? rows[0] : null;
+}
+
+/**
+ * Keep the page image behind an already-filed reading.
+ *
+ * SEPARATE FROM FILING, ON PURPOSE. The reading is the record; the page is a convenience. If
+ * this were part of file(), an upload that timed out would take a correct transcription down
+ * with it, and the officer would be back to retyping the memo — which is the exact problem the
+ * whole feature exists to remove. Filing succeeds first, and this either adds the page or does
+ * not.
+ */
+async function retain(req, user, id, buffer, { filename = 'page.png', mime = 'image/png' } = {}) {
+  if (!canFile(user)) return { ok: false, error: 'Requires Administrator, DGP or SCRB Analyst.', status: 403 };
+  const n = await getOne(req, id);
+  if (!n) return { ok: false, error: 'Unknown reading.', status: 404 };
+  if (String(n.createdBy) !== String(user.email || user.appUserId || user.role) && user.role !== 'Admin') {
+    return { ok: false, error: 'Only the officer who filed a reading may keep its page.', status: 403 };
+  }
+  if (n.imageFileId) return { ok: false, error: 'This reading already has its page.', status: 409 };
+
+  const up = await filestore.put(req, buffer, filename, mime);
+  if (!up.ok) return { ok: false, error: `Could not keep the page: ${up.error}`, status: 503 };
+
+  const out = await datastore.query(req,
+    `UPDATE ${TABLE} SET imageFileId='${esc(up.fileId)}', `
+      + `retainedBy='${esc(user.email || user.role)}' WHERE noteKey='${esc(trim(id, 40))}'`);
+  if (out === null) {
+    // The row did not take the reference, so nothing can ever reach this file again. Remove it
+    // rather than leaving an unreferenced photograph in the store forever.
+    await filestore.remove(req, up.fileId);
+    return { ok: false, error: 'Could not record the retained page.', status: 503 };
+  }
+  return { ok: true, id: trim(id, 40), bytes: up.bytes };
+}
+
+/**
+ * Note that a retained page was read again.
+ *
+ * A re-read does NOT overwrite the original reading, and it does not file itself. It returns
+ * what the second engine said and leaves the officer to file it as its own note if it is worth
+ * keeping. That preserves the whole point of re-reading: comparing what two engines made of
+ * the same page, with both readings intact and separately attributable.
+ */
+async function recordReread(req, id) {
+  const n = await getOne(req, id);
+  if (!n) return 0;
+  const next = Number(n.rereadCount || 0) + 1;
+  await datastore.query(req,
+    `UPDATE ${TABLE} SET rereadCount='${next}' WHERE noteKey='${esc(trim(id, 40))}'`);
+  return next;
+}
+
 /**
  * Withdraw a note. The row survives; only its status changes.
  *
@@ -191,7 +274,7 @@ async function withdraw(req, user, id, reason) {
   if (why.length < 5) return { ok: false, error: 'Say why it is being withdrawn.', status: 400 };
 
   const rows = await datastore.query(req,
-    `SELECT ROWID, noteKey, createdBy, noteStatus, caseMasterId FROM ${TABLE} WHERE noteKey = '${esc(key)}'`, TABLE);
+    `SELECT ROWID, noteKey, createdBy, noteStatus, caseMasterId, imageFileId FROM ${TABLE} WHERE noteKey = '${esc(key)}'`, TABLE);
   if (!rows || !rows.length) return { ok: false, error: 'Unknown reading.', status: 404 };
   const n = rows[0];
   const mine = String(n.createdBy) === String(user.email || user.appUserId || user.role);
@@ -202,9 +285,18 @@ async function withdraw(req, user, id, reason) {
 
   const out = await datastore.query(req,
     `UPDATE ${TABLE} SET noteStatus='withdrawn', withdrawnBy='${esc(user.email || user.role)}', `
-      + `withdrawnAt='${nowIso()}', withdrawReason='${esc(why)}' WHERE noteKey='${esc(key)}'`);
+      + `withdrawnAt='${nowIso()}', withdrawReason='${esc(why)}', imageFileId='' `
+      + `WHERE noteKey='${esc(key)}'`);
   if (out === null) return { ok: false, error: 'Could not withdraw the reading.', status: 503 };
-  return { ok: true, id: key, caseMasterId: n.caseMasterId };
+
+  // The TEXT survives a withdrawal and the PHOTOGRAPH does not, which is the right asymmetry.
+  // The text is the record -- keeping it is what stops a note being made to have never existed.
+  // The image is a convenience this feature did not want to be holding in the first place, and
+  // an officer pulling a mis-filed reading wants it gone rather than merely hidden. Done after
+  // the row is updated, so a delete that fails leaves an orphaned file rather than a note still
+  // pointing at a photograph it no longer admits to.
+  if (n.imageFileId) await filestore.remove(req, n.imageFileId).catch(() => null);
+  return { ok: true, id: key, caseMasterId: n.caseMasterId, pageDeleted: Boolean(n.imageFileId) };
 }
 
 function status() {
@@ -212,12 +304,16 @@ function status() {
     table: TABLE,
     task: 'machine readings of photographs, filed against a case',
     capabilities: CAPABILITIES,
-    stores: 'the reading only — never the image it came from',
+    stores: 'the reading always; the page image only when an officer explicitly kept it',
     writeRequires: 'DGP, Administrator or SCRB Analyst, because filing a note requires having '
       + 'read an uploaded image',
     readFollows: 'the case: anyone who can see the case sees the readings filed against it',
-    deletion: 'none. A note is withdrawn, which records who and why and keeps the row.',
+    deletion: 'a note is withdrawn, which records who and why and keeps the row and its text. '
+      + 'A retained page IS deleted at that point.',
   };
 }
 
-module.exports = { file, forCase, recent, withdraw, canFile, status, CAPABILITIES, TABLE };
+module.exports = {
+  file, forCase, recent, withdraw, canFile, status, getOne, retain, recordReread,
+  CAPABILITIES, TABLE,
+};

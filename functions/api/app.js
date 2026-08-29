@@ -28,6 +28,7 @@ const zianlp = require('./services/zianlp');
 const vlm = require('./services/vlm');
 const ziavision = require('./services/ziavision');
 const evidencenote = require('./services/evidencenote');
+const filestore = require('./services/filestore');
 const smartbrowz = require('./services/smartbrowz');
 const events = require('./services/events');
 const tasking = require('./services/tasking');
@@ -1350,6 +1351,111 @@ r.get('/analytics/outlook', handle(async (req) => {
     return { items, mine };
   }));
 
+  // Keep the page behind a reading that is already filed.
+  //
+  // A SEPARATE CALL FROM FILING, AND THAT IS DELIBERATE. The reading is the record; the page is
+  // a convenience. Folding this into POST /evidence/note would mean an upload that timed out
+  // took a correct transcription down with it, leaving the officer to retype the memo -- the
+  // exact problem the feature exists to remove. So filing succeeds on its own and this either
+  // adds the page or does not.
+  r.post(
+    '/evidence/note/:id/page',
+    express.raw({ type: () => true, limit: '12mb' }),
+    handle(async (req) => {
+      const image = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!image || image.length < 256) {
+        const e = new Error('No image received.'); e.status = 400; e.code = 'no_image'; throw e;
+      }
+      const mime = String(req.headers['content-type'] || 'image/png');
+      const out = await evidencenote.retain(req, req.user, req.params.id, image, {
+        mime, filename: `${req.params.id}.${mime.includes('jpeg') ? 'jpg' : 'png'}`,
+      });
+      if (!out.ok) fail(out);
+      audit.record({ user: req.user, action: 'retain_evidence_page', targetType: 'image',
+        targetId: req.params.id, queryText: String(image.length), ip: req.clientIp, req });
+      return out;
+    }),
+  );
+
+  // The retained page itself, streamed back as an image.
+  //
+  // Scoped through the note's own case, not by rank. A page kept against a case belongs to that
+  // case exactly as its transcription does -- and the whole reason for keeping it is so the
+  // station can check the reading against what was actually photographed.
+  r.get('/evidence/note/:id/page', handle(async (req, res) => {
+    const n = await evidencenote.getOne(req, req.params.id);
+    if (!n || !n.imageFileId) { const e = new Error('No page kept for this reading.'); e.status = 404; throw e; }
+    const c = q.getCase(req.user, n.caseMasterId);
+    if (!rbac.caseInScope(req.user, c)) throw forbidden('That reading is outside your scope.');
+    const got = await filestore.get(req, n.imageFileId);
+    if (!got.ok) { const e = new Error('The page could not be fetched.'); e.status = 503; throw e; }
+    audit.record({ user: req.user, action: 'view_evidence_page', targetType: 'image',
+      targetId: req.params.id, ip: req.clientIp, req });
+    // Sent raw rather than in the JSON envelope: it is an image, and an <img src> cannot read
+    // an envelope. handle() checks res.headersSent before wrapping, so returning undefined
+    // after a send is all this needs -- no flag, and nothing to keep in step.
+    res.set('Content-Type', got.mime);
+    res.set('Cache-Control', 'private, max-age=300');
+    res.send(got.buffer);
+    return undefined;
+  }));
+
+  // Read a retained page again, with a different engine or a different question.
+  //
+  // This is the whole reason retention exists. It does NOT overwrite the original reading and
+  // it does not file itself -- it returns what the second engine said and leaves the officer to
+  // file it separately if it is worth keeping. Comparing two engines on one page only works if
+  // both readings survive and stay separately attributable.
+  r.post('/evidence/note/:id/reread', handle(async (req) => {
+    rbac.requireRole(req.user, ['DGP', 'Admin', 'Analyst']);
+    const n = await evidencenote.getOne(req, req.params.id);
+    if (!n || !n.imageFileId) { const e = new Error('No page kept for this reading.'); e.status = 404; throw e; }
+    const c = q.getCase(req.user, n.caseMasterId);
+    if (!rbac.caseInScope(req.user, c)) throw forbidden('That reading is outside your scope.');
+
+    const cap = String((req.body || {}).capability || 'ocr');
+    if (!evidencenote.CAPABILITIES[cap]) {
+      const e = new Error(`capability must be one of: ${Object.keys(evidencenote.CAPABILITIES).join(', ')}`);
+      e.status = 400; throw e;
+    }
+    const got = await filestore.get(req, n.imageFileId);
+    if (!got.ok) { const e = new Error('The page could not be fetched.'); e.status = 503; throw e; }
+
+    const started = Date.now();
+    let reading = null;
+    if (cap === 'read') {
+      const prompt = String((req.body || {}).question || 'What does this document say?');
+      const refusal = vlm.refuse(prompt);
+      if (refusal) return { ok: false, refused: true, answer: refusal };
+      const out = await vlm.readImage(req, got.buffer, prompt);
+      reading = out ? { text: out.answer, engine: out.model } : null;
+    } else {
+      const out = await ziavision.call(req, cap, got.buffer, { mime: got.mime });
+      if (out.ok) {
+        const inner = (out.data && out.data.data) || out.data || {};
+        // An empty content field is the scanner's CORRECT answer for a page with no code on
+        // it, and it is falsy -- so a plain `||` chain falls through and shows the reader
+        // `{"content":""}`. Dumping the raw envelope in place of a finding is how a reader ends
+        // up pasting JSON into a case file.
+        const found = inner.text != null ? String(inner.text) : (inner.content != null ? String(inner.content) : null);
+        reading = {
+          text: found !== null
+            ? (found.trim() || 'No code found on this page.')
+            : JSON.stringify(inner),
+          empty: found !== null && !found.trim(),
+          engine: evidencenote.CAPABILITIES[cap].engine,
+          confidence: inner.confidence != null ? String(inner.confidence) : null,
+        };
+      }
+    }
+    const rereads = await evidencenote.recordReread(req, req.params.id);
+    audit.record({ user: req.user, action: 'reread_evidence_page', targetType: 'image',
+      targetId: req.params.id, queryText: cap, ip: req.clientIp, req });
+    if (!reading) return { ok: false, detail: 'That reader did not answer for this page.', rereads };
+    return { ok: true, capability: cap, ...reading, ms: Date.now() - started, rereads,
+      caseMasterId: n.caseMasterId, crimeNo: n.crimeNo };
+  }));
+
   // Withdrawn, not deleted. Attaching a reading to the wrong case is a one-click mistake and
   // needs an undo, but a police record that can be made to have never said something is a
   // worse problem than a wrong note -- so the row survives and carries who withdrew it and why.
@@ -1404,6 +1510,28 @@ r.get('/analytics/outlook', handle(async (req) => {
       };
     }),
   );
+
+  // What the file store actually said. Same discipline as /diag/zia-vision: the REST surface
+  // is established by asking rather than by reading, because the documented shape and the
+  // deployed one have already diverged three times on this project.
+  r.get('/diag/filestore', handle(async (req) => {
+    rbac.requireRole(req.user, ['DGP', 'Admin', 'Analyst']);
+    let id = String(req.query.file || '');
+    let note = null;
+    if (req.query.note) {
+      const n = await evidencenote.getOne(req, String(req.query.note));
+      note = n ? { raw: n.imageFileId, type: typeof n.imageFileId, str: String(n.imageFileId) } : null;
+      if (n) id = String(n.imageFileId);
+    }
+    const probe = id ? await filestore.get(req, id) : null;
+    return {
+      idUsed: id,
+      note,
+      status: filestore.status(),
+      probe: probe ? { ok: probe.ok, status: probe.status, mime: probe.mime,
+        bytes: probe.buffer ? probe.buffer.length : 0, error: probe.error } : null,
+    };
+  }));
 
   // Which image capabilities this deployment actually answers. The console documents these
   // through SDK samples and the SDK is the thing that does not work here, so the paths are

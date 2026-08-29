@@ -322,6 +322,10 @@ export type EvidenceNoteRow = {
   question: string; extract: string; confidence: string | null;
   filename: string | null; bytes: number | null;
   status: 'filed' | 'withdrawn';
+  pages: number;
+  // Whether the page image behind this reading was kept. The file id itself never reaches the
+  // browser -- a handle in a list response is a handle somebody can try.
+  retained: boolean; retainedBy: string | null; rereads: number;
   createdBy: string; creatorRole: string; createdAt: string;
   withdrawnBy: string | null; withdrawnAt: string | null; withdrawReason: string | null;
 };
@@ -350,6 +354,14 @@ export const useFileEvidenceNote = () =>
   useMutation({
     mutationFn: (body: Record<string, unknown>) =>
       api.post<{ ok: boolean; id: string; caseMasterId: string; crimeNo: string | null }>('/evidence/note', body),
+  });
+export const useRereadEvidencePage = () =>
+  useMutation({
+    mutationFn: (v: { id: string; capability: 'ocr' | 'barcode' | 'read'; question?: string }) =>
+      api.post<{
+        ok: boolean; text?: string; engine?: string; confidence?: string | null;
+        ms?: number; rereads?: number; refused?: boolean; answer?: string; detail?: string;
+      }>(`/evidence/note/${v.id}/reread`, { capability: v.capability, question: v.question || '' }),
   });
 export const useWithdrawEvidenceNote = () =>
   useMutation({
