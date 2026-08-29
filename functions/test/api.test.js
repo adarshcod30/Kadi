@@ -766,3 +766,29 @@ test('an absent endpoint key is re-read rather than remembered as absent', async
     delete require.cache[pendPath];
   }
 });
+
+// Found by standing at station rank rather than by reading the code. The SHO's scope is ONE
+// register, so the shortlist is one row, so the set of returned scores is necessarily size one --
+// and the degeneracy guard read that as "the endpoint answered the same thing for everything" and
+// threw the score away. The endpoint had answered 0.857 for that station, correctly. The one
+// reader with the strongest claim on the number was the only one who could not see it.
+//
+// A set of one is evidence of a narrow scope, not a broken model. Both servers carry the guard,
+// so both are pinned here.
+test('a single-candidate scope keeps its score instead of reading as a degenerate endpoint', () => {
+  for (const [name, mod] of [
+    ['pendency', require('../api/services/pendencyrisk')],
+    ['offender', require('../api/services/offenderrisk')],
+  ]) {
+    assert.strictEqual(mod.discriminates([0.857]), true,
+      `${name}: one station in scope must keep its score — this is the SHO case`);
+    assert.strictEqual(mod.discriminates([]), true,
+      `${name}: an empty set is handled by the all-null check above, not by this guard`);
+    // The guard's real job, unchanged: an endpoint answering one value for a real shortlist has
+    // not ranked anything, and sorting by it would leave the rule's order while claiming a model.
+    assert.strictEqual(mod.discriminates([0.4, 0.4, 0.4]), false,
+      `${name}: three identical scores is a degenerate endpoint and must fall back`);
+    assert.strictEqual(mod.discriminates([0.4, 0.9]), true,
+      `${name}: two distinct scores rank`);
+  }
+});

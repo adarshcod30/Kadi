@@ -313,6 +313,24 @@ function postOne(record, token, key) {
 }
 
 /**
+ * Does this set of scores actually rank?
+ *
+ * The same guard the spike and pendency servers carry, and for the same reason: an endpoint that
+ * answers one identical value for every candidate has not ranked anything, and sorting by it
+ * would leave the rule's order untouched while the response claimed a model produced it. A
+ * regressor should never do that -- if it does, something is wrong with the model rather than
+ * the request, and the honest move is to say so and fall back.
+ *
+ * The length check exists because a set of ONE is not evidence of a degenerate endpoint, it is
+ * evidence of a narrow scope. A station with a single offender on its watchlist is the ordinary
+ * case at the tier this product argues from, and answering "the model cannot rank" there reports
+ * a failure that did not happen. One score is not a ranking; it is still a prediction.
+ */
+function discriminates(values) {
+  return values.length < 2 || new Set(values).size > 1;
+}
+
+/**
  * Score a shortlist. Returns null on ANY failure, and every caller treats null as "keep the
  * rule's ordering" — an unreachable model must degrade the ranking, never fail the request.
  */
@@ -344,13 +362,8 @@ async function score(req, rows, model = DEFAULT_MODEL) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, shortlist.length) }, worker));
   if (out.every((v) => v === null)) return null;
 
-  // The same degeneracy guard the spike server carries, and for the same reason: an endpoint
-  // that answers one identical value for every candidate has not ranked anything, and sorting
-  // by it would leave the rule's order untouched while the response claimed a model produced
-  // it. A regressor should never trip this — if it does, something is wrong with the model
-  // rather than with the request, and the honest move is to say so and fall back.
   const seen = out.filter((v) => v !== null);
-  if (new Set(seen).size < 2) {
+  if (!discriminates(seen)) {
     lastError = `endpoint returned one value (${seen[0]}) for all ${seen.length} candidates — cannot rank`;
     return null;
   }
@@ -359,5 +372,6 @@ async function score(req, rows, model = DEFAULT_MODEL) {
 }
 
 module.exports = {
-  FEATURES, candidates, score, configured, status, resolve, MODELS, DEFAULT_MODEL, MAX_SCORED,
+  FEATURES, candidates, score, configured, status, resolve, discriminates,
+  MODELS, DEFAULT_MODEL, MAX_SCORED,
 };

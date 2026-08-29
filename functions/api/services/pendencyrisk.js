@@ -203,6 +203,25 @@ function postOne(record, token, key) {
   });
 }
 
+/**
+ * Does this set of scores actually rank?
+ *
+ * An endpoint that answers one identical value for every candidate has not ranked anything, and
+ * sorting by it would leave the rule's order untouched while the response claimed a model made
+ * it. A regressor should never do that -- if it does, something is wrong with the model rather
+ * than the request, and the honest move is to say so and fall back.
+ *
+ * The length check is not a technicality, and leaving it out cost the reader who needed the
+ * number most. At station tier the scope is ONE register, so the shortlist is one row and the
+ * set of scores is necessarily size one. The old check read that as a degenerate endpoint and
+ * threw the score away -- so the SHO, whose register it is, was told the model could not rank
+ * while the model had in fact answered correctly. One score is not a ranking, but it is still a
+ * prediction, and it belongs to whoever is standing in that scope.
+ */
+function discriminates(values) {
+  return values.length < 2 || new Set(values).size > 1;
+}
+
 /** Score a shortlist. Returns null on ANY failure; every caller keeps the rule's ordering. */
 async function score(req, rows) {
   if (!configured() || !rows || !rows.length) return null;
@@ -228,10 +247,8 @@ async function score(req, rows) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, shortlist.length) }, worker));
   if (out.every((v) => v === null)) return null;
 
-  // The same degeneracy guard the other endpoints carry: one identical value for every station is
-  // not a ranking, and saying "rankedBy: model" over it would be a lie the reader cannot check.
   const seen = out.filter((v) => v !== null);
-  if (new Set(seen).size < 2) {
+  if (!discriminates(seen)) {
     lastError = `endpoint returned one value (${seen[0]}) for all ${seen.length} stations — cannot rank`;
     return null;
   }
@@ -240,5 +257,6 @@ async function score(req, rows) {
 }
 
 module.exports = {
-  FEATURES, candidates, score, configured, status, MEASURED, HORIZON_MONTHS, GROWTH_THRESHOLD,
+  FEATURES, candidates, score, configured, status, discriminates,
+  MEASURED, HORIZON_MONTHS, GROWTH_THRESHOLD,
 };

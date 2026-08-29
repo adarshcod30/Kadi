@@ -776,9 +776,14 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
       {pend?.items?.length > 0 && (
       <Section title={<span className="flex items-center gap-2">
         <Activity size={15} className="text-kadi-blue" /> Registers falling further behind
+        {/* At station rank the scope is ONE register, and "top 1 by load, re-ranked by model"
+            describes a shortlisting and a re-ordering that did not happen. The SHO is not
+            reading a league table; they are reading their own register. */}
         <span className="text-[12px] font-normal text-ink-muted">
-          {pend.stations} in scope · top {pend.scored} by {pend.serving?.ruleName?.split(' (')[0]},
-          re-ranked by {pend.rankedBy}
+          {pend.stations === 1
+            ? `this register, scored by the ${pend.rankedBy === 'model' ? 'model' : 'rule'}`
+            : `${pend.stations} in scope · top ${pend.scored} by `
+              + `${pend.serving?.ruleName?.split(' (')[0]}, re-ranked by ${pend.rankedBy}`}
         </span>
         <InfoDot label="Why pendency" align="left" width="w-[26rem]">
           <b className="block mb-1 text-kadi-navy">Why this question and not hotspots</b>
