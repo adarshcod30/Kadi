@@ -48,6 +48,13 @@ The shipped district x head spike classifier is documented as 0.587 AUC against 
     inverse recent level  auc 0.620    <- the real baseline
     scale-free only       auc 0.516    <- the win was series size
 
+SUPERSEDED TWICE SINCE, both recorded in docs/11_ML_MODELS.md. The classifier was replaced by a
+regressor on the same 0/1 target, because QuickML's classification endpoints return a hard LABEL
+and a label cannot rank -- the published classifier answered 0 for every candidate at the
+default threshold and the degeneracy guard fell back to the rule every time. The shipped
+regressor scores 0.677 against the same 0.620 baseline; the 0.678 above is the research
+prototype's figure, and the shipped builder's is the one that counts.
+
 Its honest margin is +0.058, not +0.168. It still beats the rule, so it stays.
 
 ## Two data facts worth not rediscovering
@@ -66,3 +73,11 @@ Some of D's margin may be the corpus generator giving each offender a stable off
 which (prior_cases, span_days) then recovers almost exactly — the same circularity the
 socio-economic panel already declares about urbanisation. Re-measure on real KSP data before
 relying on the figure.
+
+---
+
+## Where the full record lives
+
+This file covers the early sweep only. The complete measured field -- twenty tasks, eight
+shipped, twelve rejected, with the test that killed each and the serving contract -- is
+`docs/11_ML_MODELS.md`. Read that first; this file is kept for the working notes behind it.

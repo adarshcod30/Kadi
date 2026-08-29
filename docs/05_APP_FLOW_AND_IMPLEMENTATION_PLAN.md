@@ -71,8 +71,18 @@ Function → RBAC scope → intent routing → parametrized read over the case d
          → grounded answer + FIR citations → audit write → response
 ```
 
-QuickML sits behind `QUICKML_ENABLED` and is off. The deterministic engine is the live path —
-and it cannot invent an FIR number, which is worth more here than fluency.
+QuickML is two separate surfaces on this project and this paragraph is only about one of them.
+
+**The GLM-4.7 LLM / RAG surface**, which this assistant flow would use, sits behind
+`QUICKML_ENABLED`. That flag is now `true` in `functions/api/catalyst-config.json`, but the
+deterministic engine remains the live path for grounded answers — it cannot invent an FIR
+number, which is worth more here than fluency. `/ai/status` reports `quickml.tokenState` as
+`not-attempted`, so "enabled" here means the gate is open, not that the path is exercised.
+
+**The QuickML prediction endpoints are a different surface entirely and are live** — eight of
+them, serving the ML forecaster. They are not gated by `QUICKML_ENABLED` and never were. See
+`docs/11_ML_MODELS.md` for what they are, what they were measured against, and the twelve
+candidates that were rejected.
 
 **Nightly recompute (write path — where all the work happens):**
 ```
