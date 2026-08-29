@@ -130,7 +130,12 @@ const CONCURRENCY = 6;
 
 let lastError = null;
 let lastServed = 'rule';
+
+// Cached ONLY once a key is real. See the note in pendencyrisk.js: remembering that a key was
+// absent outlives the moment the operator pastes it, and turns a two-second fix into a bug that
+// looks like the model is broken.
 const cachedKey = {};
+const keyAttempted = {};
 
 // The contract with appsail/pipeline/offender_set.py. Order and spelling both matter: the
 // endpoint validates against the columns it was trained from.
@@ -196,13 +201,15 @@ function candidates(offenders, casesById, asOf, { limit = 40 } = {}) {
 async function endpointKey(req, slug) {
   const m = MODELS[slug];
   if (!m) return '';
-  if (cachedKey[slug] !== undefined) return cachedKey[slug];
+  if (cachedKey[slug]) return cachedKey[slug];
   // eslint-disable-next-line global-require
   const datastore = require('./datastore');
   const rows = await datastore.query(req,
     `SELECT configValue FROM AppConfig WHERE configKey = '${m.key}'`, 'AppConfig');
-  cachedKey[slug] = (rows && rows[0] && rows[0].configValue) || '';
-  return cachedKey[slug];
+  keyAttempted[slug] = true;
+  const key = (rows && rows[0] && rows[0].configValue) || '';
+  if (key) cachedKey[slug] = key;
+  return key;
 }
 
 /** Resolve whatever the caller asked for to a real slug, defaulting rather than failing. */
@@ -249,7 +256,7 @@ function status() {
       use: m.use,
       configKey: m.key,
       served: configured(slug),
-      keyLoaded: cachedKey[slug] === undefined ? 'not-attempted' : Boolean(cachedKey[slug]),
+      keyLoaded: keyAttempted[slug] ? Boolean(cachedKey[slug]) : 'not-attempted',
     })),
     configured: configured(),
     endpoint: ENDPOINT,

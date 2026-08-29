@@ -726,3 +726,43 @@ test('pendency is served only while its measured margins hold', () => {
   assert.ok(m.scaleFreeAuc > m.rule,
     'scale-free AUC has fallen to the baseline — the model may be learning station size, not pendency');
 });
+
+// The bug this pins cost a live debugging session: the pendency key was pasted, the Admin screen read
+// it back successfully, and the panel still said rankedBy: rule. Nothing was wrong with the key. The
+// serving module had answered one earlier request, found no key, and cached the ABSENCE -- so every
+// later request on that warm container skipped the lookup and reported a missing key forever.
+//
+// A negative cache is invisible in exactly the situation it hurts: while somebody is trying to fix
+// the thing. So an empty lookup is never remembered, and this test is what says so.
+test('an absent endpoint key is re-read rather than remembered as absent', async () => {
+  const dsPath = require.resolve('../api/services/datastore');
+  const qmPath = require.resolve('../api/services/quickml');
+  const pendPath = require.resolve('../api/services/pendencyrisk');
+  const realDs = require.cache[dsPath];
+  const realQm = require.cache[qmPath];
+  const stub = (p, exports) => { require.cache[p] = { id: p, filename: p, loaded: true, exports }; };
+
+  let lookups = 0;
+  // Empty the first time, a real key the second: the sequence an operator actually produces.
+  stub(dsPath, { query: async () => (++lookups === 1 ? [] : [{ configValue: 'a'.repeat(64) }]) });
+  stub(qmPath, { accessToken: async () => null });
+  delete require.cache[pendPath];
+  const pendency = require('../api/services/pendencyrisk');
+
+  try {
+    const rows = [{ unit_id: '1' }];
+    assert.strictEqual(await pendency.score({}, rows), null);
+    assert.match(pendency.status().lastError, /no endpoint key/,
+      'the first request should report the key as missing, because it is');
+
+    assert.strictEqual(await pendency.score({}, rows), null);
+    assert.strictEqual(lookups, 2,
+      'the second request did not re-read AppConfig — an empty lookup is being cached');
+    assert.doesNotMatch(pendency.status().lastError, /no endpoint key/,
+      'still reporting a missing key after one was installed');
+  } finally {
+    if (realDs) require.cache[dsPath] = realDs; else delete require.cache[dsPath];
+    if (realQm) require.cache[qmPath] = realQm; else delete require.cache[qmPath];
+    delete require.cache[pendPath];
+  }
+});

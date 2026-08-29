@@ -65,7 +65,15 @@ const FEATURES = [
 
 let lastError = null;
 let lastServed = 'rule';
+
+// The key is cached ONLY once it is a real key. Caching its ABSENCE is the version of this that
+// looks harmless and is not: a warm container that answered one request before the operator
+// pasted the key remembers "there is no key" for as long as it lives, so the paste appears to do
+// nothing, the panel keeps saying rankedBy: rule, and the operator cannot tell a missing key from
+// a rejected one. An empty lookup is one cheap query and only happens while somebody is actively
+// fixing the thing -- which makes it the one result worth asking for again.
 let cachedKey;
+let keyAttempted = false;
 
 /**
  * The stations in this reader's scope, with the row the model scores.
@@ -108,13 +116,15 @@ function candidates(db, user, { limit = 24 } = {}) {
 }
 
 async function endpointKey(req) {
-  if (cachedKey !== undefined) return cachedKey;
+  if (cachedKey) return cachedKey;
   // eslint-disable-next-line global-require
   const datastore = require('./datastore');
   const r = await datastore.query(req,
     `SELECT configValue FROM AppConfig WHERE configKey = '${KEY_CONFIG}'`, 'AppConfig');
-  cachedKey = (r && r[0] && r[0].configValue) || '';
-  return cachedKey;
+  keyAttempted = true;
+  const key = (r && r[0] && r[0].configValue) || '';
+  if (key) cachedKey = key;
+  return key;
 }
 
 function configured() {
@@ -139,7 +149,7 @@ function status() {
     configured: configured(),
     configKey: KEY_CONFIG,
     endpoint: ENDPOINT,
-    keyLoaded: cachedKey === undefined ? 'not-attempted' : Boolean(cachedKey),
+    keyLoaded: keyAttempted ? Boolean(cachedKey) : 'not-attempted',
     lastServed,
     lastError,
     outputKind: 'regressor on a 0/1 target — a float that ranks, for the same reason the offender '
