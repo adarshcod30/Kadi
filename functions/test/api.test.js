@@ -779,6 +779,11 @@ test('a single-candidate scope keeps its score instead of reading as a degenerat
   for (const [name, mod] of [
     ['pendency', require('../api/services/pendencyrisk')],
     ['offender', require('../api/services/offenderrisk')],
+    // mlforecast was missed on the first pass through this bug -- a typo'd grep path returned
+    // "no such file" and the sweep moved on, so the third copy of the guard went unfixed until
+    // /ai/status was read and showed it tripping on "all 1 candidates". Enumerated here so the
+    // set of servers carrying this guard is asserted rather than remembered.
+    ['spike', require('../api/services/mlforecast')],
   ]) {
     assert.strictEqual(mod.discriminates([0.857]), true,
       `${name}: one station in scope must keep its score — this is the SHO case`);

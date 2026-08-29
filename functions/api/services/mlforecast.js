@@ -72,17 +72,36 @@ const CONCURRENCY = 6;
 
 let lastError = null;
 let lastServed = 'rule';
+
+// Cached ONLY once the key is real. Remembering that a key was ABSENT outlives the moment an
+// operator pastes it: a warm container that answered one request beforehand reports a missing
+// key for the rest of its life, and the paste appears to do nothing. Same fix as offenderrisk
+// and pendencyrisk carry.
 let cachedKey = null;
+let keyAttempted = false;
 
 async function endpointKey(req) {
-  if (cachedKey !== null) return cachedKey;
+  if (cachedKey) return cachedKey;
   if (process.env.QUICKML_SPIKE_KEY) { cachedKey = process.env.QUICKML_SPIKE_KEY; return cachedKey; }
   // eslint-disable-next-line global-require
   const datastore = require('./datastore');
   const rows = await datastore.query(req,
     `SELECT configValue FROM AppConfig WHERE configKey = '${KEY_CONFIG}'`, 'AppConfig');
-  cachedKey = (rows && rows[0] && rows[0].configValue) || '';
-  return cachedKey;
+  keyAttempted = true;
+  const key = (rows && rows[0] && rows[0].configValue) || '';
+  if (key) cachedKey = key;
+  return key;
+}
+
+/**
+ * Does this set of scores actually rank? Shared shape with offenderrisk and pendencyrisk.
+ *
+ * A set of ONE is a narrow scope, not a degenerate endpoint -- one district and head left after
+ * filtering is an ordinary result at station and district rank. One score is not a ranking; it
+ * is still a prediction.
+ */
+function discriminates(values) {
+  return values.length < 2 || new Set(values).size > 1;
 }
 
 function configured() {
@@ -102,7 +121,7 @@ function status() {
     servedBy: configured() ? 'model' : 'rule',
     lastServed,
     lastError,
-    keyLoaded: cachedKey === null ? 'not-attempted' : Boolean(cachedKey),
+    keyLoaded: keyAttempted ? Boolean(cachedKey) : Boolean(cachedKey) || 'not-attempted',
     note: configured()
       ? `The regressor scores ${MODEL_AUC} AUC against the best simple rule's ${RULE_AUC} on a `
         + 'time-ordered hold-out — a margin of +'
@@ -228,9 +247,15 @@ async function scoreSpikes(req, rows) {
   // untouched while the response claimed a model produced it. A regressor should never trip
   // this. If it does, the model is wrong rather than the request, and saying so beats a
   // ranking nobody can trust.
+  //
+  // It must not fire on a shortlist of ONE, which is not a degenerate endpoint but a narrow
+  // scope -- a single district and head left after filtering. The same omission in the offender
+  // and pendency servers meant a station officer was shown no score at all while the endpoint
+  // had answered correctly; this file was missed on that pass because a typo'd grep put it out
+  // of reach. One score is not a ranking; it is still a prediction.
   const seen = out.filter((v) => v !== null);
   const distinct = new Set(seen).size;
-  if (distinct < 2) {
+  if (!discriminates(seen)) {
     lastError = `endpoint returned ${distinct === 1 ? `the same value (${seen[0]}) for all ${seen.length} candidates` : 'nothing usable'} — labels, not probabilities, so it cannot rank`;
     return null;
   }
@@ -261,4 +286,4 @@ function chooseServed(baseline) {
   };
 }
 
-module.exports = { FEATURES, chooseServed, scoreSpikes, configured, status };
+module.exports = { FEATURES, chooseServed, scoreSpikes, configured, status, discriminates };
