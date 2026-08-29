@@ -14,7 +14,13 @@ export default {
           gold: '#ffc712', saffron: '#E8871E', teal: '#2FA8A0',
         },
         surface: { DEFAULT: '#FFFFFF', 2: '#F7F9FB', 3: '#EDF1F6' },
-        ink: { DEFAULT: '#1C2A3A', muted: '#5B6B7E' },
+        // subtle is the third text tier the guidelines describe and the app has used 85 times
+        // since the beginning -- without it ever existing. Tailwind generates nothing for an
+        // undefined token, so every `text-ink-subtle` silently inherited its parent's colour and
+        // the three-tier hierarchy rendered as two. That is a large part of why dense screens
+        // read as flat. Chosen at ~4.6:1 on white so it still clears WCAG AA for small text,
+        // which is the constraint that stops this being the much lighter grey it wants to be.
+        ink: { DEFAULT: '#1C2A3A', muted: '#5B6B7E', subtle: '#67768A' },
         line: '#D9E1EC',
         success: '#1E874B', warning: '#C9820A', danger: '#C0392B',
         heinous: '#C0392B', nonheinous: '#5B6B7E',

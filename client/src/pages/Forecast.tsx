@@ -31,7 +31,7 @@ import {
 
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Flame, Clock, Network, AlertTriangle,
-  BarChart3, Cpu, Users2, CheckCircle2, XCircle, Activity,
+  BarChart3, Cpu, Users2, CheckCircle2, XCircle, Activity, ChevronDown,
 } from 'lucide-react';
 import { useOutlook, useForecast, useAnomalies, useOffenderRisk, usePendencyRisk, useMe } from '../api/hooks';
 import { Skeleton, Empty, Section, TierChip } from '../components/ui';
@@ -102,13 +102,19 @@ const FAMILY_REJECTED = [
     why: 'Loses outright to prior case count.' },
 ];
 
+// `fam` marks the six rows that are the offender family restated in this table's wording --
+// "Repeat offending within 90 days" here is "Back within 90 days" in MODEL_FAMILY. Both tables
+// are wanted: this one is the full measured field in one place, MODEL_FAMILY carries the
+// average-precision and hold-out-positive detail the family panel needs. The flag exists so a
+// surface showing both can drop the duplicates without matching on prose, which would break
+// silently the first time either label was reworded.
 const CANDIDATES = [
-  { task: 'Repeat offending within 180 days', model: 0.746, rule: 0.562, ruleName: 'recency', ship: true },
-  { task: 'Repeat offending within 90 days', model: 0.699, rule: 0.584, ruleName: 'recency', ship: true },
-  { task: 'Repeat offending within a year', model: 0.733, rule: 0.512, ruleName: 'recency', ship: true },
-  { task: 'Next FIR in a district never worked', model: 0.762, rule: 0.561, ruleName: 'districts worked so far', ship: true },
-  { task: 'Next FIR recorded Heinous', model: 0.661, rule: 0.502, ruleName: 'recency', ship: true },
-  { task: 'Next FIR a crime against women', model: 0.638, rule: 0.459, ruleName: 'recency', ship: true },
+  { task: 'Repeat offending within 180 days', model: 0.746, rule: 0.562, ruleName: 'recency', ship: true, fam: true },
+  { task: 'Repeat offending within 90 days', model: 0.699, rule: 0.584, ruleName: 'recency', ship: true, fam: true },
+  { task: 'Repeat offending within a year', model: 0.733, rule: 0.512, ruleName: 'recency', ship: true, fam: true },
+  { task: 'Next FIR in a district never worked', model: 0.762, rule: 0.561, ruleName: 'districts worked so far', ship: true, fam: true },
+  { task: 'Next FIR recorded Heinous', model: 0.661, rule: 0.502, ruleName: 'recency', ship: true, fam: true },
+  { task: 'Next FIR a crime against women', model: 0.638, rule: 0.459, ruleName: 'recency', ship: true, fam: true },
   { task: 'District × head spike next month', model: 0.677, rule: 0.620, ruleName: 'inverse recent level', ship: true },
   { task: 'Station pendency +20% in 3 months', model: 0.870, rule: 0.701, ruleName: 'inflow over recent clearance', ship: true },
   { task: 'Station surge next month', model: 0.738, rule: 0.717, ruleName: 'inverse recent level', ship: false,
@@ -133,9 +139,15 @@ const CANDIDATES = [
 const N_SERVING = CANDIDATES.filter((c) => c.ship).length;
 const N_REJECTED = CANDIDATES.filter((c) => !c.ship).length + FAMILY_REJECTED.length;
 const N_MEASURED = N_SERVING + N_REJECTED;
+// Complete one to twenty rather than the handful the counts happened to land on. The sparse
+// version read "8 trained models ... and the twelve that did not" and "Twenty tasks measured ·
+// 8 serving · twelve rejected" -- numerals and words in the same sentence, because eight was
+// never a value any count had taken when the map was written. A lookup that silently degrades
+// to a numeral is worse than no lookup: it looks deliberate.
 const WORDS: Record<number, string> = {
-  5: 'Five', 6: 'Six', 7: 'Seven', 10: 'Ten', 11: 'Eleven', 12: 'Twelve', 14: 'Fourteen',
-  17: 'Seventeen', 18: 'Eighteen', 19: 'Nineteen', 20: 'Twenty',
+  1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven', 8: 'Eight',
+  9: 'Nine', 10: 'Ten', 11: 'Eleven', 12: 'Twelve', 13: 'Thirteen', 14: 'Fourteen',
+  15: 'Fifteen', 16: 'Sixteen', 17: 'Seventeen', 18: 'Eighteen', 19: 'Nineteen', 20: 'Twenty',
 };
 const word = (n: number) => WORDS[n] || String(n);
 
@@ -586,6 +598,167 @@ function ShiftPanel({ data }: { data: any }) {
 // ---------------------------------------------------------------------------------------
 // The model head.
 // ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+// The ML forecaster.
+//
+// WHAT WAS WRONG WITH THE PREVIOUS LAYOUT, since the fix only makes sense against it.
+//
+// Five Sections stacked at equal weight, all expanded, about four screens of scrolling. Three
+// result panels the reader had to choose between by scrolling past two of them, then two long
+// methodology sections in the same card-with-prose rhythm as everything above. Every panel
+// opened with a grey paragraph and continued into a list of rows with a pill on the right, so
+// the eye had nothing to catch on: the page was uniformly dense and therefore uniformly
+// unreadable. The same measurement also appeared four times -- on the summary card, in the
+// panel subtitle, in the family list and in the candidates list -- which is not thoroughness,
+// it is noise that makes a reader stop trusting that any of the four is the real one.
+//
+// THE SHAPE NOW: three zones, in the order a reader actually needs them.
+//
+//   1. THE BENCH. The three model families as selectable tiles. This is the page's index and
+//      its control: picking a tile is what decides zone 2, so the reader chooses what to look
+//      at instead of scrolling past it.
+//   2. THE RESULT. One panel, full attention, for the family the reader picked.
+//   3. THE EVIDENCE. Everything methodological, collapsed behind one row and split across
+//      three tabs. It is the most defensible work in the project and it still must not be the
+//      first thing between a reader and the answer.
+//
+// WHY THE MARGIN BAR EXISTS. This page's whole argument is "every shipped model beats the best
+// simple rule available on its own question, and here is by how much". Stated as three loose
+// numbers -- 0.870, 0.701, +0.169 -- that argument has to be reassembled by the reader every
+// time, and it is stated about twenty times on this page. Drawn as a track from 0.50 to 1.00
+// with the rule's reach in grey and the margin in teal, it is read rather than computed, and
+// it carries something the numbers do not show together: the ABSOLUTE level and the GAP at
+// once. A 0.87 with a small margin and a 0.66 with the same margin are different claims, and
+// on the bar they look different.
+// ---------------------------------------------------------------------------------------
+
+// The AUC floor for the bar. 0.5 is not an arbitrary left edge: it is what a coin scores, so
+// the bar's origin is "knows nothing" and its width is the whole of what a model can earn.
+const AUC_FLOOR = 0.5;
+const pctOf = (auc: number) => Math.max(0, Math.min(100, ((auc - AUC_FLOOR) / (1 - AUC_FLOOR)) * 100));
+
+/**
+ * Model against its baseline, on one track.
+ *
+ * Grey runs from chance to what the simple rule reaches; teal continues to where the model
+ * reaches. The teal length IS the margin, which is the only part either number was ever
+ * chosen to demonstrate. `lost` flips the accent to muted for candidates that did not beat
+ * their rule, so the rejected table can use the identical component and the failures read as
+ * short and grey rather than as a differently-shaped chart.
+ */
+function MarginBar({ model, rule, lost = false, height = 6 }: {
+  model: number; rule: number; lost?: boolean; height?: number;
+}) {
+  const rulePct = pctOf(rule);
+  const modelPct = pctOf(model);
+  const lo = Math.min(rulePct, modelPct);
+  const hi = Math.max(rulePct, modelPct);
+  return (
+    <div className="relative w-full rounded-full bg-surface-3 overflow-hidden" style={{ height }}>
+      {/* what the rule alone reaches */}
+      <div className="absolute inset-y-0 left-0 bg-ink-subtle/35" style={{ width: `${rulePct}%` }} />
+      {/* the margin: teal when the model won, muted when it did not */}
+      <div
+        className={`absolute inset-y-0 ${lost ? 'bg-ink-subtle/55' : 'bg-kadi-teal'}`}
+        style={{ left: `${lo}%`, width: `${Math.max(hi - lo, 0.8)}%` }}
+      />
+      {/* where the model lands */}
+      <div className="absolute inset-y-0 w-[2px] bg-kadi-navy" style={{ left: `calc(${modelPct}% - 1px)` }} />
+    </div>
+  );
+}
+
+/** The chip every surface uses to say which of the two orderings the reader is looking at. */
+function ServingChip({ serving }: { serving: boolean }) {
+  return (
+    <span className={`text-[10.5px] rounded-full px-2 py-0.5 border whitespace-nowrap ${
+      serving
+        ? 'text-kadi-teal border-kadi-teal/40 bg-kadi-teal/10'
+        : 'text-ink-muted border-line bg-surface-2'}`}>
+      {serving ? 'model' : 'rule'}
+    </span>
+  );
+}
+
+/**
+ * One family on the bench.
+ *
+ * A button, not a card: it selects. The selected state is carried by a navy rail and a raised
+ * white surface rather than by colour alone, so it survives both a monochrome print and a
+ * reader who cannot separate teal from grey.
+ */
+function ModelTile({ icon: Icon, title, question, model, rule, ruleName, serving, active, onClick, note }: {
+  icon: any; title: string; question: string; model: number; rule: number; ruleName: string;
+  serving: boolean; active: boolean; onClick: () => void; note?: string;
+}) {
+  const margin = Math.round((model - rule) * 1000) / 1000;
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      // The tile's visible content is a heading, a question, a bar and three numbers -- correct
+      // to look at and a poor thing to hear read out in order. A control that SELECTS should
+      // announce what selecting it does and what state it is in, so the name is written rather
+      // than inherited from the contents.
+      aria-label={`Show ${title} — ${serving ? 'model' : 'rule'} is ranking, `
+        + `${model.toFixed(3)} against the ${ruleName} baseline's ${rule.toFixed(3)}`}
+      className={`relative text-left rounded-card border p-4 pl-5 transition-all duration-150 ${
+        active
+          ? 'bg-surface border-kadi-navy/25 shadow-hover'
+          : 'bg-surface-2 border-line hover:bg-surface hover:shadow-card'}`}
+    >
+      <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-card transition-colors ${
+        active ? 'bg-kadi-navy' : 'bg-transparent'}`} />
+      <div className="flex items-center gap-2">
+        <Icon size={14} className={active ? 'text-kadi-navy' : 'text-ink-muted'} />
+        <span className={`text-[13.5px] font-semibold ${active ? 'text-kadi-navy' : 'text-ink'}`}>{title}</span>
+        <span className="ml-auto"><ServingChip serving={serving} /></span>
+      </div>
+      <p className="text-[12px] text-ink-muted mt-1.5 leading-snug min-h-[2.4em]">{question}</p>
+
+      <div className="mt-3">
+        <MarginBar model={model} rule={rule} />
+      </div>
+      <div className="flex items-baseline gap-1.5 mt-2">
+        <span className="text-[20px] leading-none font-semibold font-num text-ink">{model.toFixed(3)}</span>
+        <span className="text-[11.5px] font-num text-ink-subtle">vs {rule.toFixed(3)} {ruleName}</span>
+        <span className="ml-auto text-[12px] font-num font-semibold text-kadi-teal">+{margin.toFixed(3)}</span>
+      </div>
+      {note && <div className="mt-2 pt-2 border-t border-line text-[11px] text-ink-muted leading-relaxed">{note}</div>}
+    </button>
+  );
+}
+
+/** A row in either evidence table. Same component for winners and losers, on purpose. */
+function EvidenceRow({ label, model, rule, ruleName, ship, why, extra }: {
+  label: string; model: number; rule: number; ruleName?: string; ship: boolean;
+  why?: string; extra?: string;
+}) {
+  const margin = Math.round((model - rule) * 1000) / 1000;
+  return (
+    <div className="px-4 py-3 border-b border-line/70 last:border-0 hover:bg-surface-2/70 transition-colors">
+      <div className="flex items-center gap-2 flex-wrap">
+        {ship
+          ? <CheckCircle2 size={13} className="text-kadi-teal shrink-0" />
+          : <XCircle size={13} className="text-ink-subtle shrink-0" />}
+        <span className="text-[13px] font-medium text-ink">{label}</span>
+        <span className="ml-auto font-num text-[12px] whitespace-nowrap">
+          <span className={ship ? 'text-ink font-semibold' : 'text-ink-muted'}>{model.toFixed(3)}</span>
+          <span className="text-ink-subtle"> vs {rule.toFixed(3)}{ruleName ? ` ${ruleName}` : ''}</span>
+          <span className={`ml-2 font-semibold ${ship ? 'text-kadi-teal' : 'text-ink-subtle'}`}>
+            {margin >= 0 ? '+' : ''}{margin.toFixed(3)}
+          </span>
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <div className="w-40 shrink-0"><MarginBar model={model} rule={rule} lost={!ship} height={5} /></div>
+        {extra && <span className="text-[11.5px] font-num text-ink-subtle whitespace-nowrap">{extra}</span>}
+      </div>
+      {why && <div className="text-[11.5px] text-ink-muted mt-1.5 leading-relaxed">{why}</div>}
+    </div>
+  );
+}
+
 function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
   risk: any; spike: any; tier: string; nav: any; model: string; setModel: (m: string) => void;
   pend?: any;
@@ -596,50 +769,73 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
   const fam = MODEL_FAMILY.find((f) => f.slug === model) || MODEL_FAMILY[1];
   const sel = ((risk?.models || []).find((m: any) => m.slug === model))
     || { question: fam.label.toLowerCase(), modelAuc: fam.model, ruleAuc: fam.rule, ruleName: fam.ruleName };
+
+  // The spike model is a district-level question and has always been withheld at station rank,
+  // because an SHO cannot act on another district's crime head. The bench is built from what
+  // has a panel to show HERE rather than from the full roster, so no tile leads to an empty
+  // panel -- and the omission is stated below the bench rather than left as a silent gap.
+  const spikeShown = tier !== 'station' && spike?.items?.length > 0;
+  const pendShown = pend?.items?.length > 0;
+
+  const [family, setFamily] = useState<'offender' | 'spike' | 'pendency'>('offender');
+  const [evidence, setEvidence] = useState(false);
+  const [tab, setTab] = useState<'ship' | 'rejected' | 'why'>('ship');
+
+  const active = (family === 'spike' && !spikeShown) || (family === 'pendency' && !pendShown)
+    ? 'offender' : family;
+
   return (
     <>
-      {/* What is actually serving, first and without decoration. A model page whose first
-          panel is a result rather than a provenance statement is asking to be believed. */}
+      {/* ---- ZONE 1: the bench ------------------------------------------------------------ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* Reads the model the picker is on rather than restating one model's numbers. The
-            hard-coded version drifted the moment the measurement was corrected: this card said
-            0.769 while the panel directly beneath it said 0.746, which is worse than either
-            number being wrong on its own. */}
-        <ModelCard
+        <ModelTile
+          icon={Users2}
           title="Repeat offending"
           question={askable(sel.question)}
-          model={sel.modelAuc} rule={sel.ruleAuc} ruleName={sel.ruleName || 'recency'}
-          serving={served(risk)} lastError={risk?.serving?.lastError}
+          model={sel.modelAuc} rule={sel.ruleAuc} ruleName={sel.ruleName?.split(' (')[0] || 'recency'}
+          serving={served(risk)}
+          active={active === 'offender'}
+          onClick={() => setFamily('offender')}
+          note={!served(risk) && risk?.serving?.lastError ? `Falling back: ${risk.serving.lastError}` : undefined}
         />
-        <ModelCard
-          title="Spike risk"
-          question="Which district and crime head runs well above its own normal next month?"
-          model={0.677} rule={0.620} ruleName="inverse recent level"
-          serving={served(spike)} lastError={spike ? undefined : 'not computed at this rank'}
-        />
-        {/* The third family, and the one this row was missing: the header sentence above counts
-            the serving models off the registry and said EIGHT while this row showed two. A count
-            that is computed sitting next to a set of cards that is hand-maintained is the same
-            drift the counter was introduced to kill, one level up.
-
-            Its numbers come from the serving object rather than the page's own table, for the
-            reason the offender card does: when the measurement was corrected the hard-coded card
-            said 0.769 over a panel saying 0.746. The rule name is shortened the way the panel
-            subtitle below shortens it -- "load", not "load (inflow over recent clearance)" --
-            because at three columns the long form is what breaks the row. */}
-        <ModelCard
-          title="Station pendency"
-          question="Which registers are falling further behind over the next three months?"
-          model={pend?.serving?.modelAuc ?? 0.870}
-          rule={pend?.serving?.ruleAuc ?? 0.701}
-          ruleName={pend?.serving?.ruleName?.split(' (')[0] || 'load'}
-          serving={served(pend)}
-          lastError={pend ? pend.serving?.lastError : 'not loaded'}
-        />
+        {spikeShown && (
+          <ModelTile
+            icon={AlertTriangle}
+            title="Spike risk"
+            question="Which district and crime head runs well above its own normal next month?"
+            model={0.677} rule={0.620} ruleName="inverse recent level"
+            serving={served(spike)}
+            active={active === 'spike'}
+            onClick={() => setFamily('spike')}
+          />
+        )}
+        {pendShown && (
+          <ModelTile
+            icon={Activity}
+            title="Station pendency"
+            question="Which registers are falling further behind over the next three months?"
+            model={pend?.serving?.modelAuc ?? 0.870}
+            rule={pend?.serving?.ruleAuc ?? 0.701}
+            ruleName={pend?.serving?.ruleName?.split(' (')[0] || 'load'}
+            serving={served(pend)}
+            active={active === 'pendency'}
+            onClick={() => setFamily('pendency')}
+            note={!served(pend) && pend?.serving?.lastError ? `Falling back: ${pend.serving.lastError}` : undefined}
+          />
+        )}
       </div>
 
-      {/* Offender risk — every tier. A station cares about its own register's offenders, a
-          district about its stations', the state about the ones crossing district lines. */}
+      <p className="text-[11.5px] text-ink-subtle leading-relaxed -mt-1">
+        Grey is what the best simple rule reaches on the same question; teal is what the model adds
+        on top of it. Pick a tile to read that model&apos;s ranking.
+        {!spikeShown && tier === 'station' && (
+          <> Spike risk is a district-level model and is not shown at station rank — an SHO cannot
+          act on another district&apos;s crime head.</>
+        )}
+      </p>
+
+      {/* ---- ZONE 2: the selected family's result ----------------------------------------- */}
+      {active === 'offender' && (
       <Section
         action={
           <div className="flex items-center gap-1 flex-wrap justify-end">
@@ -671,9 +867,9 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
           Each model is scored against the best simple rule that can see its own question —
           recency for the return horizons, districts-worked for the mobility model. The buttons
           above change the list rather than relabelling it: the top-20 shortlists of the four
-          year-long models share at most one person with each other, so "who is back", "who
-          surfaces somewhere new", "who escalates to Heinous" and "who returns with a crime
-          against women" are four different sets of names.
+          year-long models share at most one person with each other, so &quot;who is back&quot;,
+          &quot;who surfaces somewhere new&quot;, &quot;who escalates to Heinous&quot; and
+          &quot;who returns with a crime against women&quot; are four different sets of names.
           <b className="block mt-1.5 text-kadi-navy">A caveat worth carrying</b>
           Some of that margin may be the synthetic generator giving each offender a stable
           offending rate, which prior-count and span together recover almost exactly. Re-measure
@@ -718,10 +914,9 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
           </>
         )}
       </Section>
+      )}
 
-      {/* Spike risk — the district×head model. Not shown at station rank: the grain is a
-          district, and an SHO cannot act on another district's crime head. */}
-      {tier !== 'station' && spike?.items?.length > 0 && (
+      {active === 'spike' && spikeShown && (
         <Section title={<span className="flex items-center gap-2">
           <AlertTriangle size={15} className="text-warning" /> Spike risk next month
           <span className="text-[12px] font-normal text-ink-muted">
@@ -729,15 +924,15 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
           </span>
           <InfoDot label="What this predicts" align="left" width="w-96">
             <b className="block mb-1 text-kadi-navy">A ranking, never a number</b>
-            Predicting next month's count means predicting an arrival process. At the district
+            Predicting next month&apos;s count means predicting an arrival process. At the district
             grain the Poisson floor alone is 11.5% and a three-month moving average already sits
             near it — every regression tried lost to that average. Classification escapes the
             problem because it only has to put the riskiest first.
             <b className="block mt-1.5 text-kadi-navy">How much of this is real</b>
             0.677 AUC against 0.620 for the best trivial rule. Note the honest baseline: the
-            target "40% above the trailing mean" is easier to hit on a small series, so a model
-            given absolute volumes can win by learning which series are small. Strip the volumes
-            and this model falls to 0.516. Its real contribution is +0.058.
+            target &quot;40% above the trailing mean&quot; is easier to hit on a small series, so a
+            model given absolute volumes can win by learning which series are small. Strip the
+            volumes and this model falls to 0.516. Its real contribution is +0.058.
           </InfoDot>
         </span>}>
           <p className="px-4 pt-3 text-[12.5px] text-ink-muted">{spike.note}</p>
@@ -771,9 +966,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
         </Section>
       )}
 
-      {/* Station pendency. The only model here that scores a REGISTER, and the only one that came
-          from reading the Indian literature rather than the Western predictive-policing canon. */}
-      {pend?.items?.length > 0 && (
+      {active === 'pendency' && pendShown && (
       <Section title={<span className="flex items-center gap-2">
         <Activity size={15} className="text-kadi-blue" /> Registers falling further behind
         {/* At station rank the scope is ONE register, and "top 1 by load, re-ranked by model"
@@ -791,7 +984,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
           crime rates here are charge-sheeting rate, conviction rate and pendency — Hazra (2020) across
           32 states, Dutta &amp; Husain (2009) on earlier panel data. That is a lever about disposal,
           and a FIR register can speak to disposal.
-          <b className="block mt-1.5 text-kadi-navy">Why not "where will crime happen"</b>
+          <b className="block mt-1.5 text-kadi-navy">Why not &quot;where will crime happen&quot;</b>
           At a 1&nbsp;km cell and a week this register averages one case, so the best possible predictor
           of the count is still 78% out. A backlog averages 46 per station-month and is worth modelling.
           <b className="block mt-1.5 text-kadi-navy">What it must not become</b>
@@ -808,7 +1001,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-ink-subtle border-b border-line">
+              <tr className="text-[11px] uppercase tracking-wide text-ink-subtle border-b border-line bg-surface-2/60">
                 <th className="text-left font-medium px-4 py-2">Station</th>
                 <th className="text-right font-medium px-3 py-2">Past window</th>
                 <th className="text-right font-medium px-3 py-2">Share of register</th>
@@ -819,7 +1012,7 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
             </thead>
             <tbody>
               {pend.items.map((r: any) => (
-                <tr key={r.unitId} className="border-b border-line/60 last:border-0">
+                <tr key={r.unitId} className="border-b border-line/60 last:border-0 hover:bg-surface-2/70 transition-colors">
                   <td className="px-4 py-2">
                     <span className="text-ink">{r.unitName}</span>
                     <span className="text-ink-subtle text-[11.5px] ml-1.5">{r.districtName}</span>
@@ -844,159 +1037,135 @@ function MlHead({ risk, spike, tier, nav, model, setModel, pend }: {
       </Section>
       )}
 
-      {/* The model family. Added after a second sweep, because "seven tasks measured" was
-          where the first pass stopped rather than where the space ended — and the obvious
-          question, whether the offender panel answers more than one question, had not been
-          asked. It answers six. */}
-      <Section title={<span className="flex items-center gap-2">
-        <Users2 size={15} className="text-kadi-teal" /> Six questions about the same people
-      </span>}>
-        <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
-          One panel, one set of seven features, six different things to predict. That is what
-          makes them cheap to run together: the scoring record is identical, so choosing a model
-          means choosing an endpoint rather than rebuilding the question.
-        </p>
-        <p className="px-4 pt-2 text-[12.5px] text-ink-muted leading-relaxed">
-          It is also what makes them worth having separately. Measured across the hold-out —
-          every repeat offender, not a shortlist — <b>their top-20 lists share at most one
-          person.</b> Rank correlation over the whole panel runs 0.33 to 0.46, which reads like
-          "much the same model" and is misleading: correlation is dominated by the vast middle
-          of the list nobody acts on. The top twenty is the product.
-        </p>
-        <p className="px-4 pt-2 text-[12.5px] text-ink-muted leading-relaxed">
-          The lists <i>on this page</i> overlap more than that, and it is worth saying why rather
-          than letting the two numbers look like a contradiction. Serving does not score all
-          {' '}{risk?.candidates || 200} offenders in scope: the recency rule takes the top
-          {' '}{risk?.scored || 24} — it is cheap and it supplies the recall — and the model
-          re-ranks those. So every model here is ordering the same two dozen people, and
-          typically shares three to six of ten with its neighbours. The measured figure is what
-          the models do when each picks freely from everyone; this page is what they do inside a
-          shared shortlist. Both are true, and the first is the one that says whether the models
-          are different.
-        </p>
-        <div className="p-3 space-y-1.5">
-          {MODEL_FAMILY.map((m) => (
-            <div key={m.slug} className="rounded-ctl border border-kadi-teal/40 bg-teal-50/30 px-3 py-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CheckCircle2 size={14} className="text-kadi-teal shrink-0" />
-                <span className="text-[13px] font-medium text-ink">{m.label}</span>
-                <span className="ml-auto font-num text-[12px]">
-                  <span className="text-kadi-teal font-semibold">{m.model.toFixed(3)}</span>
-                  <span className="text-ink-subtle"> vs {m.rule.toFixed(3)} {m.ruleName}</span>
-                  <span className="text-ink-muted"> · AP {m.ap.toFixed(3)} vs {m.apRule.toFixed(3)}</span>
-                </span>
-              </div>
-              <div className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">
-                {m.use} <span className="text-ink-subtle font-num">({m.pos} hold-out positives)</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="px-4 pt-1 text-[12px] font-medium text-ink">Measured on the same panel and not shipped</p>
-        <div className="px-3 pb-3 pt-2 space-y-1.5">
-          {FAMILY_REJECTED.map((r) => (
-            <div key={r.label} className="rounded-ctl border border-line bg-surface-2 px-3 py-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <XCircle size={14} className="text-ink-subtle shrink-0" />
-                <span className="text-[13px] text-ink">{r.label}</span>
-                <span className="ml-auto font-num text-[12px] text-ink-subtle">
-                  {r.model.toFixed(3)} vs {r.rule.toFixed(3)}
-                </span>
-              </div>
-              <div className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{r.why}</div>
-            </div>
-          ))}
-        </div>
-        <p className="px-4 pb-3 text-[11.5px] text-ink-subtle leading-relaxed">
-          Three of those rejections score <i>higher</i> than models that ship. That is the whole
-          point of the conditional test: a target of "comes back AND it is a property crime"
-          inherits the predictability of "comes back", which is 0.733 on its own. Ask instead
-          whether the model can say <i>what</i> they come back with — score it only on the people
-          who did come back — and property, body and economic collapse while Heinous and crimes
-          against women hold. Every training file carries exactly its own target and nothing
-          else; a sibling target left in the frame would be handed to the model as a feature,
-          and the horizons nest, so "back within 180 days" would give away "back within a year".
-        </p>
-      </Section>
+      {/* ---- ZONE 3: the evidence, folded away ------------------------------------------- */}
+      {/* This is the most defensible work in the project -- twenty tasks measured against the
+          best rule available on each, twelve rejected -- and it was also two full screens of
+          prose sitting between the reader and nothing. Folded, it is one honest line; opened,
+          it is the same content with the three questions separated instead of run together. */}
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => setEvidence((v) => !v)}
+          aria-expanded={evidence}
+          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-surface-2 transition-colors"
+        >
+          <Cpu size={15} className="text-ink-muted shrink-0" />
+          <span className="text-sm font-semibold text-ink">How this was measured</span>
+          <span className="text-[12px] text-ink-muted">
+            {word(N_MEASURED)} tasks measured · {word(N_SERVING).toLowerCase()} serving ·
+            {' '}{word(N_REJECTED).toLowerCase()} rejected
+          </span>
+          <ChevronDown
+            size={16}
+            className={`ml-auto text-ink-subtle transition-transform ${evidence ? 'rotate-180' : ''}`}
+          />
+        </button>
 
-      {/* The losers. This is the panel that makes the two winners mean something. */}
-      <Section title={<span className="flex items-center gap-2">
-        <Cpu size={15} className="text-ink-muted" /> {word(N_MEASURED)} tasks were measured. {word(N_SERVING)} are serving.
-      </span>}>
-        <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
-          Every candidate was scored on a time-ordered hold-out against the <b>best</b> simple
-          rule available on the same information — not the first baseline that came to mind.
-          That choice decided most of these results: against an obvious baseline nearly all of
-          them win, and against the best one nearly all of them lose. A model that cannot beat a
-          one-line rule is worse than no model, because it reads as capability while adding a
-          serving dependency and a failure mode.
-        </p>
-        <div className="p-3 space-y-1.5">
-          {CANDIDATES.map((c) => (
-            <div key={c.task} className={`rounded-ctl border px-3 py-2 ${
-              c.ship ? 'border-kadi-teal/40 bg-teal-50/30' : 'border-line bg-surface-2'}`}>
-              <div className="flex items-center gap-2 flex-wrap">
-                {c.ship
-                  ? <CheckCircle2 size={14} className="text-kadi-teal shrink-0" />
-                  : <XCircle size={14} className="text-ink-subtle shrink-0" />}
-                <span className="text-[13px] font-medium text-ink">{c.task}</span>
-                <span className="ml-auto font-num text-[12px]">
-                  <span className={c.ship ? 'text-kadi-teal font-semibold' : 'text-ink-muted'}>{c.model.toFixed(3)}</span>
-                  <span className="text-ink-subtle"> vs {c.rule.toFixed(3)} {c.ruleName}</span>
-                </span>
-              </div>
-              {c.why && <div className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{c.why}</div>}
+        {evidence && (
+          <div className="border-t border-line">
+            {/* Scrolls rather than squeezes. Three labels of this length in a flex row at 375px
+                wrap to four lines each and the strip stops reading as a set of tabs. */}
+            <div className="flex items-center gap-1 px-3 py-2.5 border-b border-line bg-surface-2/60 overflow-x-auto">
+              {([
+                ['ship', `The ${word(N_SERVING).toLowerCase()} that ship`],
+                ['rejected', `The ${word(N_REJECTED).toLowerCase()} that did not`],
+                ['why', 'Why six questions, not one'],
+              ] as const).map(([k, lbl]) => (
+                <button key={k} onClick={() => setTab(k)}
+                  className={`text-[12px] rounded-ctl px-3 py-1.5 whitespace-nowrap shrink-0 transition-colors ${
+                    tab === k
+                      ? 'bg-kadi-navy text-white'
+                      : 'text-ink-muted hover:bg-surface-3'}`}>
+                  {lbl}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="px-4 pb-3 text-[11.5px] text-ink-subtle leading-relaxed">
-          AUC on time-ordered hold-outs. A random split would flatter every one of them: crime
-          series are autocorrelated, so random test rows sit between training rows of the same
-          series. Fairness holds across all seven — counts, dates, places and calendar positions
-          only, and a unit test fails the build if a protected column reaches a feature set.
-        </p>
-      </Section>
-    </>
-  );
-}
 
-function ModelCard({ title, question, model, rule, ruleName, serving, lastError }: {
-  title: string; question: string; model: number; rule: number; ruleName: string;
-  serving: boolean; lastError?: string;
-}) {
-  const margin = Math.round((model - rule) * 1000) / 1000;
-  return (
-    <div className="card p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-[13.5px] font-semibold text-kadi-navy">{title}</span>
-        <span className={`ml-auto text-[11px] rounded-full px-2 py-0.5 border ${
-          serving ? 'text-kadi-teal border-kadi-teal/40 bg-teal-50' : 'text-ink-muted border-line bg-surface-2'}`}>
-          {serving ? 'model is ranking' : 'rule is ranking'}
-        </span>
-      </div>
-      <p className="text-[12.5px] text-ink-muted mt-1">{question}</p>
-      <div className="mt-2.5 flex items-end gap-3">
-        <div>
-          <div className="text-[10.5px] uppercase tracking-wide text-ink-subtle">Model</div>
-          <div className="text-2xl font-semibold font-num text-ink">{model.toFixed(3)}</div>
-        </div>
-        <div className="pb-1">
-          <div className="text-[10.5px] uppercase tracking-wide text-ink-subtle">{ruleName}</div>
-          <div className="text-lg font-num text-ink-muted">{rule.toFixed(3)}</div>
-        </div>
-        <div className="pb-1.5 ml-auto text-right">
-          <div className="text-[10.5px] uppercase tracking-wide text-ink-subtle">Margin</div>
-          <div className={`text-lg font-num font-semibold ${margin > 0.1 ? 'text-kadi-teal' : 'text-ink'}`}>
-            +{margin.toFixed(3)}
+            {tab === 'ship' && (
+              <div>
+                <p className="px-4 pt-3 pb-1 text-[12.5px] text-ink-muted leading-relaxed max-w-3xl">
+                  Every candidate was scored on a time-ordered hold-out against the <b>best</b> simple
+                  rule available on the same information — not the first baseline that came to mind.
+                  That choice decided most of these results: against an obvious baseline nearly all of
+                  them win, and against the best one nearly all of them lose.
+                </p>
+                <div className="mt-1">
+                  {MODEL_FAMILY.map((m) => (
+                    <EvidenceRow key={m.slug} label={m.label} model={m.model} rule={m.rule}
+                      ruleName={m.ruleName} ship why={m.use}
+                      extra={`AP ${m.ap.toFixed(3)} vs ${m.apRule.toFixed(3)} · ${m.pos} positives`} />
+                  ))}
+                  {CANDIDATES.filter((c) => c.ship && !c.fam).map((c) => (
+                    <EvidenceRow key={c.task} label={c.task} model={c.model} rule={c.rule}
+                      ruleName={c.ruleName} ship why={c.why} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tab === 'rejected' && (
+              <div>
+                <p className="px-4 pt-3 pb-1 text-[12.5px] text-ink-muted leading-relaxed max-w-3xl">
+                  A model that cannot beat a one-line rule is worse than no model: it reads as
+                  capability while adding a serving dependency and a failure mode. Three of these
+                  score <i>higher</i> than models that ship — see the conditional test below.
+                </p>
+                <div className="mt-1">
+                  {FAMILY_REJECTED.map((r) => (
+                    <EvidenceRow key={r.label} label={r.label} model={r.model} rule={r.rule}
+                      ship={false} why={r.why} />
+                  ))}
+                  {CANDIDATES.filter((c) => !c.ship).map((c) => (
+                    <EvidenceRow key={c.task} label={c.task} model={c.model} rule={c.rule}
+                      ruleName={c.ruleName} ship={false} why={c.why} />
+                  ))}
+                </div>
+                <p className="px-4 py-3 text-[11.5px] text-ink-subtle leading-relaxed border-t border-line max-w-3xl">
+                  A target of &quot;comes back AND it is a property crime&quot; inherits the
+                  predictability of &quot;comes back&quot;, which is 0.733 on its own. Ask instead
+                  whether the model can say <i>what</i> they come back with — score it only on the
+                  people who did come back — and property, body and economic collapse while Heinous
+                  and crimes against women hold. Every training file carries exactly its own target
+                  and nothing else; the horizons nest, so a sibling target left in the frame would
+                  hand &quot;back within a year&quot; the answer to &quot;back within 180 days&quot;.
+                </p>
+              </div>
+            )}
+
+            {tab === 'why' && (
+              <div className="px-4 py-4 space-y-3 max-w-3xl">
+                <p className="text-[12.5px] text-ink-muted leading-relaxed">
+                  One panel, one set of seven features, six different things to predict. That is what
+                  makes them cheap to run together: the scoring record is identical, so choosing a
+                  model means choosing an endpoint rather than rebuilding the question.
+                </p>
+                <p className="text-[12.5px] text-ink-muted leading-relaxed">
+                  It is also what makes them worth having separately. Measured across the hold-out —
+                  every repeat offender, not a shortlist — <b>their top-20 lists share at most one
+                  person.</b> Rank correlation over the whole panel runs 0.33 to 0.46, which reads
+                  like &quot;much the same model&quot; and is misleading: correlation is dominated by
+                  the vast middle of the list nobody acts on. The top twenty is the product.
+                </p>
+                <p className="text-[12.5px] text-ink-muted leading-relaxed">
+                  The lists <i>on this page</i> overlap more than that. Serving does not score all
+                  {' '}{risk?.candidates || 200} offenders in scope: the recency rule takes the top
+                  {' '}{risk?.scored || 24} — it is cheap and it supplies the recall — and the model
+                  re-ranks those. So every model here is ordering the same two dozen people. The
+                  measured figure is what the models do when each picks freely from everyone; this
+                  page is what they do inside a shared shortlist.
+                </p>
+                <p className="text-[11.5px] text-ink-subtle leading-relaxed border-t border-line pt-3">
+                  AUC on time-ordered hold-outs throughout. A random split would flatter every one of
+                  them: crime series are autocorrelated, so random test rows sit between training rows
+                  of the same series. Fairness holds across all of them — counts, dates, places and
+                  calendar positions only, and a unit test fails the build if a protected column
+                  reaches a feature set.
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
-      {!serving && lastError && (
-        <div className="mt-2 text-[11.5px] text-ink-muted leading-relaxed border-t border-line pt-2">
-          Falling back to the rule: {lastError}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 

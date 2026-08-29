@@ -1001,16 +1001,26 @@ r.get('/analytics/outlook', handle(async (req) => {
       }));
       const scored = ranked.filter((r) => r.modelScore !== null);
       if (scored.length) scored.sort((a, b) => b.modelScore - a.modelScore);
+      const spikeStatus = mlforecast.status();
       out.spikeRisk = {
         grain: 'district x crime head',
         forMonth: cand.forMonth,
         candidates: cand.total,
         rankedBy: scored.length ? 'model' : 'rule',
         items: (scored.length ? scored : ranked).slice(0, 8),
+        // Read off the serving module rather than restated. The hard-coded version of this line
+        // was wrong twice over by the time anyone noticed: it quoted 0.587 against a z-score
+        // rule's 0.419 -- the weak baseline mlforecast.js's own header disowns in favour of
+        // 0.677 against 0.620 -- and it called the model a classifier, which it stopped being
+        // when the label-returning endpoint was replaced by a regressor. Both were visible on
+        // one screen, sixty pixels under a tile showing the corrected figures.
         note: scored.length
-          ? 'Ranked by the trained classifier. It scores 0.587 AUC on a rolling hold-out against the z-score rule\'s 0.419.'
-          : 'Ranked by the z-score rule. The trained classifier did not return a usable ranking '
-            + '(see /ai/status forecastModel.lastError for why), so the ordering falls back rather than pretending.',
+          ? `Ranked by the trained regressor. It scores ${spikeStatus.modelAuc} AUC on a `
+            + `time-ordered hold-out against ${String(spikeStatus.ruleName).split(' (')[0]}'s `
+            + `${spikeStatus.ruleAuc}.`
+          : `Ranked by ${String(spikeStatus.ruleName).split(' (')[0]}. The trained model did not `
+            + 'return a usable ranking (see /ai/status forecastModel.lastError for why), so the '
+            + 'ordering falls back rather than pretending.',
       };
     }
     if (String(req.query.explain) === 'false' || !rows.length) return out;
