@@ -51,9 +51,12 @@ const ENDPOINT = process.env.QUICKML_SPIKE_ENDPOINT
 // The endpoint key is a real credential, so it lives in the AppConfig Data Store table beside
 // the auth signing secret rather than in catalyst-config.json -- that file is committed, and a
 // live prediction key in a public repo is a different thing from the mock account passwords.
-// The regressor endpoint's key. The old classifier endpoint's key lives under
-// quickml.spikeEndpointKey and is left in place: it still answers, it just answers with a
-// label, and keeping it makes the before/after checkable rather than asserted.
+// The regressor endpoint's key. The classifier this replaced -- kadi-spike-endpoint, on
+// spike-classifier-v1 -- was kept live for a while so the "a label cannot rank" claim could be
+// demonstrated rather than asserted. It has since been deleted along with the rest of the dead
+// console artifacts, so the evidence now lives where every other rejected model's does: the
+// measurement table in this file's header and research/README.md. A stale credential under
+// quickml.spikeEndpointKey may remain in AppConfig; nothing reads it.
 const KEY_CONFIG = process.env.QUICKML_SPIKE_KEY_CONFIG || 'quickml.spikeRegressorEndpointKey';
 const TIMEOUT_MS = Number(process.env.QUICKML_SPIKE_TIMEOUT_MS || 6000);
 // Measured average AUC over four rolling three-month hold-out windows. Configuration rather
