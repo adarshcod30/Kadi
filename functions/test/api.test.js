@@ -797,3 +797,31 @@ test('a single-candidate scope keeps its score instead of reading as a degenerat
       `${name}: two distinct scores rank`);
   }
 });
+
+// The phrasing model is allowed to rewrite a sentence and is not allowed to invent a figure.
+//
+// Told to lead with the number that answers the question, it counted the five example FIRs it
+// had been shown and wrote "Five cases are flagged as slipping" over a deterministic answer
+// that said 16,136 — fluent, confident, and wrong by three orders of magnitude. Prompting alone
+// does not fix that class of error, so the output is checked against its own input.
+test('a phrased answer may not contain a number its facts did not', () => {
+  // The guard as it runs in assistant.js: every digit run in the answer must exist in the facts.
+  const check = (facts, answer) => {
+    const factDigits = new Set((String(facts).replace(/,/g, '').match(/\d+/g) || []));
+    return (String(answer).replace(/,/g, '').match(/\d+/g) || [])
+      .filter((n) => n.length > 1 && !factDigits.has(n));
+  };
+  const facts = '16136 cases are flagged as slipping. The 5 highest-risk are listed.\n'
+    + '- case 100290291202300008 (id 19674)';
+
+  assert.deepStrictEqual(check(facts, '16,136 cases are slipping; the five most at risk are below.'), [],
+    'a comma-formatted figure that IS in the facts must pass');
+  assert.deepStrictEqual(check(facts, 'FIR 100290291202300008 is the most at risk.'), [],
+    'an id taken from the facts must pass');
+  assert.deepStrictEqual(check(facts, 'There are 4200 cases slipping.'), ['4200'],
+    'a figure absent from the facts must be caught');
+  // The real regression, in the exact shape it appeared.
+  assert.deepStrictEqual(check(facts, 'Five cases are flagged as slipping.'), [],
+    'a word-number is not caught by this guard — the prompt handles that, and the guard is '
+    + 'the backstop for digits, which is where the damage is');
+});

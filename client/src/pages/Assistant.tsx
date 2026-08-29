@@ -22,7 +22,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Send, Mic, MicOff, FileDown, ShieldCheck, Volume2, VolumeX, Languages,
-  AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage, Copy,
+  AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage, Copy, ChevronDown,
 } from 'lucide-react';
 import { useAssistant, useExport, useTranslate } from '../api/hooks';
 import { useLang, useTx } from '../lib/i18n';
@@ -600,16 +600,19 @@ export default function Assistant() {
 
       {/* Capability line. Stated up front rather than discovered by pressing a button that does
           nothing — Chrome ships no Kannada voice on most machines. */}
+      {/* A STATUS LINE SHOULD SAY SOMETHING, NOT SIT THERE.
+          "Voice input ready · Read-aloud ready" was two permanent sentences reporting that
+          nothing was wrong, on every visit, forever. Neither is actionable and neither ever
+          changes, so both were noise crowding the one item here that IS a control. A limitation
+          is worth stating up front -- a reader should not discover a missing Kannada voice by
+          pressing a button that stays silent -- so the line now appears only when there is a
+          limitation to name. */}
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-subtle mb-2 ${kn ? 'kn' : ''}`}>
-        <span className="flex items-center gap-1">
-          <Mic size={11} /> {speechSupported ? tx('Voice input ready') : tx('Voice input unavailable in this browser')}
-        </span>
-        <span className="flex items-center gap-1">
-          {ttsSupported && (kn ? knVoice : enVoice) ? <Volume2 size={11} /> : <VolumeX size={11} />}
-          {kn
-            ? (knVoice ? tx('Kannada read-aloud ready') : tx('Kannada read-aloud ready — spoken by Zia'))
-            : (enVoice ? tx('Read-aloud ready') : tx('Read-aloud ready — spoken by Zia'))}
-        </span>
+        {!speechSupported && (
+          <span className="flex items-center gap-1">
+            <Mic size={11} /> {tx('Voice input unavailable in this browser')}
+          </span>
+        )}
         {/* Turning this off silences what is already playing. Leaving the current answer to
             finish after the reader has just said "stop speaking to me" is the wrong reading of
             the control. */}
@@ -800,6 +803,29 @@ export default function Assistant() {
         {ask.isPending && <div className={`text-sm text-ink-muted ${kn ? 'kn' : ''}`}>{tx('Thinking…')}</div>}
         <div ref={endRef} />
       </div>
+
+      {/* WHAT TO ASK NEXT, ONCE THE EMPTY STATE IS GONE.
+          The four capability panels only exist before the first question, so the moment someone
+          asks anything the entire menu of what this thing can do disappears and they are left
+          with a blank box. That is the point at which a reader stops using an assistant -- not
+          because it failed, but because they ran out of ideas about it. One quiet row, six
+          starters drawn from the same list, collapsible for anyone who does not want it. */}
+      {msgs.length > 0 && (
+        <details className="mt-3 group">
+          <summary className={`text-[12px] text-ink-muted cursor-pointer hover:text-kadi-blue list-none flex items-center gap-1 ${kn ? 'kn' : ''}`}>
+            <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
+            {tx('More you can ask')}
+          </summary>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {SUGGESTIONS.map((q) => (
+              <button key={q} onClick={() => send(q, tx(q))}
+                className={`text-[11.5px] rounded-full border border-line bg-surface px-2.5 py-1 text-ink-muted hover:bg-kadi-blue50 hover:text-kadi-blue transition-colors ${kn ? 'kn' : ''}`}>
+                {tx(q)}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
 
       <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mt-3 flex gap-2">
         <button type="button" onClick={toggleMic}

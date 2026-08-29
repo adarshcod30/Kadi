@@ -13,6 +13,11 @@ const KN = /[ಀ-೿]/; // Kannada script range
 // what it actually costs: the phrasing call runs 8-12s at state tier, and the deterministic
 // answer beneath it is ready in about one. Five seconds keeps the nicety on the fast path and
 // removes it from the critical one.
+// Figures an officer reads aloud in a briefing. 16136 is a digit soup; 16,136 is a number.
+// The phrasing model is told to copy figures exactly, and the numeric guard strips commas
+// before comparing, so formatting here reaches the reader without tripping either.
+const n = (v) => Number(v || 0).toLocaleString('en-IN');
+
 const PHRASE_DEADLINE_MS = Number(process.env.ASSISTANT_PHRASE_DEADLINE_MS || 5000);
 
 // Safe parametrized query tools (whitelisted) — the assistant may only call these.
@@ -131,7 +136,7 @@ function query(user, text, lang) {
     const acc = fc.accuracy ? ` Backtest MAPE ${fc.accuracy.mape}% over ${fc.accuracy.holdoutMonths} withheld months.` : '';
     answer = isKn
       ? `ಮುಂದಿನ ${fc.horizonMonths || 3} ತಿಂಗಳ ಮುನ್ಸೂಚನೆ ಪ್ರಕಾರ ${rising.length} ಜಿಲ್ಲೆಗಳಲ್ಲಿ ಏರಿಕೆ ನಿರೀಕ್ಷಿಸಲಾಗಿದೆ.`
-      : `Over the next ${fc.horizonMonths || 3} months, ${rising.length} district(s) are projected to rise against their own 12-month average.${acc}`;
+      : `Over the next ${fc.horizonMonths || 3} months, ${rising.length} district${rising.length === 1 ? '' : 's'} are projected to rise against their own 12-month average.${acc}`;
     action = { type: 'open_intelligence' };
   } else if (hasRate) {
     intent = 'socio_rates';
@@ -159,8 +164,8 @@ function query(user, text, lang) {
     const top = res.items.slice(0, 5);
     top.forEach((h) => citations.push({ type: 'case', id: h.caseMasterId, label: h.crimeNo }));
     answer = isKn
-      ? `${res.total} ಪ್ರಕರಣಗಳು ತನಿಖೆಯಲ್ಲಿ ವಿಳಂಬವಾಗುತ್ತಿವೆ. ಅತಿ ಹೆಚ್ಚು ಅಪಾಯದ ${top.length} ಪ್ರಕರಣಗಳನ್ನು ಕೆಳಗೆ ತೋರಿಸಲಾಗಿದೆ.`
-      : `${res.total} cases are flagged as slipping (ageing / pendency / undetected-risk). The ${top.length} highest-risk are cited below, each with a recommended action in the Health cockpit.`;
+      ? `${n(res.total)} ಪ್ರಕರಣಗಳು ತನಿಖೆಯಲ್ಲಿ ವಿಳಂಬವಾಗುತ್ತಿವೆ. ಅತಿ ಹೆಚ್ಚು ಅಪಾಯದ ${top.length} ಪ್ರಕರಣಗಳನ್ನು ಕೆಳಗೆ ತೋರಿಸಲಾಗಿದೆ.`
+      : `${n(res.total)} cases are flagged as slipping (ageing / pendency / undetected-risk). The ${top.length} highest-risk are cited below, each with a recommended action in the Health cockpit.`;
     action = { type: 'open_health' };
   } else if (hasPast) {
     intent = 'offender_history';
@@ -177,7 +182,7 @@ function query(user, text, lang) {
     });
     answer = isKn
       ? `${off.canonicalName} ಅವರ ವಿರುದ್ಧ ${off.distinctCases} ಪ್ರಕರಣಗಳು ${off.distinctDistricts} ಜಿಲ್ಲೆಗಳಲ್ಲಿ ದಾಖಲಾಗಿವೆ. ಅಪಾಯ ಸೂಚ್ಯಂಕ ${off.riskScore}/100 (${off.band}). ಜಾತಿ/ಧರ್ಮ ಬಳಸಲಾಗಿಲ್ಲ.`
-      : `${off.canonicalName} is linked to ${off.distinctCases} cases across ${off.distinctDistricts} district(s); behaviour-based risk ${off.riskScore}/100 (${off.band}). Caste/religion/occupation are not used.`;
+      : `${off.canonicalName} is linked to ${off.distinctCases} cases across ${off.distinctDistricts} district${off.distinctDistricts === 1 ? '' : 's'}; behaviour-based risk ${off.riskScore}/100 (${off.band}). Caste/religion/occupation are not used.`;
     action = { type: 'open_offender', offenderId: off.offenderIdentityId };
   } else if (hasHotspot) {
     intent = 'hotspots';
@@ -185,7 +190,7 @@ function query(user, text, lang) {
     res.hotspots.slice(0, 3).forEach((h) => citations.push({ type: 'hotspot', id: h.cellId, label: `${h.recentCount} cases/60d` }));
     answer = isKn
       ? `${res.hotspots.length} ಉದಯೋನ್ಮುಖ ಅಪರಾಧ ತಾಣಗಳು ಪತ್ತೆಯಾಗಿವೆ.`
-      : `${res.hotspots.length} emerging hotspot(s) detected where recent activity far exceeds the historical baseline. See the Map.`;
+      : `${res.hotspots.length} emerging hotspot${res.hotspots.length === 1 ? '' : 's'} detected where recent activity far exceeds the historical baseline. See the Map.`;
     action = { type: 'open_map' };
   } else if (crimeNoAsked) {
     // A specific FIR, asked for by number. This must sit ABOVE the generic list branch: the
@@ -248,8 +253,8 @@ function query(user, text, lang) {
       ? (db.lookups.districts.get(district) || {}).DistrictName
       : (isKn ? 'ರಾಜ್ಯಾದ್ಯಂತ' : 'the state');
     answer = isKn
-      ? `${distName} ${res.total} ${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
-      : `Found ${res.total} ${headName || 'matching'} case(s) in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
+      ? `${distName} ${n(res.total)} ${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
+      : `Found ${n(res.total)} ${headName || 'matching'} case${res.total === 1 ? '' : 's'} in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
     action = { type: 'open_cases', filters: { head, district, dateFrom } };
   } else {
     answer = isKn
@@ -399,6 +404,32 @@ async function queryEnhanced(user, text, lang, req) {
   ]);
   const phraseMs = Date.now() - t0 - baseMs;
   if (!phrased) return { ...base, llm: 'fallback', timing: { baseMs, phraseMs } };
+
+  // A NUMBER THE FACTS DO NOT CONTAIN IS A NUMBER THE MODEL MADE UP.
+  //
+  // Prompting is not enough here and this is the demonstration: told to lead with the figure
+  // that answers the question, the model counted the five example FIRs beneath the facts and
+  // wrote "Five cases are flagged as slipping" over a deterministic answer that said 16,136.
+  // Fluent, confident, and wrong by three orders of magnitude.
+  //
+  // So the phrasing is checked rather than trusted, the same way the endpoints are: every run
+  // of digits in what the model wrote must appear in what it was given. Commas are stripped
+  // first so 16,136 still matches 16136, and years and short ordinals are ignored because they
+  // legitimately arise from wording ("the 5 highest" is already in the facts, "in 2026" is not
+  // a claim about the register). Anything else and the deterministic answer is served instead
+  // -- it was always correct, it was only ever plainer.
+  const factDigits = new Set((String(facts).replace(/,/g, '').match(/\d+/g) || []));
+  const invented = (String(phrased).replace(/,/g, '').match(/\d+/g) || [])
+    .filter((n) => n.length > 1 && !factDigits.has(n));
+  if (invented.length) {
+    return {
+      ...base,
+      llm: 'rejected-phrasing',
+      // Named so it can be seen in /ai/status and in a transcript rather than being silent.
+      phrasingRejected: `introduced ${invented.slice(0, 3).join(', ')}`,
+      timing: { baseMs, phraseMs },
+    };
+  }
   // Citations, intent and action stay as computed; only the prose is replaced.
   return {
     ...base, answer: phrased, llm: 'glm-4.7', deterministicAnswer: base.answer,
