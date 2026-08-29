@@ -850,7 +850,14 @@ function buildApp() {
     if (!cand.items.length) {
       return { ...cand, rankedBy: 'rule', serving: offenderrisk.status(), items: [] };
     }
-    const scores = await offenderrisk.score(req, cand.items).catch(() => null);
+    // WHICH MODEL is the reader's choice, and it is a real choice rather than a relabelling.
+    // The four year-long models share at most one name in their top twenty: asking "who is
+    // back at all", "who surfaces in a district they have never worked", "who escalates to
+    // Heinous" and "who returns with a crime against women" produces four different lists of
+    // twenty people, and the shortlist is the product.
+    const slug = offenderrisk.resolve(req.query.model || req.query.horizon);
+    const M = offenderrisk.MODELS[slug];
+    const scores = await offenderrisk.score(req, cand.items, slug).catch(() => null);
     const rows = cand.items.map((c, i) => ({
       offenderIdentityId: c.offenderIdentityId,
       name: c.canonicalName,
@@ -869,17 +876,27 @@ function buildApp() {
     if (scoredRows.length) scoredRows.sort((a, b) => b.modelScore - a.modelScore);
     return {
       asOf,
-      horizonDays: offenderrisk.HORIZON_DAYS,
+      model: slug,
+      question: M.question,
+      horizonDays: M.horizonDays,
+      models: Object.entries(offenderrisk.MODELS).map(([k, m]) => ({
+        slug: k, short: m.short, question: m.question, horizonDays: m.horizonDays,
+        modelAuc: m.auc, ruleAuc: m.rule, ruleName: m.ruleName,
+        margin: Math.round((m.auc - m.rule) * 1000) / 1000,
+        apMargin: Math.round((m.ap - m.apRule) * 1000) / 1000,
+        testPositives: m.testPositives, use: m.use,
+      })),
       candidates: cand.total,
       rankedBy: scoredRows.length ? 'model' : 'rule',
       items: (scoredRows.length ? scoredRows : rows).slice(0, 10),
       serving: offenderrisk.status(),
       note: scoredRows.length
-        ? 'Ranked by the trained model. It scores 0.769 AUC on a time-ordered hold-out against '
-          + 'recency\'s 0.565 — the widest margin of any model measured on this corpus.'
-        : 'Ranked by recency, which is the baseline the model was measured against. The model '
-          + 'did not return a usable ranking (see serving.lastError), so the ordering falls '
-          + 'back to a known quantity rather than pretending.',
+        ? `Ranked by the model for "${M.question}". It scores ${M.auc} AUC on a time-ordered `
+          + `hold-out against ${M.ruleName}'s ${M.rule}, on ${M.testPositives} hold-out `
+          + 'positives.'
+        : `Ranked by ${M.ruleName}, which is the baseline this model was measured against. `
+          + 'The model did not return a usable ranking (see serving.lastError), so the '
+          + 'ordering falls back to a known quantity rather than pretending.',
     };
   }));
 
@@ -1252,7 +1269,14 @@ r.get('/analytics/outlook', handle(async (req) => {
       download: '/server/api/ml/training-set.csv',
       downloadFull: '/server/api/ml/training-set.csv?grain=full',
       downloadDistrict: '/server/api/ml/training-set.csv?grain=district',
-      downloadOffender: '/server/api/ml/training-set.csv?grain=offender',
+      // One download per offender task. The list is derived from the pipeline's own task
+      // registry rather than written out here, so a model added upstream appears without a
+      // second edit -- and, more to the point, cannot go missing from this list silently.
+      downloadOffender: ((q.offenderSetMeta() || {}).tasks || []).map((t) => ({
+        slug: t.slug,
+        question: t.question,
+        url: `/server/api/ml/training-set.csv?grain=offender:${t.slug}`,
+      })),
       offenderSet: q.offenderSetMeta(),
       serving: mlforecast.status(),
       // The feature order the serving code will send at scoring time. Published so a mismatch
@@ -1264,24 +1288,64 @@ r.get('/analytics/outlook', handle(async (req) => {
 
   // ?grain=district serves the coarser, better-conditioned dataset. Both are written every
   // pipeline run; which to train on is a judgement the metadata gives the numbers for.
+  //
+  // NOTHING IN THIS ROUTE TOUCHES q. That is deliberate and was learned the hard way: q.dataDir()
+  // is `() => load().dataDir`, so asking the query layer where the data directory is loads the
+  // entire 60,000-case read model in order to hand back a string. Locally that costs a second
+  // and nobody notices; in the deployed function it blew through the 30-second execution limit,
+  // and the platform's own timeout handling turned that into an empty HTTP 200 rather than an
+  // error. Every grain of this route had been serving a zero-byte file for as long as it has
+  // existed. Reading DATA_DIR off the store module is a constant lookup with no load.
   r.get('/ml/training-set.csv', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const derived = path.join(require('./services/store.mock').DATA_DIR, 'derived');
+    const readMeta = () => {
+      try {
+        return JSON.parse(fs.readFileSync(path.join(derived, 'offender_set_meta.json'), 'utf8'));
+      } catch { return null; }
+    };
+
     // Default is the ready-to-train file: eligible rows only, no leaky target_count column,
     // nothing to remember in the console. ?grain=full and ?grain=district serve the raw sets.
     const g = String(req.query.grain || '');
-    const file = g === 'district' ? 'training_set_district.csv'
+    // The offender family: one file per task, named by slug. They share a grain and a feature
+    // list and differ only in the single target column, which is exactly why each is its own
+    // file -- a sibling target left in the frame would be handed to the model as a feature,
+    // and the horizons nest, so "back within 180 days" would give away "back within a year".
+    let offenderFile = null;
+    if (g.startsWith('offender')) {
+      const tasks = (readMeta() || {}).tasks || [];
+      const slug = g.slice('offender'.length).replace(/^[:-]/, '');
+      const hit = slug ? tasks.find((t) => t.slug === slug) : tasks[0];
+      if (!hit) {
+        return res.status(404).json({
+          ok: false,
+          error: {
+            code: 'unknown_grain',
+            message: `No offender task "${slug}". Available: ${tasks.map((t) => t.slug).join(', ')}`,
+          },
+        });
+      }
+      offenderFile = hit.file;
+    }
+    const file = offenderFile || (g === 'district' ? 'training_set_district.csv'
       : g === 'full' ? 'training_set.csv'
-        // The second model's set: repeat offending, built on the resolved identities. It is a
-        // different task on a different grain, not another slice of the spike data.
-        : g === 'offender' ? 'training_set_offender.csv'
-          // Numeric-only spike rows, for the regression pipeline that replaces the classifier.
-          : g === 'spike-numeric' ? 'training_set_spike_numeric.csv' : 'training_set_spike.csv';
-    const p = require('path').join(q.dataDir(), 'derived', file);
-    if (!require('fs').existsSync(p)) {
+        // Numeric-only spike rows, for the regression pipeline that replaces the classifier.
+        : g === 'spike-numeric' ? 'training_set_spike_numeric.csv' : 'training_set_spike.csv');
+    const p = path.join(derived, file);
+    if (!fs.existsSync(p)) {
       return res.status(404).json({ ok: false, error: { code: 'not_found', message: 'Run the pipeline to build the training set.' } });
     }
+    // Read and send in one go rather than piping. createReadStream(p).pipe(res) is the idiomatic
+    // Express spelling and returns an EMPTY 200 here: the wrapper treats "the handler returned"
+    // as "the response is finished", so the invocation ends before the first chunk reaches the
+    // socket. These files top out around 600 KB, so buffering costs nothing worth optimising.
+    const body = fs.readFileSync(p);
     res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Length', body.length);
     res.setHeader('Content-Disposition', `attachment; filename="kadi_${file}"`);
-    require('fs').createReadStream(p).pipe(res);
+    res.status(200).end(body);
   });
 
   r.get('/ai/quickml-test', handle(async (req) => quickml.selfTest(req)));
@@ -1306,10 +1370,11 @@ r.get('/analytics/outlook', handle(async (req) => {
   // present, never what it is.
   r.post('/admin/model-key', handle(async (req) => {
     rbac.requireRole(req.user, ['Admin', 'DGP']);
-    const ALLOWED = {
-      offender: 'quickml.offenderEndpointKey',
-      spike: 'quickml.spikeRegressorEndpointKey',
-    };
+    // Derived from the model registry rather than restated, so a model added in
+    // offenderrisk.js gets a paste target without a matching edit here. A slot list that has
+    // to be kept in step by hand is a slot list that will be one model short at some point.
+    const ALLOWED = { spike: 'quickml.spikeRegressorEndpointKey' };
+    for (const [slug, m] of Object.entries(offenderrisk.MODELS)) ALLOWED[slug] = m.key;
     const which = String((req.body || {}).model || '');
     const value = String((req.body || {}).key || '').trim();
     const configKey = ALLOWED[which];

@@ -599,3 +599,49 @@ test('rbac district names match the corpus district table', () => {
   assert.strictEqual(Object.keys(rbac.DISTRICT_NAMES).length, districts.size,
     'rbac must name every district in the corpus and no others');
 });
+
+// A sibling target in a training file is the worst column a training file can carry, because
+// the horizons NEST: a model predicting "back within a year" that is handed "back within 180
+// days" as a feature is reading the answer. It would score near 1.0, and the endpoint it
+// produced would then demand columns the serving code does not send.
+//
+// This is not a hypothetical — it is what the first multi-horizon file did. So the invariant
+// is asserted rather than documented: every offender training file is exactly the seven shared
+// features plus ONE target, and that target is the one the registry says it should be.
+test('every offender training file carries one target and no sibling targets', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const q = require('../api/services/queries');
+  const offenderrisk = require('../api/services/offenderrisk');
+  const meta = q.offenderSetMeta();
+  assert.ok(meta && Array.isArray(meta.tasks) && meta.tasks.length,
+    'offender_set_meta.json should list the tasks — run the pipeline');
+
+  const slugs = Object.keys(offenderrisk.MODELS).sort();
+  assert.deepStrictEqual(meta.tasks.map((t) => t.slug).sort(), slugs,
+    'the pipeline task list and the serving model registry must name the same models');
+
+  const allTargets = new Set(meta.tasks.map((t) => t.target));
+  for (const task of meta.tasks) {
+    const p = path.join(q.dataDir(), 'derived', task.file);
+    assert.ok(fs.existsSync(p), `${task.file} is missing — run the pipeline`);
+    const header = fs.readFileSync(p, 'utf8').split('\n')[0].trim().split(',');
+    assert.deepStrictEqual(header, [...offenderrisk.FEATURES, task.target],
+      `${task.file} must be exactly the shared features plus its own target`);
+    const strays = header.filter((c) => allTargets.has(c) && c !== task.target);
+    assert.deepStrictEqual(strays, [],
+      `${task.file} carries another task's target as a feature: ${strays.join(', ')}`);
+  }
+});
+
+// Serving a model whose measured margin has gone negative is worse than serving no model,
+// because the response still says "rankedBy: model". configured() reads the margin instead of
+// a hand-set flag precisely so a revised measurement unplugs the model by itself.
+test('a model is only served if it beat its baseline on both AUC and average precision', () => {
+  const offenderrisk = require('../api/services/offenderrisk');
+  for (const [slug, m] of Object.entries(offenderrisk.MODELS)) {
+    const shouldServe = m.auc > m.rule && m.ap > m.apRule;
+    assert.strictEqual(offenderrisk.configured(slug), shouldServe,
+      `${slug}: configured() must follow the measured margins, not a flag`);
+  }
+});

@@ -158,21 +158,34 @@ const ACTIONS: { key: string; label: string; path: string; desc: string; danger?
 // does not end up in a screenshot, a response body or a browser history entry. What comes back
 // is whether it landed.
 function ModelKeys() {
-  const [vals, setVals] = useState<Record<string, string>>({ offender: '', spike: '' });
+  const [vals, setVals] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
 
+  // One row per served model. The slugs match functions/api/services/offenderrisk.js MODELS,
+  // which is also what the install route derives its allow-list from -- so a model added there
+  // gets a paste target here without a third place to keep in step.
   const MODELS = [
-    { key: 'offender', label: 'Repeat offending', endpoint: 'kadi-offender-endpoint',
+    { key: 'h90', label: 'Back within 90 days', endpoint: 'kadi-offender-h90-endpoint',
+      config: 'quickml.offenderH90EndpointKey' },
+    { key: 'h180', label: 'Back within six months', endpoint: 'kadi-offender-endpoint',
       config: 'quickml.offenderEndpointKey' },
-    { key: 'spike', label: 'Spike risk', endpoint: 'kadi-spike-regressor-endpoint',
+    { key: 'h365', label: 'Back within a year', endpoint: 'kadi-offender-h365-endpoint',
+      config: 'quickml.offenderH365EndpointKey' },
+    { key: 'new365', label: 'Surfaces in a district never worked', endpoint: 'kadi-offender-new365-endpoint',
+      config: 'quickml.offenderNew365EndpointKey' },
+    { key: 'heinous365', label: 'Escalates to Heinous', endpoint: 'kadi-offender-heinous365-endpoint',
+      config: 'quickml.offenderHeinous365EndpointKey' },
+    { key: 'women365', label: 'Returns with a crime against women', endpoint: 'kadi-offender-women365-endpoint',
+      config: 'quickml.offenderWomen365EndpointKey' },
+    { key: 'spike', label: 'District × head spike', endpoint: 'kadi-spike-regressor-endpoint',
       config: 'quickml.spikeRegressorEndpointKey' },
   ];
 
   const install = async (m: typeof MODELS[number]) => {
     setBusy(m.key);
     try {
-      const res = await api.post<any>('/admin/model-key', { model: m.key, key: vals[m.key] });
+      const res = await api.post<any>('/admin/model-key', { model: m.key, key: vals[m.key] || '' });
       setMsg((x) => ({ ...x, [m.key]: { ok: !!res?.installed, text: res?.note || 'Stored.' } }));
       if (res?.installed) setVals((v) => ({ ...v, [m.key]: '' }));
     } catch (e: any) {

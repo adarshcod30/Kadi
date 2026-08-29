@@ -211,10 +211,14 @@ export const useWorklist = (params: Record<string, unknown> = {}) =>
 // and not an ambient scope the rest of the product should inherit.
 // The offender-risk model's ranking. Kept separate from useOutlook so a slow model call can
 // never delay the statistical panels, which have nothing to do with it.
-export const useOffenderRisk = () =>
+// The model is a slug now, not a horizon, because the family stopped being one question asked
+// at four distances: "surfaces in a district they have never worked" and "returns with a crime
+// against women" are different questions about the same people, and their shortlists share
+// almost nobody.
+export const useOffenderRisk = (model = 'h180') =>
   useQuery({
-    queryKey: ['offender-risk', role()],
-    queryFn: () => api.get<any>('/analytics/offender-risk'),
+    queryKey: ['offender-risk', role(), model],
+    queryFn: () => api.get<any>(`/analytics/offender-risk?model=${encodeURIComponent(model)}`),
     staleTime: 5 * 60 * 1000,
   });
 export const useAgenda = (params: Record<string, unknown> = {}) =>

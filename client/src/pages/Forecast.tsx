@@ -48,24 +48,73 @@ const DIR = {
 // The measurement behind the whole ML head, stated on the page rather than in a commit
 // message. Five of these lost and are shown losing: a reader who only ever sees the winners
 // has no way to judge how hard the winners had to work.
-// Measured in a second sweep, on one common panel so the horizons are comparable to each
-// other. See research/measure_more.py.
-const HORIZONS = [
-  { days: 30, model: 0.644, rule: 0.514, served: false, use: 'this month — a station duty list' },
-  { days: 90, model: 0.648, rule: 0.516, served: false, use: 'this quarter — a district review' },
-  { days: 180, model: 0.650, rule: 0.536, served: true, use: 'six months — the served model' },
-  { days: 365, model: 0.760, rule: 0.510, served: false, use: 'a year — a state watchlist review' },
+// THE MODEL FAMILY, re-measured on the files that actually ship.
+//
+// This table has been corrected twice, and both corrections are worth stating because they
+// both moved numbers that were already on the page.
+//
+// The first pass measured on a research panel and reported 30d 0.644, 90d 0.648, 180d 0.650,
+// 365d 0.760. That panel asked a slightly different question -- it admitted offenders with a
+// single prior case -- so the figures described a dataset nobody trains on.
+//
+// The second pass measured on the shipped file but censored every task at the same date. That
+// is wrong in the other direction: a 90-day target only needs 90 days of future, and censoring
+// it by a year costs it six observation dates and drags its train/test split a year earlier.
+// Under that mistake the served 180-day model measured 0.609. Censored by its own horizon, as
+// it ships, it measures 0.746.
+//
+// So: every model below is trained on rows whose future is complete FOR THAT MODEL, split on
+// the observation date, and scored against the best simple rule that can see the question.
+const MODEL_FAMILY = [
+  { slug: 'h90', label: 'Back within 90 days', model: 0.699, rule: 0.584, ap: 0.319, apRule: 0.257,
+    ruleName: 'recency', pos: 775, state: 'serving',
+    use: 'A station duty list. Shares 7 of its top 20 with the six-month model, so it is a genuinely different set of names rather than the same list read sooner.' },
+  { slug: 'h180', label: 'Back within six months', model: 0.746, rule: 0.562, ap: 0.538, apRule: 0.387,
+    ruleName: 'recency', pos: 1051, state: 'serving',
+    use: 'The default, and the widest margin on average precision — which is the number that matters for a list read from the top.' },
+  { slug: 'h365', label: 'Back within a year', model: 0.733, rule: 0.512, ap: 0.720, apRule: 0.517,
+    ruleName: 'recency', pos: 1318, state: 'serving',
+    use: 'A watchlist review horizon.' },
+  { slug: 'new365', label: 'Surfaces somewhere new', model: 0.762, rule: 0.561, ap: 0.452, apRule: 0.309,
+    ruleName: 'districts worked so far', pos: 732, state: 'serving',
+    use: 'Will their next FIR be in a district they have never worked? The question no single SP can answer from their own register — and it shares ONE name in its top 20 with the year-long return list.' },
+  { slug: 'heinous365', label: 'Escalates to Heinous', model: 0.661, rule: 0.502, ap: 0.089, apRule: 0.057,
+    ruleName: 'recency', pos: 155, state: 'serving',
+    use: 'Severity rather than frequency. Survives the test that killed the crime-family models: conditioned on the offender returning at all, it still beats the rule by +0.121.' },
+  { slug: 'women365', label: 'Returns with a crime against women', model: 0.638, rule: 0.459, ap: 0.040, apRule: 0.021,
+    ruleName: 'recency', pos: 60, state: 'serving',
+    use: 'The thinnest evidence base here — 60 positives in the hold-out — and the clearest operational claim. Read it as a prompt to look, not a finding.' },
+];
+
+// Measured on the same panel and NOT shipped. A family of six that all happen to win would be
+// a family that was never really tested.
+const FAMILY_REJECTED = [
+  { label: 'Back within 30 days', model: 0.658, rule: 0.588,
+    why: '+0.069 on AUC and +0.013 on average precision. Its shortlist IS distinct — 1 of 20 shared with the six-month list — but a list that names different people less accurately is just a different wrong list.' },
+  { label: 'Next FIR is a property crime', model: 0.657, rule: 0.562,
+    why: 'Looks like a win and is not. "Comes back AND it is property" inherits the predictability of "comes back". Conditioned on the offender actually returning, the margin collapses to +0.022 — it was ranking who returns, not what with.' },
+  { label: 'Next FIR is a body crime', model: 0.710, rule: 0.575,
+    why: 'Same failure. Conditional margin +0.074.' },
+  { label: 'Next FIR is an economic crime', model: 0.728, rule: 0.508,
+    why: 'Same failure. Conditional margin +0.085.' },
+  { label: 'Next FIR is a cyber crime', model: 0.464, rule: 0.566,
+    why: 'Loses outright to prior case count.' },
 ];
 
 const CANDIDATES = [
-  { task: 'Repeat offending within 180 days', model: 0.769, rule: 0.565, ruleName: 'recency', ship: true },
+  { task: 'Repeat offending within 180 days', model: 0.746, rule: 0.562, ruleName: 'recency', ship: true },
+  { task: 'Repeat offending within 90 days', model: 0.699, rule: 0.584, ruleName: 'recency', ship: true },
+  { task: 'Repeat offending within a year', model: 0.733, rule: 0.512, ruleName: 'recency', ship: true },
+  { task: 'Next FIR in a district never worked', model: 0.762, rule: 0.561, ruleName: 'districts worked so far', ship: true },
+  { task: 'Next FIR recorded Heinous', model: 0.661, rule: 0.502, ruleName: 'recency', ship: true },
+  { task: 'Next FIR a crime against women', model: 0.638, rule: 0.459, ruleName: 'recency', ship: true },
   { task: 'District × head spike next month', model: 0.677, rule: 0.620, ruleName: 'inverse recent level', ship: true },
   { task: 'Station surge next month', model: 0.738, rule: 0.717, ruleName: 'inverse recent level', ship: false,
     why: 'Wins by +0.021 — but strip absolute volumes from the features and it falls to 0.583, below the rule. It was learning station size, not risk.' },
   { task: 'Location re-victimisation, 14 days', model: 0.621, rule: 0.632, ruleName: '26-week rate', ship: false,
     why: 'Loses outright. Persistence — "somewhere that had a crime recently will have another" — is most of the signal.' },
-  { task: 'Cross-district escalation', model: 0.586, rule: 0.691, ruleName: 'share of districts so far', ship: false,
-    why: 'Loses to a one-line ratio by a wide margin.' },
+  { task: 'Cross-district escalation (per case)', model: 0.586, rule: 0.691, ruleName: 'share of districts so far', ship: false,
+    why: 'Loses to a one-line ratio by a wide margin — asked once per case. Re-asked on the offender × observation-date panel as "will their next FIR be in a district they have never worked", the same idea wins by +0.201 and ships. The framing was the problem, not the question.' },
   { task: 'Charge-sheet within 90 days, at registration', model: 0.520, rule: 0.527, ruleName: 'sub-head history', ship: false,
     why: 'No signal beyond what the crime type already tells you.' },
   { task: 'Linkage at registration', model: 0.930, rule: 0.929, ruleName: 'sub-head history', ship: false,
@@ -82,7 +131,8 @@ export default function Forecast() {
   const { data, isLoading } = useOutlook();
   const { data: fc } = useForecast();
   const { data: anom } = useAnomalies(8);
-  const { data: risk } = useOffenderRisk();
+  const [model, setModel] = useState('h180');
+  const { data: risk } = useOffenderRisk(model);
   const [head, setHead] = useState<'stat' | 'ml'>('stat');
 
   const caps = me?.capabilities;
@@ -462,7 +512,8 @@ export default function Forecast() {
         )}
       </>}
 
-      {head === 'ml' && <MlHead risk={risk} spike={data.spikeRisk} tier={tier} nav={nav} />}
+      {head === 'ml' && <MlHead risk={risk} spike={data.spikeRisk} tier={tier} nav={nav}
+        model={model} setModel={setModel} />}
     </div>
   );
 }
@@ -509,7 +560,9 @@ function ShiftPanel({ data }: { data: any }) {
 // ---------------------------------------------------------------------------------------
 // The model head.
 // ---------------------------------------------------------------------------------------
-function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: string; nav: any }) {
+function MlHead({ risk, spike, tier, nav, model, setModel }: {
+  risk: any; spike: any; tier: string; nav: any; model: string; setModel: (m: string) => void;
+}) {
   const served = (s: any) => s?.rankedBy === 'model';
   return (
     <>
@@ -532,8 +585,23 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
 
       {/* Offender risk — every tier. A station cares about its own register's offenders, a
           district about its stations', the state about the ones crossing district lines. */}
-      <Section title={<span className="flex items-center gap-2">
-        <Users2 size={15} className="text-kadi-blue" /> Likely to reoffend within {risk?.horizonDays || 180} days
+      <Section
+        action={
+          <div className="flex items-center gap-1 flex-wrap justify-end">
+            {(risk?.models || MODEL_FAMILY.map((m) => ({ slug: m.slug, short: m.label }))).map((m: any) => (
+              <button key={m.slug} onClick={() => setModel(m.slug)} title={m.question || m.short}
+                className={`text-[11.5px] rounded-full px-2.5 py-1 border transition-colors ${
+                  model === m.slug
+                    ? 'bg-kadi-navy text-white border-kadi-navy'
+                    : 'bg-surface border-line text-ink-muted hover:bg-kadi-blue50'}`}>
+                {m.short}
+              </button>
+            ))}
+          </div>
+        }
+        title={<span className="flex items-center gap-2">
+        <Users2 size={15} className="text-kadi-blue" /> {(risk?.question || 'back on a new FIR within 180 days')
+          .replace(/^./, (c: string) => c.toUpperCase())}
         <span className="text-[12px] font-normal text-ink-muted">
           {risk?.candidates || 0} on the watchlist · ranked by {risk?.rankedBy || 'rule'}
         </span>
@@ -543,10 +611,13 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
           offending tempo, districts and crime heads spanned, and recorded gravity. No age, no
           gender, and no caste, religion or occupation — the feature list is asserted against the
           protected set before the training file is written.
-          <b className="block mt-1.5 text-kadi-navy">What it beats</b>
-          Recency — "who was active lately" — which scores 0.565 AUC on its own and is a strong
-          baseline. The model scores 0.769 on a time-ordered hold-out. That +0.204 is the widest
-          margin of any model measured on this corpus.
+          <b className="block mt-1.5 text-kadi-navy">What it beats, and why there are six of them</b>
+          Each model is scored against the best simple rule that can see its own question —
+          recency for the return horizons, districts-worked for the mobility model. The buttons
+          above change the list rather than relabelling it: the top-20 shortlists of the four
+          year-long models share at most one person with each other, so "who is back", "who
+          surfaces somewhere new", "who escalates to Heinous" and "who returns with a crime
+          against women" are four different sets of names.
           <b className="block mt-1.5 text-kadi-navy">A caveat worth carrying</b>
           Some of that margin may be the synthetic generator giving each offender a stable
           offending rate, which prior-count and span together recover almost exactly. Re-measure
@@ -644,43 +715,66 @@ function MlHead({ risk, spike, tier, nav }: { risk: any; spike: any; tier: strin
         </Section>
       )}
 
-      {/* The horizon family. Added after a second sweep, because "seven tasks measured" was
+      {/* The model family. Added after a second sweep, because "seven tasks measured" was
           where the first pass stopped rather than where the space ended — and the obvious
-          question, whether the offender model works at other horizons, had not been asked. */}
+          question, whether the offender panel answers more than one question, had not been
+          asked. It answers six. */}
       <Section title={<span className="flex items-center gap-2">
-        <Users2 size={15} className="text-kadi-teal" /> The same question at four horizons
+        <Users2 size={15} className="text-kadi-teal" /> Six questions about the same people
       </span>}>
         <p className="px-4 pt-3 text-[12.5px] text-ink-muted leading-relaxed">
-          The repeat-offending model is trained at 180 days. Asked at other horizons it keeps
-          beating recency — and, more usefully, it names <b>different people</b>. The Spearman
-          correlation between the 30-day and 365-day scorings of the same offenders is 0.277,
-          and their top-20 shortlists overlap 9 of 20. "Who is back this month" and "who is back
-          this year" are different lists for different posts, not one model shown four times.
+          One panel, one set of seven features, six different things to predict. That is what
+          makes them cheap to run together: the scoring record is identical, so choosing a model
+          means choosing an endpoint rather than rebuilding the question.
+        </p>
+        <p className="px-4 pt-2 text-[12.5px] text-ink-muted leading-relaxed">
+          It is also what makes them worth having separately. <b>Their top-20 shortlists share at
+          most one person.</b> Rank correlation across the whole panel runs 0.33 to 0.46, which
+          reads like "much the same model" and is misleading — correlation is dominated by the
+          vast middle of the list nobody acts on. The top twenty is the product.
         </p>
         <div className="p-3 space-y-1.5">
-          {HORIZONS.map((h) => (
-            <div key={h.days} className={`rounded-ctl border px-3 py-2 flex items-center gap-2 flex-wrap ${
-              h.served ? 'border-kadi-teal/40 bg-teal-50/30' : 'border-line bg-surface-2'}`}>
-              {h.served
-                ? <CheckCircle2 size={14} className="text-kadi-teal shrink-0" />
-                : <Clock size={14} className="text-ink-subtle shrink-0" />}
-              <span className="text-[13px] font-medium text-ink">Back within {h.days} days</span>
-              <span className="text-[11.5px] text-ink-muted">{h.use}</span>
-              <span className="ml-auto font-num text-[12px]">
-                <span className={h.served ? 'text-kadi-teal font-semibold' : 'text-ink'}>{h.model.toFixed(3)}</span>
-                <span className="text-ink-subtle"> vs {h.rule.toFixed(3)} recency</span>
-                <span className="text-ink-muted"> · {h.served ? 'serving' : 'trainable'}</span>
-              </span>
+          {MODEL_FAMILY.map((m) => (
+            <div key={m.slug} className="rounded-ctl border border-kadi-teal/40 bg-teal-50/30 px-3 py-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CheckCircle2 size={14} className="text-kadi-teal shrink-0" />
+                <span className="text-[13px] font-medium text-ink">{m.label}</span>
+                <span className="ml-auto font-num text-[12px]">
+                  <span className="text-kadi-teal font-semibold">{m.model.toFixed(3)}</span>
+                  <span className="text-ink-subtle"> vs {m.rule.toFixed(3)} {m.ruleName}</span>
+                  <span className="text-ink-muted"> · AP {m.ap.toFixed(3)} vs {m.apRule.toFixed(3)}</span>
+                </span>
+              </div>
+              <div className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">
+                {m.use} <span className="text-ink-subtle font-num">({m.pos} hold-out positives)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="px-4 pt-1 text-[12px] font-medium text-ink">Measured on the same panel and not shipped</p>
+        <div className="px-3 pb-3 pt-2 space-y-1.5">
+          {FAMILY_REJECTED.map((r) => (
+            <div key={r.label} className="rounded-ctl border border-line bg-surface-2 px-3 py-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <XCircle size={14} className="text-ink-subtle shrink-0" />
+                <span className="text-[13px] text-ink">{r.label}</span>
+                <span className="ml-auto font-num text-[12px] text-ink-subtle">
+                  {r.model.toFixed(3)} vs {r.rule.toFixed(3)}
+                </span>
+              </div>
+              <div className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{r.why}</div>
             </div>
           ))}
         </div>
         <p className="px-4 pb-3 text-[11.5px] text-ink-subtle leading-relaxed">
-          All four target columns ship in the training file, so each is one console cycle from an
-          endpoint; only the 180-day column is wired to one today. These figures come from a
-          common panel observed to a full year before the corpus ends, which is why the 180-day
-          number here (0.650) is lower than the 0.769 measured on the served file — that one
-          observes to 180 days before the end and sees a different, easier sample. Comparing the
-          two would be comparing different questions.
+          Three of those rejections score <i>higher</i> than models that ship. That is the whole
+          point of the conditional test: a target of "comes back AND it is a property crime"
+          inherits the predictability of "comes back", which is 0.733 on its own. Ask instead
+          whether the model can say <i>what</i> they come back with — score it only on the people
+          who did come back — and property, body and economic collapse while Heinous and crimes
+          against women hold. Every training file carries exactly its own target and nothing
+          else; a sibling target left in the frame would be handed to the model as a feature,
+          and the horizons nest, so "back within 180 days" would give away "back within a year".
         </p>
       </Section>
 
