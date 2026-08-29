@@ -158,6 +158,10 @@ const ACTIONS: { key: string; label: string; path: string; desc: string; danger?
 // does not end up in a screenshot, a response body or a browser history entry. What comes back
 // is whether it landed.
 function ModelKeys() {
+  // Starts empty and fills in as the operator types, so every read has to tolerate a missing
+  // key. It used to be seeded with one entry per model, which hid that: when the model list
+  // grew and the seed was dropped, `vals[m.key].length` threw on first render and took the
+  // whole Admin page white -- a blank screen, not a broken field.
   const [vals, setVals] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
@@ -225,12 +229,12 @@ function ModelKeys() {
                   type="password"
                   autoComplete="off"
                   spellCheck={false}
-                  value={vals[m.key]}
+                  value={vals[m.key] || ''}
                   onChange={(e) => setVals((v) => ({ ...v, [m.key]: e.target.value }))}
                   placeholder="Paste X-QUICKML-ENDPOINT-KEY"
                   className="flex-1 rounded-ctl border border-line bg-surface px-3 py-1.5 text-[12.5px] font-mono focus:border-kadi-blue focus:outline-none"
                 />
-                <button onClick={() => install(m)} disabled={busy === m.key || vals[m.key].length < 32}
+                <button onClick={() => install(m)} disabled={busy === m.key || (vals[m.key] || '').length < 32}
                   className="btn-outline text-xs shrink-0 inline-flex items-center gap-1.5 disabled:opacity-40">
                   {busy === m.key ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />} Install
                 </button>
