@@ -22,7 +22,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Send, Mic, MicOff, FileDown, ShieldCheck, Volume2, VolumeX, Languages,
-  AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage,
+  AlertTriangle, Sparkles, BookOpen, Database, Square, FileImage, Copy,
 } from 'lucide-react';
 import { useAssistant, useExport, useTranslate } from '../api/hooks';
 import { useLang, useTx } from '../lib/i18n';
@@ -50,6 +50,62 @@ const SUGGESTIONS = [
   'Cyber-crime FIRs in Bengaluru this quarter',
   'Emerging hotspots',
   'What does a pulsing red zone mean?',
+];
+
+// WHAT THE EMPTY STATE IS FOR.
+//
+// It used to be one sentence and six chips, all of them questions about the records -- so the
+// two capabilities nobody would guess at, reading a photographed document and asking by voice,
+// were discoverable only by pressing an unlabelled button and finding out. An assistant that
+// can do four different things and advertises one of them is three-quarters wasted.
+//
+// Grouped by WHERE THE ANSWER COMES FROM rather than by feature, because that is the
+// distinction a reader has to hold anyway when they judge an answer: a count from the register
+// and a definition from the handbook are different kinds of claim, and the badges on the
+// answers use these same four groups.
+const CAPABILITIES: {
+  key: string; title: string; blurb: string; tint: string; examples: string[];
+}[] = [
+  {
+    key: 'records',
+    title: 'The case register',
+    blurb: 'Counts, lists and one FIR by its number — computed live, always cited.',
+    tint: 'text-kadi-teal border-kadi-teal/40 bg-kadi-teal/10',
+    examples: [
+      'Which cases are slipping?',
+      'Cyber-crime FIRs in Bengaluru this quarter',
+      'Tell me about case 100310297202500003',
+    ],
+  },
+  {
+    key: 'analysis',
+    title: 'Analysis and forecasts',
+    blurb: 'Hotspots, per-capita rates and next month, from the models on the Forecast page.',
+    tint: 'text-kadi-blue border-kadi-blue/40 bg-kadi-blue50',
+    examples: [
+      'Forecast for next month',
+      'Emerging hotspots',
+      'Which districts have the highest crime rate per capita?',
+    ],
+  },
+  {
+    key: 'handbook',
+    title: 'What things mean',
+    blurb: 'Definitions and policy from the knowledge base, when the answer is not in a column.',
+    tint: 'text-purple-800 border-purple-300 bg-purple-100',
+    examples: [
+      'What does a pulsing red zone mean?',
+      'How is the offender risk score built?',
+      'What does the fairness policy say?',
+    ],
+  },
+  {
+    key: 'document',
+    title: 'A document in your hand',
+    blurb: 'Photograph a memo or notice and ask what it says. Never identifies people.',
+    tint: 'text-ink border-kadi-gold/50 bg-kadi-gold/20',
+    examples: [],
+  },
 ];
 
 // What the browser can actually say, decided by looking rather than assuming. Chrome on most
@@ -586,21 +642,41 @@ export default function Assistant() {
 
       <div className="flex-1 card overflow-auto p-4 space-y-3">
         {!msgs.length && (
-          <div className={`text-sm text-ink-muted ${kn ? 'kn' : ''}`}>
-            <p className="mb-3">{tx('Ask about cases, offenders, slipping investigations, per-capita crime rates, forecasts or hotspots. Try:')}</p>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTIONS.map((s) => (
-                // Send the ENGLISH source, show the Kannada. The intent engine matches on
-                // English phrasing, and posting it a machine translation of its own suggestion
-                // means it fails to recognise a question it wrote -- which is how "Which cases
-                // are slipping?" came back as "no information is provided". The answer still
-                // arrives in Kannada, because `lang` controls that, not the question.
-                <button key={s} onClick={() => send(s, tx(s))}
-                  className={`chip bg-kadi-blue50 text-kadi-blue hover:bg-kadi-blue hover:text-white ${kn ? 'kn' : ''}`}>
-                  {tx(s)}
-                </button>
+          <div className={`text-sm ${kn ? 'kn' : ''}`}>
+            <p className="text-ink-muted mb-3">
+              {tx('Four kinds of answer, each labelled so you can see which one you are reading.')}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {CAPABILITIES.map((c) => (
+                <div key={c.key} className="rounded-card border border-line bg-surface-2/60 p-3">
+                  <span className={`chip border ${c.tint} text-[11px]`}>{tx(c.title)}</span>
+                  <p className="text-[12.5px] text-ink-muted mt-1.5 leading-snug">{tx(c.blurb)}</p>
+                  {c.examples.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {/* Send the ENGLISH source, show the Kannada. The intent engine matches
+                          on English phrasing, and posting it a machine translation of its own
+                          suggestion means it fails to recognise a question it wrote. The answer
+                          still arrives in Kannada, because `lang` controls that. */}
+                      {c.examples.map((s) => (
+                        <button key={s} onClick={() => send(s, tx(s))}
+                          className={`chip bg-surface text-kadi-blue border border-line hover:bg-kadi-blue50 text-left ${kn ? 'kn' : ''}`}>
+                          {tx(s)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => fileRef.current?.click()}
+                      className="mt-2 chip bg-surface text-kadi-blue border border-line hover:bg-kadi-blue50 flex items-center gap-1">
+                      <FileImage size={11} /> {tx('Attach a document')}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
+            <p className="text-[11.5px] text-ink-subtle mt-3 flex items-center gap-1.5">
+              <Mic size={11} />
+              {tx('You can also ask by voice, in English or Kannada — press the microphone.')}
+            </p>
           </div>
         )}
 
@@ -655,6 +731,14 @@ export default function Assistant() {
                 <div className="mt-2 space-y-2">
                   {/* Where the answer came from. Records and knowledge base are different kinds
                       of claim and the reader should not have to ask which this is. */}
+                  {/* A Kannada question is routed through an English reading. Showing that
+                      reading is not a debug detail: if the translation changed what was asked,
+                      this is the only place the reader could notice. */}
+                  {(m.res as any).interpretedAs && (
+                    <div className="text-[11.5px] text-ink-subtle italic" data-notranslate>
+                      {tx('Read as')}: “{(m.res as any).interpretedAs}”
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
                     {m.res.source === 'knowledge_base' ? (
                       <span className="chip bg-purple-100 text-purple-800 flex items-center gap-1">
@@ -690,6 +774,16 @@ export default function Assistant() {
                     <button onClick={() => (speakingIdx === i ? stopSpeaking() : speak(m.content, m.res!.lang, i))}
                       className="flex items-center gap-1 hover:text-kadi-blue">
                       {speakingIdx === i ? <><Square size={10} /> {tx('Stop')}</> : <><Volume2 size={12} /> {tx('Listen')}</>}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(m.content).then(
+                          () => setNotice({ kind: 'warn', text: tx('Answer copied.') }),
+                          () => setNotice({ kind: 'warn', text: tx('Could not copy.') }),
+                        );
+                      }}
+                      className="flex items-center gap-1 hover:text-kadi-blue">
+                      <Copy size={12} /> {tx('Copy')}
                     </button>
                     <button onClick={() => toggleTranslation(i)} disabled={translate.isPending}
                       className="flex items-center gap-1 hover:text-kadi-blue disabled:opacity-50">
