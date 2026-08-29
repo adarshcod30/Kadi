@@ -7,10 +7,11 @@
 // Everything here is computed server-side by queries.stateCommand / districtCommand; these
 // components only decide how to show it.
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+
 import { Sparkles, MapPin, Building2, Share2, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Section, Skeleton } from './ui';
 import { Hint, stagger, rise } from './viz';
+import { useNav } from '../lib/useNav';
 
 // Three bands now (D3): Red is retired — it was empty by construction — and the survivors are
 // Pulsing (accelerating), Watch (elevated) and Normal. `red` is kept as an alias so a stale
@@ -39,7 +40,7 @@ export function CommandInsight({ text, view }: { text?: string; view: string }) 
 
 /** STATE: 31 districts ranked by concern, so "where do I put attention" is answerable. */
 export function StateCommand({ data }: { data: any }) {
-  const nav = useNavigate();
+  const nav = useNav();
   if (!data) return <div className="card"><Skeleton rows={6} /></div>;
   const z = data.zoneSummary || {};
   return (
@@ -110,7 +111,7 @@ export function StateCommand({ data }: { data: any }) {
 
 /** DISTRICT: my stations, and what is reaching in from outside — the silo-breaking view. */
 export function DistrictCommand({ data }: { data: any }) {
-  const nav = useNavigate();
+  const nav = useNav();
   if (!data) return <div className="card"><Skeleton rows={6} /></div>;
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="grid lg:grid-cols-2 gap-4">
@@ -190,7 +191,7 @@ export function DistrictCommand({ data }: { data: any }) {
  * and at station level it can be stated exactly instead of described.
  */
 export function StationCommand({ data }: { data: any }) {
-  const nav = useNavigate();
+  const nav = useNav();
   if (!data) return <div className="card"><Skeleton rows={6} /></div>;
   const outsideShare = data.total ? Math.round((data.linkedOutTotal / data.total) * 10) / 10 : 0;
 

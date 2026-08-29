@@ -19,7 +19,7 @@
 //      the knowledge base are different kinds of claim, and the reader can now see which is
 //      which without asking.
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Send, Mic, MicOff, FileDown, ShieldCheck, Volume2, VolumeX, Languages,
   AlertTriangle, Sparkles, BookOpen, Database, Square,
@@ -29,6 +29,7 @@ import { useLang, useTx } from '../lib/i18n';
 import { API_BASE } from '../lib/api';
 import { InfoDot } from '../components/InfoDot';
 import type { AssistantResponse } from '../lib/types';
+import { useNav } from '../lib/useNav';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -64,7 +65,7 @@ function useVoices() {
 }
 
 export default function Assistant() {
-  const nav = useNavigate();
+  const nav = useNav();
   const [params] = useSearchParams();
   const { lang, setLang } = useLang();
   const tx = useTx();

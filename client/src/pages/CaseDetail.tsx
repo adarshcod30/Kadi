@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +10,7 @@ import {
 import { StatusChip, GravityChip, Chip, Section, Skeleton, Mono, RiskBadge } from '../components/ui';
 import { Select } from '../components/Select';
 import { InfoDot } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 
 // Zia reads the FIR's own narrative and returns the entities and phrases in it. This is the
@@ -65,7 +66,7 @@ function NarrativeEntities({ id }: { id: string }) {
 
 export default function CaseDetail() {
   const { id } = useParams();
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: c, isLoading } = useCase(id);
 
   if (isLoading || !c) return <Skeleton rows={12} />;

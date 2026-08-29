@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useCases, useLookups, useMe, useCommand, useCaseIntel, useCaseThemes } from '../api/hooks';
 import { StatusChip, GravityChip, SeverityDot, Skeleton, Empty, Mono, Chip, FilterChips, Pager, QuickFilters } from '../components/ui';
 import { Share2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Select } from '../components/Select';
 import { IntelligenceBand } from '../components/IntelligenceBand';
 import { InfoDot } from '../components/InfoDot';
 import { clampPage, clampPageSize } from '../lib/api';
+import { useNav } from '../lib/useNav';
 
 const SORTS: [string, string][] = [
   ['date_desc', 'Newest first'],
@@ -19,7 +20,7 @@ const SORTS: [string, string][] = [
 
 export default function Cases() {
   const [params, setParams] = useSearchParams();
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: lookups } = useLookups();
   const { data: me } = useMe();
   const q = Object.fromEntries(params.entries());

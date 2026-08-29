@@ -8,12 +8,13 @@ import {
   ResponsiveContainer, XAxis, YAxis, ZAxis, Tooltip, ReferenceLine, CartesianGrid, Legend as RLegend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Info, Target, Users2, Building2, MapPin, HelpCircle, CalendarDays, Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 import { useSocio, useForecast, useOccasions, useZones, useMe, useHotspots, useStations, useAnomalies, useTasking, useNearRepeat, useReporting, useScopeProfile, useStats, useConcentration } from '../api/hooks';
 import { Section, Skeleton, Chip, Empty } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
 import { Hint, stagger, rise } from '../components/viz';
 import { Select } from '../components/Select';
+import { useNav } from '../lib/useNav';
 
 type TabKey = 'where' | 'why' | 'when' | 'next';
 // District tier asks different questions of the same analytics. "Why is crime distributed
@@ -1243,7 +1244,7 @@ const PRIORITY: Record<string, { dot: string; label: string }> = {
   high: { dot: '#C0392B', label: 'High' }, medium: { dot: '#C9820A', label: 'Medium' }, low: { dot: '#3AA76D', label: 'Low' },
 };
 function TaskingBoard() {
-  const nav = useNavigate();
+  const nav = useNav();
   const { data, isLoading } = useTasking();
   if (isLoading) return <div className="card"><Skeleton rows={6} /></div>;
   if (!data) return <Empty title="No tasking available" />;

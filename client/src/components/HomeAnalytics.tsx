@@ -19,7 +19,7 @@
 // treemap ranks districts by share. None of that is actionable from one desk. So the station
 // keeps its own registered volume over time and nothing else.
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { motion } from 'framer-motion';
 import {
   ComposedChart, Area, Line, CartesianGrid, PieChart, Pie, ScatterChart, Scatter,
@@ -29,6 +29,7 @@ import { TrendingUp, PieChart as PieIcon, Building2, LayoutGrid, MapPin, Award }
 import { useSocio, useForecast } from '../api/hooks';
 import { HEAD_COLOR } from '../features/graph/GraphCanvas';
 import { Hint, rise } from './viz';
+import { useNav } from '../lib/useNav';
 
 const AXIS = { fontSize: 10, fill: '#5B6B7E' };
 const BAND: Record<string, string> = { Urban: '#1A6FC4', Mixed: '#2FA8A0', Rural: '#E8871E' };
@@ -121,7 +122,7 @@ function CrimePie({ data, centerLabel }: { data: { name: string; count: number }
 }
 
 export default function HomeAnalytics({ stats, tier = 'state', command }: { stats?: any; tier?: 'state' | 'district' | 'station'; command?: any }) {
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: socio } = useSocio();
   const { data: fc } = useForecast();
   const [band, setBand] = useState<string | null>(null);

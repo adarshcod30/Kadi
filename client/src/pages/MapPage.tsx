@@ -5,7 +5,7 @@
 // zones, and clicking a district flies in and drills down. India is drawn with its
 // official boundary (datameet composite).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -18,6 +18,7 @@ import indiaOutline from '../geo/india_outline.json';
 import { Select } from '../components/Select';
 import { InfoDot } from '../components/InfoDot';
 import { IntelligenceBand } from '../components/IntelligenceBand';
+import { useNav } from '../lib/useNav';
 
 // bright, satellite-legible palette
 const HEAD_COLOR: Record<string, string> = {
@@ -102,7 +103,7 @@ const KA_BOUNDS: [[number, number], [number, number]] = [[73.9, 11.4], [78.7, 18
 type LayerMode = 'density' | 'heat' | 'points';
 
 export default function MapPage() {
-  const nav = useNavigate();
+  const nav = useNav();
   const [params] = useSearchParams();
   // A specific incident someone navigated here to locate -- from a case detail's "Open
   // map" or the graph's "Map" button. Parsed once; NaN (no lat/lng in the URL) means "not

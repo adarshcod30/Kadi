@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { motion } from 'framer-motion';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from 'recharts';
 import { Share2, ArrowRight, CheckCircle2, Activity, Layers, Users, MessageSquare, ShieldCheck, Info } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
 } from '../components/illustrations';
 import HomeAnalytics from '../components/HomeAnalytics';
 import { useT } from '../lib/i18n';
+import { useNav } from '../lib/useNav';
 
 // All four Data Store statuses, so the bar always totals 100%. Deriving it from
 // open/chargeSheeted/undetected alone silently dropped 'closed'.
@@ -65,7 +66,7 @@ function RankShift() {
 }
 
 export default function Dashboard() {
-  const nav = useNavigate();
+  const nav = useNav();
   const t = useT();
   const { data: stats } = useStats();
   const { data: alerts } = useAlerts();

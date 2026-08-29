@@ -1,9 +1,10 @@
 // WhyPanel — right-side contextual panel: edge evidence ("Why linked") or node detail.
-import { useNavigate } from 'react-router-dom';
+
 import { ShieldCheck, ArrowRight, X } from 'lucide-react';
 import type { GraphNode, GraphEdge } from '../../lib/types';
 import { Chip, RiskBadge, Mono } from '../../components/ui';
 import { EDGE_COLOR } from './GraphCanvas';
+import { useNav } from '../../lib/useNav';
 
 const TYPE_LABEL: Record<string, string> = {
   shared_offender: 'Shared offender', co_accused: 'Co-accused', mo_similarity: 'Similar MO',
@@ -14,7 +15,7 @@ const TYPE_LABEL: Record<string, string> = {
 export function WhyPanel({ node, edge, onClose, fairness }: {
   node?: GraphNode | null; edge?: GraphEdge | null; onClose: () => void; fairness?: string;
 }) {
-  const nav = useNavigate();
+  const nav = useNav();
   if (!node && !edge) {
     return (
       <div className="p-4 text-sm text-ink-muted">

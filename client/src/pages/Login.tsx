@@ -7,11 +7,12 @@
 // The live figures stay because they are the one honest claim available before you are inside:
 // they are read from the running deployment, so an empty pipeline would show empty counters.
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { Globe, MapPin, Building2, Loader2, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { setRole, setToken, signOut, Role, api } from '../lib/api';
 import { LoginHero } from '../components/LoginHero';
 import { Headquarters } from '../components/Headquarters';
+import { useNav } from '../lib/useNav';
 
 const DOMAIN = 'ksp.gov.in';
 
@@ -87,7 +88,7 @@ function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
 }
 
 export default function Login() {
-  const nav = useNavigate();
+  const nav = useNav();
   const figures = useLiveFigures();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 

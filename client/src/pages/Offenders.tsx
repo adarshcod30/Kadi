@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, Share2 } from 'lucide-react';
 import { useOffenders, useOffenderIntel } from '../api/hooks';
 import { RiskBadge, Chip, Skeleton, Empty, FilterChips, Pager, QuickFilters } from '../components/ui';
@@ -7,6 +7,7 @@ import { clampPage, clampPageSize } from '../lib/api';
 import { Select } from '../components/Select';
 import { IntelligenceBand } from '../components/IntelligenceBand';
 import { InfoDot, FairnessInfo } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 const SORTS: [string, string][] = [
   ['risk_desc', 'Highest risk'],
@@ -28,7 +29,7 @@ function daysSince(asOf: string | null | undefined, date: string | null | undefi
 }
 
 export default function Offenders() {
-  const nav = useNavigate();
+  const nav = useNav();
   // Filters live in the URL, not component state. A watchlist view is something a supervisor
   // shares with the officer who has to act on it -- "the cross-district high-risk group,
   // sorted by reach" has to survive being pasted into a message.

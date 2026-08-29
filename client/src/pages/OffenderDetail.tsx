@@ -1,11 +1,12 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Share2, ShieldCheck, Users } from 'lucide-react';
 import { useOffender } from '../api/hooks';
 import { Section, Chip, StatusChip, Skeleton, Mono } from '../components/ui';
+import { useNav } from '../lib/useNav';
 
 export default function OffenderDetail() {
   const { id } = useParams();
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: o, isLoading } = useOffender(id);
   if (isLoading || !o) return <Skeleton rows={10} />;
 

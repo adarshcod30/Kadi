@@ -28,7 +28,7 @@ import {
   ComposedChart, Area, Line, BarChart, Bar, Cell, ResponsiveContainer,
   XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, ReferenceArea,
 } from 'recharts';
-import { useNavigate } from 'react-router-dom';
+
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Flame, Clock, Network, AlertTriangle,
   BarChart3, Cpu, Users2, CheckCircle2, XCircle,
@@ -36,6 +36,7 @@ import {
 import { useOutlook, useForecast, useAnomalies, useOffenderRisk, useMe } from '../api/hooks';
 import { Skeleton, Empty, Section, TierChip } from '../components/ui';
 import { InfoDot, AiProvenanceInfo } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 const AXIS = { fontSize: 10, fill: '#5B6B7E' };
 
@@ -149,7 +150,7 @@ const ML_BLURB = `${word(N_SERVING)} trained models that rank, each against the 
   + `has to beat — and the ${word(N_REJECTED).toLowerCase()} that did not.`;
 
 export default function Forecast() {
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: me } = useMe();
   const { data, isLoading } = useOutlook();
   const { data: fc } = useForecast();

@@ -2,7 +2,7 @@
 // cluster): switchable layout, edge-type filters, strength slider, draggable nodes,
 // and a "Why linked" evidence panel. Everything animated + explained.
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map as MapIcon, FileText, Info, Sliders, Network, GitBranch, Sparkles, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Maximize2, Minimize2 } from 'lucide-react';
 import { useGraphCase, useGraphCluster, useFeaturedNetworks } from '../api/hooks';
@@ -12,6 +12,7 @@ import { Empty, Mono, Chip } from '../components/ui';
 import type { GraphNode, GraphEdge } from '../lib/types';
 import { Select } from '../components/Select';
 import { FairnessInfo, InfoDot } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 // The permanent symbol key. The canvas was legible only to whoever built it — a square, a
 // circle and three kinds of line with nothing saying what they mean. This sits in the controls
@@ -53,7 +54,7 @@ const LAYOUTS: [string, string][] = [
 
 export default function GraphExplorer() {
   const [params] = useSearchParams();
-  const nav = useNavigate();
+  const nav = useNav();
   const caseId = params.get('case') || undefined;
   const clusterId = params.get('cluster') || undefined;
   const [sel, setSel] = useState<{ node?: GraphNode; edge?: GraphEdge } | null>(null);
@@ -281,7 +282,7 @@ export default function GraphExplorer() {
 // "Ask the Assistant" hands the same case off to a full conversation rather than trying to
 // cram every possible follow-up into this panel.
 function GraphIntelligence({ data }: { data: any }) {
-  const nav = useNavigate();
+  const nav = useNav();
   const [open, setOpen] = useState(true);
   if (!data) return null;
 
@@ -361,7 +362,7 @@ function Control({ title, icon, children }: { title: React.ReactNode; icon?: Rea
 // Lets an investigator move between networks without going back to the Cases list.
 // Previously the tab opened one case and offered no way to reach another.
 function CaseSwitcher({ current }: { current?: string }) {
-  const nav = useNavigate();
+  const nav = useNav();
   // Was sort:'linked_desc'. Raw link count ranks by how templated a crime's paperwork is,
   // not by how informative its network is -- three sub-heads filled the entire top 200 and
   // every option in this list read "Identity Theft / Phishing". /graph/featured round-robins
@@ -387,7 +388,7 @@ function CaseSwitcher({ current }: { current?: string }) {
 }
 
 function GraphEntry() {
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: featured } = useFeaturedNetworks();
 
   // Open a network that actually demonstrates linkage. Sorting by raw link count lands on

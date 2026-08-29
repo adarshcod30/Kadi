@@ -1,7 +1,7 @@
 // Shell — top bar (brand, global search, language, alerts, role), sidebar nav,
 // persistent fairness banner. Light, government-grade layout (docs/04 §3).
 import { ReactNode, useState, useEffect } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Home, Share2, Brain, FileText, Users, Activity, Map, MessageSquare, ShieldCheck, Settings,
   Search, Bell, ChevronLeft, ChevronRight, ShieldAlert, X, Info,
@@ -13,6 +13,7 @@ import { useLang, useT } from '../lib/i18n';
 import { setRole, getRole, signOut as clearSession, districtParam, Role } from '../lib/api';
 import { SeverityDot } from './ui';
 import { Popover, usePopover } from '../lib/Popover';
+import { useNav } from '../lib/useNav';
 
 const NAV = [
   { to: '/', icon: Home, key: 'home', end: true },
@@ -36,7 +37,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const alertsPop = usePopover();
   const { lang, setLang } = useLang();
   const t = useT();
-  const nav = useNavigate();
+  const nav = useNav();
   const location = useLocation();
   const { data: me } = useMe();
   const { data: alerts } = useAlerts();
@@ -443,7 +444,7 @@ function markRead(ids: string[]) {
 function AlertsPanel({ onClose }: { onClose: () => void }) {
   const t = useT();
   const { data: alerts } = useAlerts();
-  const nav = useNavigate();
+  const nav = useNav();
   const [onlyHigh, setOnlyHigh] = useState(false);
   const read = useState(() => readSet())[0];
   // Mark everything currently shown as read when the panel opens, so the badge clears.

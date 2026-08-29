@@ -21,7 +21,7 @@
 // station reads cases, district reads stations, state reads districts — and drilling changes
 // the shape, because looking at a district means reading the district's agenda.
 import { useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Zap, Sparkles, ArrowRight, CheckCircle2, ChevronRight, Clock, ClipboardCopy,
@@ -30,6 +30,7 @@ import {
 import { useAgenda, useMe } from '../api/hooks';
 import { Skeleton, Empty, Section, TierChip } from '../components/ui';
 import { InfoDot, AiProvenanceInfo } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 // The four tones a due date can carry. Deliberately not a severity scale: "past" is not more
 // important than "now", it is less actionable, and colouring it loudest is how a page teaches
@@ -174,7 +175,7 @@ function Board({ block, onOpen, drill }: { block: any; onOpen: (l: any) => void;
 }
 
 export default function ReactPage() {
-  const nav = useNavigate();
+  const nav = useNav();
   const [sp, setSp] = useSearchParams();
   const { data: me } = useMe();
   const unit = sp.get('unit') || '';

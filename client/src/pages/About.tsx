@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+
 import { motion } from 'framer-motion';
 import {
   Share2, Activity, Users, Layers, MessageSquare, ShieldCheck, ScrollText, Database,
@@ -7,11 +7,12 @@ import {
 import { SiloToGraph, FairnessShield, PipelineFlow, MapHotspot, RiskArt, AssistantArt } from '../components/illustrations';
 import { PlatformSection, DataSection } from '../components/AboutSections';
 import { useStats, useEval } from '../api/hooks';
+import { useNav } from '../lib/useNav';
 
 const rise = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
 
 export default function About() {
-  const nav = useNavigate();
+  const nav = useNav();
   const { data: stats } = useStats();
   const { data: ev } = useEval();
 

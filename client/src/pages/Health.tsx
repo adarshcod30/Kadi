@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { Share2, Clock, ChevronDown, FileText, AlertTriangle } from 'lucide-react';
 import { useHealthCases, useHealthSummary, useMe, useHealthIntel } from '../api/hooks';
 import { Section, Chip, Skeleton, Empty, Mono, Pager, TierChip, MiniSpark } from '../components/ui';
@@ -7,6 +7,7 @@ import { IntelligenceBand } from '../components/IntelligenceBand';
 import { InfoDot } from '../components/InfoDot';
 import { Select } from '../components/Select';
 import { DEADLINE } from '../lib/tiers';
+import { useNav } from '../lib/useNav';
 
 const FLAG_LABEL: Record<string, string> = {
   investigation_ageing: 'Ageing', pendency: 'Pendency', undetected_risk: 'Undetected risk',
@@ -56,7 +57,7 @@ function DeadlinePill({ dl }: { dl: any }) {
 
 export default function Health() {
   const { data: me } = useMe();
-  const nav = useNavigate();
+  const nav = useNav();
   const [severity, setSeverity] = useState('high');
   const [flag, setFlag] = useState('');
   const [sort, setSort] = useState('deadline');

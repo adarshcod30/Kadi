@@ -10,7 +10,7 @@
 // that plainly rather than letting a reader take "0 links" for a finding.
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FilePlus2, Inbox, Check, X, CornerUpLeft, Clock, ChevronDown, Plus, Trash2, AlertTriangle,
@@ -22,6 +22,7 @@ import {
 import { Select } from '../components/Select';
 import { Skeleton, Empty, Section } from '../components/ui';
 import { InfoDot } from '../components/InfoDot';
+import { useNav } from '../lib/useNav';
 
 const STATUS_CHIP: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -313,7 +314,7 @@ function ApprovalQueue() {
 
 function SubmissionRow({ s, open, onToggle }: { s: Submission; open: boolean; onToggle: () => void }) {
   const qc = useQueryClient();
-  const nav = useNavigate();
+  const nav = useNav();
   const decide = useDecideSubmission();
   const { data: full } = useSubmission(open ? s.id : undefined);
   const { data: lookups } = useLookups();
@@ -456,7 +457,7 @@ function Detail({ k, v }: { k: string; v: string }) {
 function MySubmissions({ canApprove }: { canApprove: boolean }) {
   const { data } = useSubmissions('');
   const { data: lookups } = useLookups();
-  const nav = useNavigate();
+  const nav = useNav();
   const decided = (data?.items || []).filter((s) => s.status !== 'pending');
   if (!data?.visible) {
     return data?.reason ? <Empty title="Not your queue" hint={data.reason} /> : null;
