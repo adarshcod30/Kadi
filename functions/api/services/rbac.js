@@ -117,9 +117,22 @@ function userFromRequest(req) {
 
   const role = resolveRole(req.headers['x-kadi-role']);
   const base = DEMO_USERS[role];
-  // District-tier users may switch which district they are looking at (?district=), and any
-  // user may drill into one station (?unit=). Neither can widen scope -- caseInScope still
-  // gates on tier, so a district user asking for another district gets their own.
+  // THE DEMO PATH, AND IT IS DELIBERATELY LOOSER THAN THE SIGNED-IN ONE.
+  //
+  // A district-tier demo user may switch WHICH district they look at, and that really does mean
+  // another district's register -- an SP demo account asking for ?district=1 reads Bengaluru
+  // City. Scope here bounds how much is visible at once (never more than one district), not
+  // which one. That is the affordance the walkthrough needs: one login that can stand in any
+  // district without twenty-nine seed accounts.
+  //
+  // This comment previously claimed the opposite -- "a district user asking for another
+  // district gets their own" -- which was never true of this path and made the looseness look
+  // like an accident rather than a decision.
+  //
+  // The real boundary is userFromToken above: a signed-in account is pinned to the district and
+  // unit in its payload, ?district= and ?unit= are ignored for anything below state tier, and
+  // x-kadi-role is ignored entirely. That is the path a real deployment uses, and it is asserted
+  // in functions/test/api.test.js rather than left to be read.
   const q = (req.query || {});
   const user = { ...base, roleMeta: ROLES[role] };
 

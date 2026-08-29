@@ -645,3 +645,45 @@ test('a model is only served if it beat its baseline on both AUC and average pre
       `${slug}: configured() must follow the measured margins, not a flag`);
   }
 });
+
+// THE SIGNED-IN BOUNDARY. The demo path deliberately trusts x-kadi-role and lets a district
+// user look at any one district -- that is a demo affordance, and it is fine while it is only
+// that. A real account must not be widenable by anything the browser can set.
+//
+// This is asserted rather than read, because the difference between the two paths is four
+// lines of tier check and nothing about a district officer's screen would look wrong if those
+// four lines were deleted. The failure mode is silent by construction: the officer sees a
+// perfectly ordinary district page, just not theirs.
+test('a signed-in account cannot be widened by the URL', () => {
+  const auth = require('../api/services/auth');
+  const rbac = require('../api/services/rbac');
+  const asUser = (payload, query) => rbac.userFromRequest({
+    headers: { 'x-kadi-token': auth.issueToken(payload), 'x-kadi-role': 'DGP' },
+    query: query || {},
+  });
+
+  // District tier: pinned to the district in the signed payload, whatever the URL asks for.
+  const sp = asUser({ email: 'sp@example.test', fullName: 'SP', role: 'SP', districtId: '5' },
+    { district: '1', unit: '999' });
+  assert.strictEqual(sp.authenticated, true);
+  assert.strictEqual(sp.districtId, '5', 'a signed-in SP must keep their own district');
+  assert.ok(!sp.drillUnitId, 'a signed-in SP must not be movable to another unit by the URL');
+
+  // Station tier: pinned to the unit, and caseInScope gates on it regardless of query.
+  const sho = asUser({ email: 'sho@example.test', fullName: 'SHO', role: 'SHO', districtId: '1', unitId: '46' },
+    { district: '30', unit: '999' });
+  assert.strictEqual(sho.unitId, '46', 'a signed-in SHO must keep their own unit');
+  assert.ok(rbac.caseInScope(sho, { unitId: '46', districtId: '1' }), 'own register is readable');
+  assert.ok(!rbac.caseInScope(sho, { unitId: '999', districtId: '30' }), 'another register is not');
+
+  // The header must not be able to promote a signed-in account either: this request carries a
+  // DGP role header on an SP token, and the token wins.
+  assert.strictEqual(sp.role, 'SP', 'x-kadi-role must be ignored when a valid token is present');
+
+  // State tier keeps its drill-down, which is a narrowing rather than a widening.
+  const dgp = asUser({ email: 'dgp@example.test', fullName: 'DGP', role: 'DGP', districtId: null },
+    { district: '7' });
+  assert.strictEqual(dgp.districtId, '7', 'a state account may drill into a district');
+  assert.strictEqual(dgp.drilledFromState, true);
+  assert.ok(!rbac.caseInScope(dgp, { unitId: '1', districtId: '9' }), 'and reads as that district while drilled');
+});
