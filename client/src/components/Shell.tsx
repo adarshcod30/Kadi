@@ -167,7 +167,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar — icon-only below md, labelled (collapsible) from md up */}
-        <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all w-14 ${collapsed ? 'md:w-14' : 'md:w-52'}`}>
+        <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all w-16 ${collapsed ? 'md:w-16' : 'md:w-60'}`}>
           {/* The collapse control belongs at the top of the rail, next to what it collapses --
               not buried at the foot beneath the account row, which is where people looked for
               sign-out and found a chevron instead. */}
@@ -175,9 +175,13 @@ export function Shell({ children }: { children: ReactNode }) {
               under the masthead — the first thing a reader's eye lands on when it drops into the
               sidebar. Naming what the list below IS costs nothing and stops the column starting
               on an empty note. Hidden when collapsed, where there is no room for a word. */}
-          <div className={`hidden md:flex items-center border-b border-line h-9 ${collapsed ? 'justify-center px-1' : 'justify-between pl-3 pr-2'}`}>
+          {/* Sized to be READ, not merely present. At 10.5px in subtle grey this was a whisper
+              above a list it was supposed to be introducing; a heading nobody notices is not
+              doing the job the strip exists for. Navy, bold, and in the same size band as the
+              items below it. */}
+          <div className={`hidden md:flex items-center border-b border-line h-11 ${collapsed ? 'justify-center px-1' : 'justify-between pl-3.5 pr-2'}`}>
             {!collapsed && (
-              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-subtle">
+              <span className="text-[12.5px] font-bold uppercase tracking-[0.1em] text-kadi-navy">
                 {t('navHeading')}
               </span>
             )}
@@ -194,14 +198,18 @@ export function Shell({ children }: { children: ReactNode }) {
                   // Pill-shaped active state rather than a full-bleed band with a right rule.
                   // The inset pill reads as a selected item; the edge-to-edge band read as a
                   // section header, which is why the current page never looked current.
-                  `group relative flex items-center gap-3 rounded-ctl px-2.5 py-2 text-sm font-medium transition-all ${
+                  // 15px rather than 14, and more vertical room. This rail is read across a
+                  // whole shift, often on a station terminal at arm's length, and the labels
+                  // were sitting at the bottom of the legible range for no reason -- the rail
+                  // had width to spare.
+                  `group relative flex items-center gap-3 rounded-ctl px-3 py-2.5 text-[15px] font-medium transition-all ${
                     isActive
                       ? 'bg-kadi-blue text-white shadow-sm'
                       : 'text-ink-muted hover:bg-kadi-blue50 hover:text-kadi-navy700'
                   }`}>
                 {({ isActive }) => (
                   <>
-                    <n.icon size={19} className={`shrink-0 transition-transform ${isActive ? '' : 'group-hover:scale-110'}`} />
+                    <n.icon size={20} className={`shrink-0 transition-transform ${isActive ? '' : 'group-hover:scale-110'}`} />
                     {!collapsed && <span className="hidden md:inline truncate">{t(n.key)}</span>}
                   </>
                 )}
@@ -456,8 +464,8 @@ function SidebarFooter({ role, label, scopeLabel, unitName, districtName, collap
         </span>
         {!collapsed && (
           <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
-            <span className="text-[13px] font-medium text-ink truncate max-w-[118px]">{label || role}</span>
-            <span className={`text-[11px] truncate max-w-[118px] ${meta.tint}`}>{scopeText}</span>
+            <span className="text-[14px] font-semibold text-ink truncate max-w-[140px]">{label || role}</span>
+            <span className={`text-[12px] truncate max-w-[140px] ${meta.tint}`}>{scopeText}</span>
           </span>
         )}
       </div>
