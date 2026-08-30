@@ -242,7 +242,7 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TB
-    O(["👮  Officer — state · district · station"])
+    O(["Officer — state · district · station"])
 
     subgraph L1["1 · BROWSER"]
         SPA["<b>React 18 + TypeScript SPA</b><br/>19 screens · EN / ಕನ್ನಡ · voice<br/>Cytoscape · MapLibre · Recharts"]
@@ -322,7 +322,7 @@ flowchart TD
     I["<b>Intent + entity resolution</b><br/><i>deterministic — no model involved</i>"]
     R{"Which source<br/>answers this?"}
 
-    subgraph SRC["📚  FOUR SOURCES — each one badged on the answer"]
+    subgraph SRC["FOUR SOURCES — each one badged on the answer"]
         direction LR
         A["<b>The case register</b><br/>live query · always cited"]
         B["<b>Analysis and forecasts</b><br/>from the Forecast models"]
@@ -330,7 +330,7 @@ flowchart TD
         D["<b>A document in your hand</b><br/>one image, this request only"]
     end
 
-    subgraph GUARD["🛡️  THE MODEL NEVER RETRIEVES — IT ONLY PHRASES"]
+    subgraph GUARD["THE MODEL NEVER RETRIEVES — IT ONLY PHRASES"]
         direction TB
         F["<b>Facts</b> — counts · FIR numbers · citations"]
         P["<b>GLM-4.7 phrases them</b><br/>two sentences, nothing more"]
@@ -432,7 +432,7 @@ never write to it.**
 flowchart TD
     Q(["Officer opens a case"])
 
-    subgraph DEC["🔐  THE DECISION — taken on the server, every time"]
+    subgraph DEC["THE DECISION — taken on the server, every time"]
         direction TB
         S{"Is the case inside<br/>their own scope?"}
         L{"Does it share evidence<br/>with a case that is?"}
@@ -441,7 +441,7 @@ flowchart TD
         L -->|yes| T
     end
 
-    subgraph RES["📄  WHAT COMES BACK"]
+    subgraph RES["WHAT COMES BACK"]
         direction TB
         FULL["<b>Full detail</b><br/>visibility: in_scope"]
         LINK["<b>Full detail, labelled</b> — visibility: linked<br/><i>“Registered in Belagavi, outside your scope.<br/>Visible because it shares evidence with a case in it.”</i>"]
@@ -583,26 +583,26 @@ matter:
 %%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     A["<b>FIR intake</b> — 29 KSP tables"]
-    subgraph RES["🧩  RESOLVE"]
+    subgraph RES["RESOLVE"]
         direction TB
-        B["<b>Entity resolution</b><br/>54,337 → 52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
+        B["<b>Entity resolution</b><br/>54,337  52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
         C["<b>MO similarity</b><br/><i>TF-IDF + NearestNeighbors</i>"]
         B --> C
     end
-    subgraph GR["🔗  CONNECT"]
+    subgraph GR["CONNECT"]
         direction TB
         E1["<b>Graph build</b><br/>6 typed edge kinds · 85,429 links"]
         E2["<b>Louvain communities</b><br/>127 active networks · 335 cross-district"]
         E1 --> E2
     end
-    subgraph SC["📊  SCORE"]
+    subgraph SC["SCORE"]
         direction TB
         F["<b>Risk · Health · Anomaly</b><br/>glass-box factor scoring"]
         G["<b>Spatial</b> — DBSCAN hotspots"]
         H["<b>Socio-economic</b><br/>per-capita + correlation with p-values"]
         F --> G --> H
     end
-    subgraph ML["🤖  PREDICT"]
+    subgraph ML["PREDICT"]
         direction TB
         I["<b>Training sets</b><br/>offender · pendency · spike"]
         J["<b>Forecast</b> — trend + seasonality"]
@@ -637,7 +637,7 @@ identities**, of which **578** appear in two or more FIRs.
 ```mermaid
 %%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart LR
-    subgraph ER["🧩  ENTITY RESOLUTION — the same person, spelled five ways"]
+    subgraph ER["ENTITY RESOLUTION — the same person, spelled five ways"]
         direction LR
         R1["<b>54,337</b><br/>accused records<br/><i>“Ravi Kumar” · “R. Kumar”<br/>“Ravikumar D”</i>"]
         R2["<b>Blocking</b><br/>candidates only, not every<br/>pair against every pair"]
