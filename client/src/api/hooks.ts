@@ -2,7 +2,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api, qs, getRole, districtParam } from '../lib/api';
 import type {
-  Me, CaseRow, CaseDetail, Paged, GraphData, Offender, HealthRow, Stats, Alert,
+  Me, CaseRow, CaseDetailResult, Paged, GraphData, Offender, HealthRow, Stats, Alert,
   Hotspot, AssistantResponse, Lookups,
 } from '../lib/types';
 
@@ -55,7 +55,7 @@ export const useEval = () => useQuery({ queryKey: ['eval'], queryFn: () => api.g
 export const useCases = (params: Record<string, unknown>) =>
   useQuery({ queryKey: ['cases', role(), params], queryFn: () => api.get<Paged<CaseRow>>(`/cases${qs(params)}`) });
 export const useCase = (id?: string) =>
-  useQuery({ queryKey: ['case', id], queryFn: () => api.get<CaseDetail>(`/cases/${id}`), enabled: !!id });
+  useQuery({ queryKey: ['case', id], queryFn: () => api.get<CaseDetailResult>(`/cases/${id}`), enabled: !!id });
 
 export const useGraphCase = (id?: string) =>
   useQuery({ queryKey: ['graph', role(), 'case', id], queryFn: () => api.get<GraphData>(`/graph/case/${id}?explain=true`), enabled: !!id });

@@ -50,7 +50,24 @@ export interface CaseRow {
   healthSeverity: string | null; healthFlags: string[]; clusterId: string | null;
 }
 
+// A case detail read the server refused: registered outside this officer's scope, and not
+// connected by evidence to anything inside it. It comes back as a 200 rather than a 403 so
+// the interface can say WHY rather than fall through to a generic error page, and it carries
+// the id it was asked about and nothing else -- no crimeNo, no district -- so a refusal
+// cannot be used to enumerate the register.
+export interface CaseRefused {
+  caseMasterId: string;
+  visible: false;
+  visibility: 'out_of_scope';
+  reason: string;
+}
+
 export interface CaseDetail extends CaseRow {
+  visible: true;
+  // WHICH rule let this through. 'linked' means the case is registered outside this officer's
+  // scope and opened only because it shares evidence with one inside it -- the silo-breaking
+  // read, and the screen labels it rather than letting it pass for the officer's own work.
+  visibility: 'in_scope' | 'linked';
   parties: {
     complainants: { name: string; age: string; genderId: string }[];
     victims: { name: string; age: string; genderId: string; isPolice: boolean }[];
@@ -67,6 +84,11 @@ export interface CaseDetail extends CaseRow {
   health: HealthRow | null;
   offenders: { offenderIdentityId: string; canonicalName: string; riskScore: number; band: string }[];
 }
+
+// A union rather than optional fields, so the compiler makes the caller check `visible`
+// before reaching for `chargesheets`. When the refusal was first added the page read
+// c.chargesheets.map() straight off the response and a refused case rendered a blank screen.
+export type CaseDetailResult = CaseDetail | CaseRefused;
 
 export interface Paged<T> { items: T[]; total: number; page: number; pageSize: number; fairness?: string   // offender list, district scope: how the list splits by where they are based
   scope?: 'state' | 'district';

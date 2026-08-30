@@ -456,6 +456,9 @@ async function requestUpdate(req, user, body = {}) {
     caseMasterId,
     crimeNo: trim(body.crimeNo, 40),
     // Scope from the case as the SERVER sees it, passed in by the route after a scope check.
+    // The route does that with getCase(..., { requireInScope: true }); until that option
+    // existed the check named here did not happen, and a station SI could file an update
+    // against any case in the state.
     districtId: String(body.districtId || ''),
     unitId: String(body.unitId || ''),
     updateType: type,

@@ -1460,3 +1460,147 @@ test('the page translator cannot outlive a switch back to English', () => {
   assert.match(src, /if \(cancelled\) return;/, 'run’s first act is to check it');
   assert.match(src, /timer = setTimeout\(run, 60\)/, 'the timer handle must be kept, not discarded');
 });
+
+// ---------------------------------------------------------------------------------------
+// Case detail scoping. queries.getCase() carried a comment describing this rule and no code
+// implementing it, so the register LIST was scoped and the register DETAIL was open to every
+// authenticated account: a station SI returned 200 with named victims and accused for cases
+// sampled across districts 2, 3, 5, 7, 11 and 19. These assert the rule in both directions,
+// because a check that only ever refuses is as wrong as one that only ever allows.
+// ---------------------------------------------------------------------------------------
+
+test('case detail: a station officer is refused a case outside their register', () => {
+  const q = require('../api/services/queries');
+  const si = { ...rbac.DEMO_USERS.SI, roleMeta: rbac.ROLES.SI };
+  const db = q.db();
+
+  const mine = db.caseList.filter((c) => rbac.caseInScope(si, c));
+  assert.ok(mine.length > 0, 'the station must hold a register to test against');
+  const own = q.getCase(si, mine[0].caseMasterId);
+  assert.strictEqual(own.visible, true, 'an SI reads their own case');
+  assert.strictEqual(own.visibility, 'in_scope');
+  assert.ok(own.parties, 'and reads it in full');
+
+  // The station tier is excluded from the linked allowance on purpose, so EVERY case outside
+  // its register must be refused -- including the 617 that are one evidence edge away. If
+  // those opened, the station tier would hold 2.2x its own register and the silo the product
+  // argues against would no longer be standable-in.
+  let checked = 0;
+  for (const c of db.caseList) {
+    if (rbac.caseInScope(si, c)) continue;
+    const got = q.getCase(si, c.caseMasterId);
+    assert.strictEqual(got.visible, false, `case ${c.caseMasterId} in district ${c.districtId} must be refused`);
+    assert.strictEqual(got.parties, undefined, 'a refusal carries no parties');
+    assert.strictEqual(got.briefFacts, undefined, 'a refusal carries no narrative');
+    assert.strictEqual(got.crimeNo, undefined, 'a refusal must not be usable to enumerate the register');
+    if (++checked >= 400) break;
+  }
+  assert.ok(checked > 0, 'there must be out-of-scope cases to refuse');
+
+  // The linked predicate itself is the thing being denied, not merely the outcome.
+  const linkedElsewhere = db.caseList.find((c) => !rbac.caseInScope(si, c));
+  assert.strictEqual(q.linkedIntoScope(si, linkedElsewhere), false, 'station tier never gets the linked allowance');
+});
+
+test('case detail: a district officer reads a case linked into their district', () => {
+  const q = require('../api/services/queries');
+  const sp = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP };
+  const db = q.db();
+
+  // A case in ANOTHER district that shares an evidence edge with one in this SP's district.
+  // This is the silo-breaking case: the whole product argues it should open.
+  const linked = db.caseList.find((c) => !rbac.caseInScope(sp, c) && q.linkedIntoScope(sp, c));
+  assert.ok(linked, 'the corpus must contain a case linked across a district boundary');
+  assert.notStrictEqual(String(linked.districtId), String(sp.districtId), 'and it must be another district');
+
+  const got = q.getCase(sp, linked.caseMasterId);
+  assert.strictEqual(got.visible, true, 'a linked case opens');
+  assert.strictEqual(got.visibility, 'linked', 'and is labelled as linked rather than as the district\'s own work');
+  assert.ok(got.parties, 'linked detail is not redacted');
+
+  // The edge that let it through must be a real one, carrying the evidence it was matched on.
+  const edges = db.adjacency[String(linked.caseMasterId)] || [];
+  const bridge = edges.find((e) => {
+    const n = db.cases.get(String(e.neighborId));
+    return n && rbac.caseInScope(sp, n);
+  });
+  assert.ok(bridge, 'the allowance must rest on an actual adjacency edge');
+  assert.ok(bridge.evidence && bridge.evidence.matched.length > 0, 'and that edge must carry matched evidence');
+
+  // The other half of the rule: unlinked and out of district is still refused.
+  const unlinked = db.caseList.find((c) => !rbac.caseInScope(sp, c) && !q.linkedIntoScope(sp, c));
+  assert.ok(unlinked, 'the corpus must contain an unlinked out-of-district case');
+  assert.strictEqual(q.getCase(sp, unlinked.caseMasterId).visible, false, 'no edge, no read');
+});
+
+test('case detail: linkage rests on adjacency, never on a shared clusterId', () => {
+  const q = require('../api/services/queries');
+  const sp = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP };
+  const db = q.db();
+  // clusterId is copied off the health record, so three quarters of the register has none.
+  // Were it the join key, a case the pipeline never flagged could not be linked into anywhere
+  // no matter how much evidence it shared -- so assert the allowance does not depend on it.
+  const linkedWithoutCluster = db.caseList.find((c) => !rbac.caseInScope(sp, c)
+    && !c.clusterId && q.linkedIntoScope(sp, c));
+  assert.ok(linkedWithoutCluster, 'a case with no clusterId must still be reachable through its edges');
+  assert.strictEqual(q.getCase(sp, linkedWithoutCluster.caseMasterId).visibility, 'linked');
+});
+
+test('case detail: a state officer drilled into a district is bounded by that drill', () => {
+  const q = require('../api/services/queries');
+  const db = q.db();
+  const undrilled = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst };
+  // Drilling is a narrowing, and it has to narrow the detail route too -- otherwise the drill
+  // is a display filter with a scope label on it.
+  const drilled = rbac.userFromRequest({ headers: { 'x-kadi-role': 'Analyst' }, query: { district: '3' } });
+  assert.strictEqual(drilled.drilledFromState, true);
+
+  const far = db.caseList.find((c) => String(c.districtId) !== '3' && !q.linkedIntoScope(drilled, c));
+  assert.ok(far, 'there must be a case outside the drill with no edge into it');
+  assert.strictEqual(q.getCase(undrilled, far.caseMasterId).visible, true, 'state tier reads everything');
+  assert.strictEqual(q.getCase(drilled, far.caseMasterId).visible, false, 'the drill bounds the read');
+});
+
+test('case detail: requireInScope refuses the linked allowance that reads accept', () => {
+  const q = require('../api/services/queries');
+  const sp = { ...rbac.DEMO_USERS.SP, roleMeta: rbac.ROLES.SP };
+  const db = q.db();
+  const linked = db.caseList.find((c) => !rbac.caseInScope(sp, c) && q.linkedIntoScope(sp, c));
+  assert.ok(linked, 'need a linked out-of-district case');
+
+  // Reading that a case connects to yours is the thesis. Writing to it is not.
+  assert.strictEqual(q.getCase(sp, linked.caseMasterId).visible, true, 'the read is allowed');
+  assert.throws(
+    () => q.getCase(sp, linked.caseMasterId, { requireInScope: true }),
+    (e) => e.status === 403 && e.code === 'forbidden',
+    'the write lookup refuses the same case',
+  );
+
+  // And a write lookup must throw rather than hand back a stub a caller might not check.
+  const own = db.caseList.find((c) => rbac.caseInScope(sp, c));
+  assert.strictEqual(q.getCase(sp, own.caseMasterId, { requireInScope: true }).visible, true);
+});
+
+test('writes take scope from a lookup that actually enforces it', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  // /case-updates admits station tier and DSP (submissions.requestUpdate), and its comment
+  // has always said the district and unit come from the register rather than the body. That
+  // stopped a body from lying but not a station SI from filing "arrest recorded" against any
+  // case in all 31 districts, because the lookup checked nothing. Both write paths must pass
+  // requireInScope; asserting on the source keeps the two from drifting apart again.
+  for (const route of ["r.post('/case-updates'", "r.post('/evidence/note'"]) {
+    const at = app.indexOf(route);
+    assert.ok(at > 0, `${route} must exist`);
+    const body = app.slice(at, at + 1600);
+    const call = body.match(/q\.getCase\(req\.user,[^\n]*\)/);
+    assert.ok(call, `${route} must resolve its case through q.getCase`);
+    assert.ok(call[0].includes('requireInScope: true'), `${route} must require strict scope`);
+  }
+  // The evidence READ is stricter still: it does not honour the linked allowance either.
+  const read = app.indexOf("r.get('/cases/:id/evidence'");
+  assert.ok(read > 0);
+  assert.ok(app.slice(read, read + 1600).includes('rbac.caseInScope(req.user, c)'),
+    'readings stay at the case\'s own scope');
+});

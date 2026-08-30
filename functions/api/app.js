@@ -231,7 +231,15 @@ function buildApp() {
     // The case's district and station are read from the register, not taken from the body --
     // otherwise a request could be filed against a case in someone else's district and land in
     // the wrong approver's queue.
-    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''));
+    //
+    // requireInScope, because this is a WRITE and the caller is below state tier: the gate in
+    // submissions.requestUpdate admits station tier and DSP, and getCase used to check nothing
+    // at all -- so an SI at one Bengaluru station could file "arrest recorded" and "status
+    // change" requests against any case in all 31 districts, and this route obligingly read
+    // the real districtId off the register so each one landed in that district's approver
+    // queue. The linked allowance is deliberately not enough here: an evidence edge lets you
+    // READ that a case connects to yours, never write to it.
+    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''), { requireInScope: true });
     const out = await submissions.requestUpdate(req, req.user, {
       ...(req.body || {}),
       crimeNo: target.crimeNo,
@@ -581,6 +589,9 @@ function buildApp() {
   r.get('/cases/:id', handle(async (req) => {
     audit.record({ user: req.user, action: 'view_case', targetType: 'case', targetId: req.params.id, ip: req.clientIp, req });
     const c = q.getCase(req.user, req.params.id);
+    // Refused reads stop here. Fetching live parties for a case the register would not show
+    // would put back, through the submission tables, exactly what getCase just withheld.
+    if (c.visible === false) return c;
     // A live case has no rows in the bundled child tables -- its parties were filed with the
     // submission and its history is the approved lifecycle changes since. Fetch both here
     // rather than in queries.js, which is synchronous by design.
@@ -606,7 +617,9 @@ function buildApp() {
   // service and must never hold up the page.
   r.get('/cases/:id/entities', handle(async (req) => {
     const c = q.getCase(req.user, req.params.id);
-    if (!c) return { entities: {}, keyphrases: [], available: false };
+    // A refused case has no narrative on it, and running the extractor over '' would answer
+    // "no entities found" -- which reads as a fact about the case rather than a refusal.
+    if (!c || c.visible === false) return { entities: {}, keyphrases: [], available: false };
     const out = await zia.analyseNarrative(req, c.briefFacts || c.BriefFacts || '');
     if (!out) return { entities: {}, keyphrases: [], available: false, reason: zia.status().lastError };
     return { ...out, available: true, caseMasterId: String(req.params.id) };
@@ -1297,11 +1310,17 @@ r.get('/analytics/outlook', handle(async (req) => {
   // PHOTOGRAPH. That asymmetry is deliberate: the image is the part carrying whoever else was
   // in frame, and the text is the part with evidentiary value.
   r.post('/evidence/note', handle(async (req) => {
-    // Scope from the register, not the body. getCase throws for a case this account may not
-    // see, so the lookup IS the permission check, and crimeNo/districtId/unitId are read off
-    // the register rather than trusted from the request -- otherwise a note could be filed
-    // into another district's case and every scoped read would honour the lie.
-    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''));
+    // Scope from the register, not the body. With requireInScope the lookup IS the permission
+    // check -- it throws for a case this account may not write to -- and crimeNo/districtId/
+    // unitId are read off the register rather than trusted from the request, otherwise a note
+    // could be filed into another district's case and every scoped read would honour the lie.
+    //
+    // That sentence was already written here when it was not yet true: getCase checked nothing,
+    // so the claim described an intention rather than the code. Filing is gated to DGP, Admin
+    // and Analyst, all state tier, so nothing below state could reach it and the gap was never
+    // exploitable -- but a state account that has drilled into a district reads as that
+    // district, and the comment would have gone on being wrong for whoever inherited it.
+    const target = q.getCase(req.user, String((req.body || {}).caseMasterId || ''), { requireInScope: true });
     const out = await evidencenote.file(req, req.user, req.body || {}, target);
     if (!out.ok) fail(out);
     audit.record({ user: req.user, action: 'file_evidence_note', targetType: 'case',
@@ -1317,20 +1336,18 @@ r.get('/analytics/outlook', handle(async (req) => {
   // they get it without ever being able to upload an image themselves.
   r.get('/cases/:id/evidence', handle(async (req) => {
     const c = q.getCase(req.user, req.params.id);
-    // SCOPE IS CHECKED HERE RATHER THAN INHERITED, because getCase does not check it.
+    // SCOPE IS STILL CHECKED HERE RATHER THAN INHERITED, but for a different reason than it
+    // was. getCase now enforces the rule its comment always claimed -- in scope, or linked
+    // into scope -- so the leak this check was working around is gone.
     //
-    // Its comment says detail is visible "if in scope OR linked into an in-scope
-    // investigation", but no code implements that: the register LIST is scoped and the
-    // register DETAIL is open to any authenticated officer. Probing found an SI at one
-    // Bengaluru station able to open cases in every other district sampled.
-    //
-    // That is a pre-existing property of the register and not something to change from here.
-    // But a filed reading is not a case row. It is a transcription of a document somebody
-    // photographed -- property lists, IMEIs, witness counts, whatever else was on the page --
-    // and it is exactly the kind of content that should not travel further than the case does.
-    // Seeing that a case in another district is LINKED to yours is the product's whole thesis;
-    // reading the seizure memo filed against it is not part of that thesis.
-    if (!rbac.caseInScope(req.user, c)) {
+    // What remains is that readings are stricter than case detail. A filed reading is not a
+    // case row: it is a transcription of a document somebody photographed -- property lists,
+    // IMEIs, witness counts, whatever else was on the page -- and it should not travel
+    // further than the case does. Seeing that a case in another district is LINKED to yours
+    // is the product's whole thesis; reading the seizure memo filed against it is not part of
+    // that thesis. So the linked allowance getCase grants is deliberately NOT honoured here,
+    // and c.visibility === 'linked' lands in the same branch as a refused read.
+    if (c.visible === false || !rbac.caseInScope(req.user, c)) {
       return {
         items: [], caseMasterId: c.caseMasterId, visible: false, canFile: false,
         reason: 'Readings filed against a case are visible at that case\'s own scope.',

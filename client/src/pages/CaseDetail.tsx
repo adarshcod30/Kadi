@@ -73,6 +73,28 @@ export default function CaseDetail() {
 
   if (isLoading || !c) return <Skeleton rows={12} />;
 
+  // A case registered outside this officer's scope with no evidence link into it. The server
+  // answers 200 with visible:false rather than 403 so this can be a sentence about the scope
+  // boundary instead of an error page -- the boundary is a designed feature of the product,
+  // not a failure. Nothing about the case is available to render here, by design: the
+  // response carries the id and nothing else.
+  if (!c.visible) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => nav(-1)} className="text-sm link flex items-center gap-1"><ArrowLeft size={14} /> Back</button>
+        <Section title="Outside your scope">
+          <div className="p-4 text-sm text-ink-muted space-y-2">
+            <p>{c.reason}</p>
+            <p>
+              Cases registered elsewhere become readable when they share evidence with a case
+              in your own scope — that link is what opens them, and there is none here.
+            </p>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
   const timeline = [
     ['Incident', c.incidentFromDate], ['Info received', c.infoReceivedPSDate],
     ['Registered', c.crimeRegisteredDate], ...(c.chargesheets.map((cs) => [cs.typeLabel, cs.date]) as [string, string][]),
@@ -95,6 +117,18 @@ export default function CaseDetail() {
             {c.ioRank && <span> ({c.ioRank})</span>}
             {c.courtName && <span> · Court: {c.courtName}</span>}
           </div>
+          {/* This case is not in the officer's own scope. It opened because it shares evidence
+              with one that is -- which is the whole argument of the product, and worth saying
+              out loud rather than letting it read as the officer's own work. */}
+          {c.visibility === 'linked' && (
+            <div className="mt-2 flex items-start gap-1.5 text-xs text-ink-muted">
+              <Share2 size={13} className="text-kadi-blue mt-0.5 shrink-0" />
+              <span>
+                Registered in <b className="text-kadi-navy">{c.districtName}</b>, outside your scope.
+                Visible because it shares evidence with a case in it.
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {c.linkedCount > 0 && (

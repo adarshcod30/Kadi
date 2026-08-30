@@ -44,7 +44,12 @@ const TOOLS = {
     if (!hit) return null;
     let detail = null;
     let graph = null;
+    // `hit` came out of listCases, which is scoped, so this lookup is always in scope. Kept
+    // explicit anyway: getCase answers a case outside the caller's scope with a
+    // { visible:false } stub rather than throwing, and handing that to the model as though it
+    // were a case would have it answer from a refusal.
     try { detail = queries.getCase(user, hit.caseMasterId); } catch { detail = null; }
+    if (detail && detail.visible === false) detail = null;
     try { graph = queries.graphForCase(user, hit.caseMasterId); } catch { graph = null; }
     return { hit, detail, graph };
   },

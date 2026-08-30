@@ -120,14 +120,78 @@ function listCases(user, q = {}) {
   return { items, total, page, pageSize, summary, sort };
 }
 
-function getCase(user, id) {
+// Does this case share evidence with one the user can already see?
+//
+// ADJACENCY, NOT clusterId. A case's clusterId is copied off its health record
+// (store.mock.js), so only 14,906 of 59,985 cases carry one at all -- a case the pipeline
+// never flagged could not be linked into anywhere no matter how much evidence it shared.
+// db.adjacency IS the linkage: each edge carries evidence.matched, which is literally what
+// "shares evidence with a case inside their district" means.
+//
+// NOT AVAILABLE AT STATION TIER, and that exclusion is the point rather than an oversight.
+// An SHO reading one register and seeing how much of it connects to cases they cannot open
+// is the silo the product argues against; you have to be able to stand in it. Bengaluru
+// Bazaar PS holds 276 cases and 617 more are one evidence edge away, so granting the station
+// tier this would hand it 2.2x its own register and there would be no silo left to show.
+// docs/knowledge_base/access-tiers.txt states the split, and rbac.js repeats it: district is
+// "one district, plus cases linked into it", station is "one police station's own register".
+//
+// Evaluated against whatever caseInScope currently accepts, so a district user drilled into a
+// single unit gets cases linked into THAT unit. The rule follows the effective scope rather
+// than keeping a second idea of what the user holds.
+function linkedIntoScope(user, c) {
+  if (!user || !user.roleMeta || user.roleMeta.tier === 'station') return false;
+  const db = load();
+  const edges = db.adjacency[String(c.caseMasterId)] || [];
+  return edges.some((e) => {
+    const n = db.cases.get(String(e.neighborId));
+    return n && rbac.caseInScope(user, n);
+  });
+}
+
+// Case detail, scoped.
+//
+// THIS FUNCTION USED TO CHECK NOTHING. It carried a comment saying detail was visible "if in
+// scope OR linked into an in-scope investigation" and no code implemented it, so the register
+// LIST was scoped and the register DETAIL was open to every authenticated account: a station
+// SI returned 200 with named victims and accused for cases sampled across districts 2, 3, 5,
+// 7, 11 and 19. The comment is now the code.
+//
+// Three outcomes:
+//   in scope  -> full detail
+//   linked in -> full detail, marked visibility:'linked' (district tier only; see above)
+//   neither   -> { visible:false } and nothing else about the case
+//
+// The refusal is a 200 carrying visible:false rather than a 403, matching how
+// /cases/:id/evidence already answers a read it will not serve. It carries the id it was asked
+// about and NOTHING else -- no crimeNo, no district, no dates -- so a refusal cannot be used
+// to enumerate the register.
+//
+// `opts.requireInScope` drops the linked allowance and throws instead of softly refusing.
+// That is the mode WRITE paths take: reading that a case in another district connects to
+// yours is the product's thesis, but filing an arrest against it is not, and a write has to
+// be refused loudly rather than handed a stub it might not check.
+function getCase(user, id, opts = {}) {
   const db = load();
   // An approved-but-unanalysed case exists only in the live rows, so look there before
   // declaring it missing -- otherwise the register lists a case whose detail page 404s.
   const c = db.cases.get(String(id))
     || ((user && user._live) || []).find((r) => String(r.caseMasterId) === String(id));
   if (!c) throw notFound(`Case ${id} not found`);
-  // detail visible if in scope OR linked into an in-scope investigation (silo-breaking is the point)
+
+  const inScope = rbac.caseInScope(user, c);
+  if (opts.requireInScope) {
+    if (!inScope) throw forbidden(`Case ${id} is outside your scope`);
+  } else if (!inScope && !linkedIntoScope(user, c)) {
+    return {
+      caseMasterId: String(id),
+      visible: false,
+      visibility: 'out_of_scope',
+      reason: 'This case is registered outside your scope and does not connect to any case in it.',
+    };
+  }
+  const visibility = inScope ? 'in_scope' : 'linked';
+
   const kid = String(id);
   const parties = {
     complainants: (db.children.complainants.get(kid) || []).map((r) => ({
@@ -173,7 +237,9 @@ function getCase(user, id) {
     const o = db.offendersById.get(oid);
     return o ? { offenderIdentityId: oid, canonicalName: o.canonicalName, riskScore: o.riskScore, band: o.band } : null;
   }).filter(Boolean);
-  return { ...c, parties, acts, arrests, chargesheets, health, offenders };
+  // visibility tells the client WHICH rule let this through, so a linked out-of-district case
+  // can be labelled as one on screen rather than passing for the officer's own work.
+  return { ...c, parties, acts, arrests, chargesheets, health, offenders, visible: true, visibility };
 }
 
 // ---------------- graph ----------------
@@ -1097,7 +1163,7 @@ function vulnerability(user) {
 
 module.exports = {
   FAIRNESS_STATEMENT, buildId: () => load().buildId, listCases, filterCases, scopeBaseline, universe,
-  filterHealth, getCase, graphForCase, getCluster,
+  filterHealth, getCase, linkedIntoScope, graphForCase, getCluster,
   corpusAsOf: () => corpusAsOf(load()), caseDeadline, statusHeadMix, nearRepeat, reportingPropensity, scopeProfile, concentration,
   listOffenders, getOffender, listHealth, healthSummary, deadlines, geoPoints, geoGrid, hotspots, vulnerability,
   // Genuinely scoped. This used to return the precomputed state-wide blob to everyone, so

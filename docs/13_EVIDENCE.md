@@ -73,16 +73,25 @@ GET  /cases/:id/evidence   own case: all six roles visible
 
 ### The scope check on the read is written here, not inherited
 
-`queries.getCase()` carries a comment saying detail is visible "if in scope OR linked into an
-in-scope investigation". **No code implements that.** Probing found a station SI able to open
-case detail in every other district sampled: the register *list* is scoped, the register *detail*
-is not.
+`queries.getCase()` used to carry a comment saying detail was visible "if in scope OR linked
+into an in-scope investigation" with **no code implementing it**. Probing found a station SI
+able to open case detail in every other district sampled: the register *list* was scoped and
+the register *detail* was not. That has since been fixed — `getCase()` now enforces the rule
+its comment always described, and the leak this section was written around is closed:
 
-That is a pre-existing property of the register and not something this feature changes. But a
+```
+GET /cases/:id  as SI (Bengaluru Bazaar PS, 276 cases)
+  before: 200 with named victims and accused, districts 2 3 5 7 11 19
+  after:  59,709 of 59,709 out-of-scope cases refused, 0 allowed
+```
+
+**But this route stays stricter than `getCase()`, and that is the point of the section.** A
 filed reading is not a case row — it is a transcription of a photographed document, carrying
 property lists, IMEIs and witness names — so `/cases/:id/evidence` calls `rbac.caseInScope`
-itself. Seeing that a case in another district is *linked* to yours is the product's thesis;
-reading the seizure memo filed against it is not part of that thesis.
+itself rather than inheriting the case's visibility. Seeing that a case in another district is
+*linked* to yours is the product's thesis; reading the seizure memo filed against it is not
+part of that thesis, so the linked allowance `getCase()` grants is deliberately not honoured
+here. A case that opens with `visibility: 'linked'` returns `visible: false` from this route.
 
 There is a test asserting that line is present.
 
