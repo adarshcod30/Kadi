@@ -12,7 +12,7 @@ Turning 59,985 siloed FIRs into one connected, explainable intelligence picture.
 [![Live on Catalyst](https://img.shields.io/badge/Live-Catalyst-1A6FC4?style=for-the-badge)](https://kadilabs-60078029367.development.catalystserverless.in/app/)
 [![Demo video](https://img.shields.io/badge/Demo-Video-E8871E?style=for-the-badge)](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing)
 [![Platform](https://img.shields.io/badge/Zoho_Catalyst-13_services-0F2F44?style=for-the-badge)](https://catalyst.zoho.com/)
-[![Tests](https://img.shields.io/badge/tests-76_passing-2FA8A0?style=for-the-badge)](#testing)
+[![Tests](https://img.shields.io/badge/tests-82_passing-2FA8A0?style=for-the-badge)](#testing)
 [![Recovery](https://img.shields.io/badge/ground_truth-100%25-2FA8A0?style=for-the-badge)](#4-evaluation-and-results)
 [![Fairness](https://img.shields.io/badge/protected_attributes-excluded-E8871E?style=for-the-badge)](#fairness-is-an-invariant-not-a-policy)
 
@@ -791,7 +791,7 @@ Station pendency is the widest margin in the project, and it **survives every ro
 | Zia OCR | **99%** confidence, ~2.0 s | typed seizure memo |
 | Barcode scan | **127 ms** QR · **288 ms** Code-128 | against real generated codes |
 | Vision model | **0.2 – 0.9 s** | free-text question over one image |
-| Test suite | **76 passing** | Node + Python |
+| Test suite | **82 passing** | Node + Python |
 
 <details>
 <summary><b>How peak memory fell from 1,770 MB to 738 MB</b></summary>
@@ -1103,7 +1103,7 @@ cd functions && npm test
 pytest appsail/tests data/generator -q
 ```
 
-**76 Node tests** covering the envelope, RBAC scoping at all three tiers, the scope refusal in
+**82 Node tests** covering the envelope, RBAC scoping at all three tiers, the scope refusal in
 both directions, evidence filing and retention, translation corrections, and a set of structural
 invariants — audit labels, route ordering, ZCQL limits, build output. Plus the **Python fairness
 invariant**, which fails the build if any protected attribute reaches a feature set.

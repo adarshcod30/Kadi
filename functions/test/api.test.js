@@ -1789,3 +1789,22 @@ test('the more specific stat pattern wins over the broader one', () => {
   assert.strictEqual(d('how many seriously flagged cases').field, 'seriousFlaggedCases');
   assert.strictEqual(d('how many flagged cases').field, 'flaggedCases');
 });
+
+test('the README test badge matches the suite', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..', '..');
+  const suite = fs.readFileSync(path.join(__dirname, 'api.test.js'), 'utf8');
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  // Counted from the source rather than from a run, so this cannot depend on its own result.
+  const declared = (suite.match(/^test\(/gm) || []).length;
+  const badge = Number((readme.match(/tests-(\d+)_passing/) || [])[1]);
+  // It has drifted twice: 74 while the suite ran 76, then 76 while it ran 81. A badge nobody
+  // rechecks is exactly the kind of stale claim the README rewrite existed to remove.
+  assert.strictEqual(badge, declared,
+    `README badge says ${badge}, the suite declares ${declared}`);
+  for (const re of [/\*\*(\d+) Node tests\*\*/, /\| Test suite \| \*\*(\d+) passing\*\* \|/]) {
+    const n = Number((readme.match(re) || [])[1]);
+    assert.strictEqual(n, declared, `a README test count says ${n}, the suite declares ${declared}`);
+  }
+});
