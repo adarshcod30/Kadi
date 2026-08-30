@@ -236,46 +236,66 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 ## System Architecture
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
 flowchart TB
-    subgraph CLIENT["🖥️  Web Client Hosting"]
-        SPA["React 18 + TypeScript SPA<br/>19 screens · Cytoscape · MapLibre · Recharts<br/>EN / ಕನ್ನಡ · voice · pdf.js"]
+    O(["👮  Officer — state · district · station"])
+
+    subgraph L1["1 · BROWSER"]
+        direction TB
+        SPA["<b>React 18 + TypeScript SPA</b><br/>19 screens · EN / ಕನ್ನಡ · voice<br/>Cytoscape · MapLibre · Recharts"]
     end
 
-    subgraph API["⚡  Serverless Function · Node 20 · 512 MB · 30 s cap"]
-        REST["105 REST endpoints"]
-        RBAC["RBAC scoping + audit trail"]
-        ASST["Grounded assistant<br/>deterministic engine owns the claim"]
+    subgraph L2["2 · SERVERLESS FUNCTION — Node 20 · 512 MB · 30 s cap"]
+        direction TB
+        RBAC["<b>RBAC + scope</b><br/>enforced on every read and write"]
+        REST["<b>105 REST endpoints</b><br/>enveloped · audited"]
+        ASST["<b>Assistant</b><br/>facts computed first,<br/>the model only phrases"]
+        RBAC --> REST --> ASST
     end
 
-    subgraph AI["🧠  Zoho AI services"]
-        ZIA["Zia — OCR · barcode<br/>translate · TTS · STT · NLP"]
-        QML["QuickML — GLM-4.7 LLM<br/>Qwen 3.6 vision · 8 tabular models"]
-        SB["SmartBrowz — briefing render"]
+    subgraph L3["3 · ZOHO AI"]
+        direction TB
+        ZIA["<b>Zia</b> — OCR · barcode<br/>translate · TTS · STT · NLP"]
+        QML["<b>QuickML</b> — GLM-4.7 · Qwen 3.6 vision<br/>8 tabular models"]
+        ZIA ~~~ QML
     end
 
-    subgraph COMPUTE["🐍  Python compute"]
-        APPSAIL["AppSail<br/>per-capita + forecast · ~135 ms"]
-        JOB["Catalyst Job + Cron<br/>full pipeline · 15-min budget<br/>nightly 02:00 IST"]
+    subgraph L4["4 · DATA"]
+        direction TB
+        RM["<b>Read-model bundle</b><br/>graph · risk · health · hotspots"]
+        DS["<b>Data Store</b> — 19 tables · ZCQL"]
+        FS["<b>File Store</b> — retained evidence pages"]
+        RM ~~~ DS ~~~ FS
     end
 
-    subgraph DATA["🗄️  Data services"]
-        DS["Data Store · 19 tables · ZCQL"]
-        FS["File Store<br/>retained evidence pages"]
-        ST["Stratus — bulk-import objects"]
-        RM["Read-model bundle<br/>graph · risk · health · hotspots"]
+    subgraph L5["5 · NIGHTLY — Catalyst Job · 15-min budget · 02:00 IST"]
+        direction TB
+        JOB["<b>Python pipeline</b> — 21 modules<br/>24.6 s · peak 738 MB"]
     end
 
-    SPA -->|HTTPS| REST
-    REST --> RBAC --> DS
-    REST -->|reads precomputed| RM
-    ASST -->|facts first, then phrasing| QML
+    O --> SPA
+    SPA -->|HTTPS| RBAC
     REST --> ZIA
-    REST --> SB
+    ASST --> QML
+    REST --> RM
+    REST --> DS
     REST --> FS
-    JOB -->|writes| RM
-    JOB --> DS
-    ST -->|bulk write| DS
-    SPA -.->|analytics on demand| APPSAIL
+    JOB ==>|writes overnight| RM
+    JOB ==> DS
+
+    classDef client fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
+    classDef api    fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef ai     fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
+    classDef data   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
+    classDef job    fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
+    classDef actor  fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+
+    class SPA client
+    class RBAC,REST,ASST api
+    class ZIA,QML ai
+    class RM,DS,FS data
+    class JOB job
+    class O actor
 ```
 
 ### The constraint that shaped everything
@@ -298,6 +318,45 @@ Counts, citations, intents and actions are computed by deterministic code agains
 *before* any language model is called. The model is handed those facts and asked to write two
 sentences. It cannot invent an FIR number because it is never in a position to look one up — and a
 numeric guard rejects any phrasing that introduces a digit run absent from the facts.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+flowchart TD
+    Q(["“Which cases are slipping?”"])
+    I["<b>Intent + entity resolution</b><br/><i>deterministic — no model involved</i>"]
+    R{"Which source<br/>answers this?"}
+
+    A["<b>The case register</b><br/>live query · always cited"]
+    B["<b>Analysis and forecasts</b><br/>from the Forecast models"]
+    C["<b>The knowledge base</b><br/>RAG over 12 documents"]
+    D["<b>A document in your hand</b><br/>one image, this request only"]
+
+    F["<b>Facts</b><br/>counts · FIR numbers · citations"]
+    P["<b>GLM-4.7 phrases them</b><br/>two sentences, nothing more"]
+    G{"Does the phrasing contain<br/>a digit run absent<br/>from the facts?"}
+    OUT["<b>Answer</b> — badged with its source<br/>· Computed from the records<br/>· Wording by the model"]
+    FALL["<b>Serve the deterministic answer</b><br/>the model's phrasing is discarded"]
+
+    Q --> I --> R
+    R --> A & B & C & D
+    A & B & C & D --> F --> P --> G
+    G -->|no| OUT
+    G -->|yes| FALL
+
+    classDef ask   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
+    classDef src   fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
+    classDef fact  fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef model fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
+    classDef guard fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
+    classDef actor fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+
+    class R,G ask
+    class A,B,C,D src
+    class I,F fact
+    class P model
+    class FALL guard
+    class Q,OUT actor
+```
 
 ---
 
@@ -364,6 +423,42 @@ granting the station tier this would hand it 2.2× its own register and leave no
 
 Writes are stricter than reads: **an evidence edge lets you read that a case connects to yours,
 never write to it.**
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+flowchart TD
+    Q(["Officer opens a case"])
+    S{"Is the case inside<br/>their own scope?"}
+    L{"Does it share evidence<br/>with a case that is?"}
+    T{"Are they<br/>station tier?"}
+
+    FULL["<b>Full detail</b><br/>visibility: in_scope"]
+    LINK["<b>Full detail, labelled</b><br/>visibility: linked<br/><i>“Registered in Belagavi, outside your<br/>scope. Visible because it shares<br/>evidence with a case in it.”</i>"]
+    DENY["<b>Refused</b><br/>200 with visible:false<br/><i>carries the id and nothing else, so a<br/>refusal cannot enumerate the register</i>"]
+    WRITE["<b>Writes need in_scope</b><br/>an evidence edge lets you READ that a<br/>case connects to yours, never write to it"]
+
+    Q --> S
+    S -->|yes| FULL
+    S -->|no| L
+    L -->|no| DENY
+    L -->|yes| T
+    T -->|"yes — the silo is the point"| DENY
+    T -->|no| LINK
+    FULL -.-> WRITE
+    LINK -.->|refused| WRITE
+
+    classDef ask   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
+    classDef good  fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef linked fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
+    classDef bad   fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
+    classDef actor fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+
+    class S,L,T ask
+    class FULL good
+    class LINK linked
+    class DENY,WRITE bad
+    class Q actor
+```
 
 ---
 
@@ -472,17 +567,35 @@ The pipeline is 21 Python modules under [`appsail/pipeline/`](appsail/pipeline/)
 matter:
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
 flowchart TD
-    A["FIR intake<br/>29 KSP tables"] --> B["Entity resolution<br/>54,337 → 52,928 identities · 578 repeat<br/>RapidFuzz + union-find, rarity-weighted"]
-    B --> C["MO similarity<br/>TF-IDF + NearestNeighbors"]
-    C --> D["Graph build<br/>6 typed edge kinds · 85,429 links"]
-    D --> E["Louvain communities<br/>127 active networks · 335 cross-district"]
-    E --> F["Risk · Health · Anomaly<br/>glass-box factor scoring"]
-    F --> G["Spatial<br/>DBSCAN hotspots"]
-    G --> H["Socio-economic<br/>per-capita + correlation with p-values"]
-    H --> I["Training sets<br/>offender · pendency · spike"]
-    I --> J["Forecast<br/>trend + seasonality"]
-    J --> K["Read-model bundle<br/>served to the SPA"]
+    A["<b>FIR intake</b><br/>29 KSP tables"]
+    B["<b>Entity resolution</b><br/>54,337 → 52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
+    C["<b>MO similarity</b><br/><i>TF-IDF + NearestNeighbors</i>"]
+    D["<b>Graph build</b><br/>6 typed edge kinds · 85,429 links"]
+    E["<b>Louvain communities</b><br/>127 active networks · 335 cross-district"]
+    F["<b>Risk · Health · Anomaly</b><br/>glass-box factor scoring"]
+    G["<b>Spatial</b><br/>DBSCAN hotspots"]
+    H["<b>Socio-economic</b><br/>per-capita + correlation with p-values"]
+    I["<b>Training sets</b><br/>offender · pendency · spike"]
+    J["<b>Forecast</b><br/>trend + seasonality"]
+    K["<b>Read-model bundle</b><br/>served to the SPA"]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K
+
+    classDef ingest  fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
+    classDef resolve fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
+    classDef graph   fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef score   fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
+    classDef model   fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
+    classDef out     fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+
+    class A ingest
+    class B,C resolve
+    class D,E graph
+    class F,G,H score
+    class I,J model
+    class K out
 ```
 
 ### Entity resolution
@@ -491,6 +604,29 @@ Names arrive with spelling variants, initials and transliteration drift. Matchin
 **rarity-aware**: a shared rare surname is worth far more than a shared common one. Candidates
 are blocked, scored with RapidFuzz, and merged with union-find. **54,337 accused records → 52,928
 identities**, of which **578** appear in two or more FIRs.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+flowchart LR
+    R1["<b>54,337</b><br/>accused records<br/><i>“Ravi Kumar”, “R. Kumar”,<br/>“Ravikumar D”</i>"]
+    R2["<b>Blocking</b><br/>candidates only, not<br/>every pair against every pair"]
+    R3["<b>Rarity-weighted scoring</b><br/>a shared rare surname is worth<br/>far more than a common one"]
+    R4["<b>Union-find merge</b>"]
+    R5["<b>52,928</b><br/>resolved identities"]
+    R6["<b>578</b><br/>appear in 2+ FIRs<br/><i>the watchlist</i>"]
+
+    R1 --> R2 --> R3 --> R4 --> R5 --> R6
+
+    classDef raw   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
+    classDef step  fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
+    classDef out   fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef key   fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+
+    class R1 raw
+    class R2,R3,R4 step
+    class R5 out
+    class R6 key
+```
 
 ### The six typed link kinds
 
