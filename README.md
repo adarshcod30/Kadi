@@ -176,6 +176,8 @@ The fastest way to understand KADI is to walk the path an investigator actually 
 
 ## Screens
 
+*Nineteen route components. What each one is for, in one line.*
+
 | Screen | What it shows |
 |---|---|
 | **Command Dashboard** | KPIs · monthly trend · hour × weekday heatmap · disposal funnel · forecast with 95% band · crime-mix radial · urbanisation bubble plot · district treemap |
@@ -234,6 +236,8 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 ---
 
 ## System Architecture
+
+*Five tiers, and the one constraint that decided the shape of all of them.*
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
@@ -463,6 +467,8 @@ flowchart TD
 ---
 
 ## Catalyst Services
+
+*Thirteen in use, and an honest account of the six that are not.*
 
 ### In use — thirteen services
 
@@ -823,6 +829,8 @@ column reaches a model's feature set.
 
 ## Tech Stack
 
+*Everything the project is built on, by layer.*
+
 <table>
 <tr><th align="left">Frontend</th><th align="left">Backend</th><th align="left">Data & ML</th><th align="left">Platform</th></tr>
 <tr valign="top"><td>
@@ -967,6 +975,8 @@ only remembered is a boundary that eventually moves.
 
 ## Project Structure
 
+*Where to look for what.*
+
 ```
 Kadi/
 ├── client/                     React SPA — Catalyst Web Client Hosting
@@ -1011,6 +1021,8 @@ Kadi/
 ---
 
 ## API Reference
+
+*105 endpoints; the ones worth knowing about, and two queries you can run right now.*
 
 Base URL (deployed):
 `https://kadilabs-60078029367.development.catalystserverless.in/server/api`
@@ -1076,6 +1088,8 @@ invariant**, which fails the build if any protected attribute reaches a feature 
 
 ## Known Limitations
 
+*Eight of them, each verifiable on the live URL — plus one that is a decision rather than a gap.*
+
 Stated plainly — every one is verifiable on the live URL.
 
 | # | Limitation | Detail |
@@ -1116,7 +1130,7 @@ general vision model is not entitled to make one.
 
 ## Documentation
 
-Sixteen documents in [`docs/`](docs/), written as a build guide rather than a spec archive.
+*Sixteen documents in [`docs/`](docs/), written as a build guide rather than a spec archive.*
 
 | # | Document | What it covers |
 |---|---|---|
