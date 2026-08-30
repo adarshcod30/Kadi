@@ -12,7 +12,7 @@ Turning 59,985 siloed FIRs into one connected, explainable intelligence picture.
 [![Live on Catalyst](https://img.shields.io/badge/Live-Catalyst-1A6FC4?style=for-the-badge)](https://kadilabs-60078029367.development.catalystserverless.in/app/)
 [![Demo video](https://img.shields.io/badge/Demo-Video-E8871E?style=for-the-badge)](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing)
 [![Platform](https://img.shields.io/badge/Zoho_Catalyst-13_services-0F2F44?style=for-the-badge)](https://catalyst.zoho.com/)
-[![Tests](https://img.shields.io/badge/tests-82_passing-2FA8A0?style=for-the-badge)](#testing)
+[![Tests](https://img.shields.io/badge/tests-83_passing-2FA8A0?style=for-the-badge)](#testing)
 [![Recovery](https://img.shields.io/badge/ground_truth-100%25-2FA8A0?style=for-the-badge)](#4-evaluation-and-results)
 [![Fairness](https://img.shields.io/badge/protected_attributes-excluded-E8871E?style=for-the-badge)](#fairness-is-an-invariant-not-a-policy)
 
@@ -240,7 +240,7 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 *Five tiers, and the one constraint that decided the shape of all of them.*
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 flowchart TB
     O(["Officer — state · district · station"])
 
@@ -282,16 +282,16 @@ flowchart TB
     REST --> FS
     JOB ==>|writes overnight| RM
 
-    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
-    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    classDef box   fill:#ffffff,stroke:#57606a,stroke-width:1px,color:#1f2328
+    classDef actor fill:#0969da,stroke:#0550ae,stroke-width:2px,color:#ffffff
     class SPA,RBAC,REST,ASST,ZIA,QML,RM,DS,FS,JOB box
     class O actor
 
-    style L1 fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
-    style L2 fill:#0a2725,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
-    style L3 fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
-    style L4 fill:#14181d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9
-    style L5 fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
+    style L1 fill:#ddf4ff,stroke:#0969da,stroke-width:2px,color:#0a3069
+    style L2 fill:#d7f5f2,stroke:#1a7f78,stroke-width:2px,color:#0d3d3a
+    style L3 fill:#fff1e5,stroke:#bc4c00,stroke-width:2px,color:#7a2e00
+    style L4 fill:#eef1f4,stroke:#57606a,stroke-width:2px,color:#24292f
+    style L5 fill:#f0e7fb,stroke:#6639ba,stroke-width:2px,color:#3b1e70
 ```
 
 ### The constraint that shaped everything
@@ -316,7 +316,7 @@ sentences. It cannot invent an FIR number because it is never in a position to l
 numeric guard rejects any phrasing that introduces a digit run absent from the facts.
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 flowchart TD
     Q(["“Which cases are slipping?”"])
     I["<b>Intent + entity resolution</b><br/><i>deterministic — no model involved</i>"]
@@ -347,17 +347,17 @@ flowchart TD
     G -->|no| OUT
     G -->|yes| FALL
 
-    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
-    classDef good  fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
-    classDef warn  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
-    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    classDef box   fill:#ffffff,stroke:#57606a,stroke-width:1px,color:#1f2328
+    classDef good  fill:#d7f5f2,stroke:#1a7f78,stroke-width:2px,color:#0d3d3a
+    classDef warn  fill:#fff1e5,stroke:#bc4c00,stroke-width:2px,color:#7a2e00
+    classDef actor fill:#0969da,stroke:#0550ae,stroke-width:2px,color:#ffffff
     class I,R,A,B,C,D,F,P,G box
     class OUT good
     class FALL warn
     class Q actor
 
-    style SRC   fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
-    style GUARD fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
+    style SRC   fill:#ddf4ff,stroke:#0969da,stroke-width:2px,color:#0a3069
+    style GUARD fill:#f0e7fb,stroke:#6639ba,stroke-width:2px,color:#3b1e70
 ```
 
 ---
@@ -367,7 +367,7 @@ flowchart TD
 What actually happens when an officer opens a case:
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant O as Officer
@@ -428,7 +428,7 @@ Writes are stricter than reads: **an evidence edge lets you read that a case con
 never write to it.**
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 flowchart TD
     Q(["Officer opens a case"])
 
@@ -458,17 +458,17 @@ flowchart TD
     FULL -.-> W
     LINK -.->|refused| W
 
-    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
-    classDef good  fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
-    classDef warn  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
-    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    classDef box   fill:#ffffff,stroke:#57606a,stroke-width:1px,color:#1f2328
+    classDef good  fill:#d7f5f2,stroke:#1a7f78,stroke-width:2px,color:#0d3d3a
+    classDef warn  fill:#fff1e5,stroke:#bc4c00,stroke-width:2px,color:#7a2e00
+    classDef actor fill:#0969da,stroke:#0550ae,stroke-width:2px,color:#ffffff
     class S,L,T,LINK box
     class FULL good
     class DENY,W warn
     class Q actor
 
-    style DEC fill:#14181d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9
-    style RES fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
+    style DEC fill:#eef1f4,stroke:#57606a,stroke-width:2px,color:#24292f
+    style RES fill:#ddf4ff,stroke:#0969da,stroke-width:2px,color:#0a3069
 ```
 
 ---
@@ -580,12 +580,12 @@ The pipeline is 21 Python modules under [`appsail/pipeline/`](appsail/pipeline/)
 matter:
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 flowchart TD
     A["<b>FIR intake</b> — 29 KSP tables"]
     subgraph RES["RESOLVE"]
         direction TB
-        B["<b>Entity resolution</b><br/>54,337  52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
+        B["<b>Entity resolution</b><br/>54,337 → 52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
         C["<b>MO similarity</b><br/><i>TF-IDF + NearestNeighbors</i>"]
         B --> C
     end
@@ -616,15 +616,15 @@ flowchart TD
     H --> I
     J --> K
 
-    classDef box fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
-    classDef key fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    classDef box fill:#ffffff,stroke:#57606a,stroke-width:1px,color:#1f2328
+    classDef key fill:#0969da,stroke:#0550ae,stroke-width:2px,color:#ffffff
     class B,C,E1,E2,F,G,H,I,J box
     class A,K key
 
-    style RES fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
-    style GR  fill:#0a2725,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
-    style SC  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
-    style ML  fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
+    style RES fill:#ddf4ff,stroke:#0969da,stroke-width:2px,color:#0a3069
+    style GR  fill:#d7f5f2,stroke:#1a7f78,stroke-width:2px,color:#0d3d3a
+    style SC  fill:#fff1e5,stroke:#bc4c00,stroke-width:2px,color:#7a2e00
+    style ML  fill:#f0e7fb,stroke:#6639ba,stroke-width:2px,color:#3b1e70
 ```
 
 ### Entity resolution
@@ -635,7 +635,7 @@ are blocked, scored with RapidFuzz, and merged with union-find. **54,337 accused
 identities**, of which **578** appear in two or more FIRs.
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','lineColor':'#57606a','primaryTextColor':'#1f2328','edgeLabelBackground':'#ffffff'}}}%%
 flowchart LR
     subgraph ER["ENTITY RESOLUTION — the same person, spelled five ways"]
         direction LR
@@ -649,13 +649,13 @@ flowchart LR
     R6["<b>578</b> appear in 2+ FIRs<br/><i>the watchlist</i>"]
     R4 --> R5 --> R6
 
-    classDef box  fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
-    classDef good fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
-    classDef key  fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    classDef box  fill:#ffffff,stroke:#57606a,stroke-width:1px,color:#1f2328
+    classDef good fill:#d7f5f2,stroke:#1a7f78,stroke-width:2px,color:#0d3d3a
+    classDef key  fill:#0969da,stroke:#0550ae,stroke-width:2px,color:#ffffff
     class R1,R2,R3,R4 box
     class R5 good
     class R6 key
-    style ER fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
+    style ER fill:#ddf4ff,stroke:#0969da,stroke-width:2px,color:#0a3069
 ```
 
 ### The six typed link kinds
@@ -791,7 +791,7 @@ Station pendency is the widest margin in the project, and it **survives every ro
 | Zia OCR | **99%** confidence, ~2.0 s | typed seizure memo |
 | Barcode scan | **127 ms** QR · **288 ms** Code-128 | against real generated codes |
 | Vision model | **0.2 – 0.9 s** | free-text question over one image |
-| Test suite | **82 passing** | Node + Python |
+| Test suite | **83 passing** | Node + Python |
 
 <details>
 <summary><b>How peak memory fell from 1,770 MB to 738 MB</b></summary>
@@ -1103,7 +1103,7 @@ cd functions && npm test
 pytest appsail/tests data/generator -q
 ```
 
-**82 Node tests** covering the envelope, RBAC scoping at all three tiers, the scope refusal in
+**83 Node tests** covering the envelope, RBAC scoping at all three tiers, the scope refusal in
 both directions, evidence filing and retention, translation corrections, and a set of structural
 invariants — audit labels, route ordering, ZCQL limits, build output. Plus the **Python fairness
 invariant**, which fails the build if any protected attribute reaches a feature set.

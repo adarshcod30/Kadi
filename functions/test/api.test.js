@@ -1808,3 +1808,18 @@ test('the README test badge matches the suite', () => {
     assert.strictEqual(n, declared, `a README test count says ${n}, the suite declares ${declared}`);
   }
 });
+
+test('the diagrams kept their arrows when the emoji were stripped', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'README.md'), 'utf8');
+  // The regex that removed the emoji used the range ←-⇿ (U+2190–U+21FF), which is arrows, not
+  // pictographs — so it also ate the → in "54,337 → 52,928 identities" and left a double space
+  // that read as a typo.
+  assert.match(src, /54,337 → 52,928 identities/, 'the entity-resolution arrow must be present');
+  for (const block of src.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
+    assert.ok(!/[A-Za-z0-9,]  +[A-Za-z0-9]/.test(
+      block[1].split('\n').filter((l) => !/^\s*(classDef|style)\s/.test(l)).join('\n')),
+    'a double space inside a diagram label means a character was stripped');
+  }
+});
