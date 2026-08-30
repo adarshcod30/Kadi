@@ -52,6 +52,10 @@ logs/
 *.swp
 Thumbs.db
 
+# Office lock files. PowerPoint writes ~$deck.pptx beside a file it has open, and once
+# clobbered the deck in docs/deck/ on close.
+~$*
+
 # Coverage
 coverage/
 .nyc_output/
