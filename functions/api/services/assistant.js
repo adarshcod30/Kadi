@@ -58,6 +58,34 @@ const TOOLS = {
   },
 };
 
+// Counts that are NOT a number of cases, mapped to the field q.stats() already computes.
+//
+// WITHOUT THIS THEY WERE ALL ANSWERED WITH A CASE COUNT. "How many offenders are high risk?"
+// carries "how many", so it fell into the case branch and answered 59,985 -- for a figure that
+// is 60. Worse, the phrasing model then rewrote that number into the question's own words, so
+// the reader was told "59,985 cases carry a health flag" when 26,168 do. The number was real,
+// so the numeric guard passed it; the CLAIM around it was invented.
+//
+// Every field here is read from the same q.stats() the dashboard KPI cards use, so the two
+// cannot disagree.
+// ORDER IS SIGNIFICANT: most specific first. `networks` matches inside "cross-district
+// networks", and `flagged` inside "serious flagged", so the narrower pattern has to be reached
+// before the broader one or it is never reached at all.
+const STAT_COUNTS = [
+  [/cross.?district/i, 'crossDistrictNetworks', 'networks working across districts', 'ಜಿಲ್ಲೆಗಳಾದ್ಯಂತ ಜಾಲಗಳು'],
+  [/serious(ly)? flag(ged)?/i, 'seriousFlaggedCases', 'cases carrying a serious flag', 'ಗಂಭೀರ ಸೂಚನೆ ಇರುವ ಪ್ರಕರಣಗಳು'],
+  [/high[- ]?risk|highest risk/i, 'highRiskOffenders', 'offenders in the High risk band', 'ಹೆಚ್ಚು ಅಪಾಯದ ಪಟ್ಟಿಯಲ್ಲಿರುವ ಆರೋಪಿಗಳು'],
+  [/resolved offenders?|offender identit/i, 'resolvedOffenders', 'resolved offender identities', 'ಪರಿಹರಿಸಿದ ಆರೋಪಿ ಗುರುತುಗಳು'],
+  [/\bnetworks?\b|\bgangs?\b/i, 'activeNetworks', 'active offender networks', 'ಸಕ್ರಿಯ ಜಾಲಗಳು'],
+  [/health flag|flagged|need(s)? attention/i, 'flaggedCases', 'cases carrying a health flag', 'ಆರೋಗ್ಯ ಸೂಚನೆ ಇರುವ ಪ್ರಕರಣಗಳು'],
+  [/hotspots?/i, 'emergingHotspots', 'emerging hotspots', 'ಹೊಸ ಅಪರಾಧ ತಾಣಗಳು'],
+];
+function detectStatCount(text) {
+  if (!/how many|count|number of|ಎಷ್ಟು/i.test(text)) return null;
+  for (const [re, field, en, kn] of STAT_COUNTS) if (re.test(text)) return { field, en, kn };
+  return null;
+}
+
 // The status a question is asking about, or null for "any".
 //
 // WITHOUT THIS, "how many cases are open?" ANSWERED WITH THE WHOLE CORPUS. The branch below is
@@ -346,6 +374,18 @@ function query(user, text, lang, context = {}) {
       }
       action = { type: 'open_case', id: String(c.caseMasterId) };
     }
+  } else if (detectStatCount(text)) {
+    // Answered from q.stats(), verbatim. noPhrase matters as much as the number: left to
+    // rewrite it, the model reaches for the question's wording and turns a correct figure into
+    // a claim nobody computed.
+    const sc = detectStatCount(text);
+    intent = 'stat_count';
+    const st = queries.stats(user) || {};
+    const v = Number(st[sc.field] || 0);
+    answer = isKn
+      ? `${n(v)} ${sc.kn}.`
+      : `${n(v)} ${sc.en}.`;
+    noPhrase = true;
   } else if (hasList) {
     intent = 'cases_query';
     const head = detectHead(text, db);
@@ -365,8 +405,15 @@ function query(user, text, lang, context = {}) {
     // and the reader has no way to tell which of the two it is.
     answer = isKn
       ? `${distName} ${n(res.total)} ${status ? status.kn + ' ' : ''}${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
-      : `Found ${n(res.total)} ${status ? status.en + ' ' : ''}${headName || ''}case${res.total === 1 ? '' : 's'} in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
+      : `Found ${n(res.total)} ${status ? status.en + ' ' : ''}${headName ? headName + ' ' : ''}case${res.total === 1 ? '' : 's'} in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
     action = { type: 'open_cases', filters: { head, district, dateFrom, status: status && status.id } };
+    // VERBATIM, ALWAYS. This branch counts cases by head, district, date and status and by
+    // nothing else. When the question asked about something it did not filter on, the sentence
+    // is honestly generic -- and the phrasing model, handed a generic sentence and a specific
+    // question, closes the gap by inventing the claim: "59,985 cases carry a health flag".
+    // The number survives the numeric guard because it is real. Only the claim is false, and
+    // no digit check can see that. So this branch keeps its own words.
+    noPhrase = true;
   } else {
     answer = isKn
       ? 'ನಾನು ಪ್ರಕರಣಗಳು, ಆರೋಪಿಗಳ ಇತಿಹಾಸ, ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು, ಅಪರಾಧ ತಾಣಗಳು, ತಲಾ ಜನಸಂಖ್ಯೆಯ ಅಪರಾಧ ದರ ಮತ್ತು ಮುನ್ಸೂಚನೆಯ ಬಗ್ಗೆ ಉತ್ತರಿಸಬಲ್ಲೆ.'
@@ -556,4 +603,4 @@ async function queryEnhanced(user, text, lang, req, context = {}) {
   };
 }
 
-module.exports = { detectStatus, queryEnhanced, query, TOOLS };
+module.exports = { detectStatCount, detectStatus, queryEnhanced, query, TOOLS };

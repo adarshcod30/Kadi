@@ -1742,3 +1742,50 @@ test('a question about open cases is not answered with the whole corpus', () => 
   assert.strictEqual(d('cyber-crime FIRs in Bengaluru this quarter'), null);
   assert.strictEqual(d('how many cases are there in total'), null);
 });
+
+test('a count that is not a number of cases is not answered with a case count', () => {
+  const assistant = require('../api/services/assistant');
+  const d = assistant.detectStatCount;
+  // Each of these carries "how many", so each fell into the case branch and was answered with
+  // the size of the register: 59,985 for a figure that was 60, or 127, or 26,168.
+  const cases = [
+    ['How many offenders are high risk?', 'highRiskOffenders'],
+    ['How many networks are active?', 'activeNetworks'],
+    ['How many cases carry a health flag?', 'flaggedCases'],
+    ['how many cross-district networks', 'crossDistrictNetworks'],
+    ['number of emerging hotspots', 'emergingHotspots'],
+  ];
+  for (const [q, field] of cases) {
+    assert.strictEqual((d(q) || {}).field, field, `"${q}" must map to ${field}`);
+  }
+  // A plain case question is still a case question.
+  assert.strictEqual(d('How many cases are open?'), null);
+  assert.strictEqual(d('cyber-crime FIRs in Bengaluru'), null);
+  // And a statement that merely mentions networks is not a count.
+  assert.strictEqual(d('show me the network around this FIR'), null);
+});
+
+test('the case-count branch never lets the model re-word its answer', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'api', 'services', 'assistant.js'), 'utf8');
+  // The branch counts by head, district, date and status and by nothing else, so its sentence
+  // is honestly generic. Handed a generic sentence and a specific question, the phrasing model
+  // closes the gap by inventing the claim -- "59,985 cases carry a health flag". The number is
+  // real, so the numeric guard passes it. Only the claim is false, and no digit check sees that.
+  const branch = src.slice(src.indexOf("intent = 'cases_query'"));
+  const body = branch.slice(0, branch.indexOf('} else {'));
+  assert.match(body, /noPhrase = true/, 'the case-count branch must be served verbatim');
+  const stat = src.slice(src.indexOf("intent = 'stat_count'"));
+  assert.match(stat.slice(0, 600), /noPhrase = true/, 'so must the stat-count branch');
+});
+
+test('the more specific stat pattern wins over the broader one', () => {
+  const d = require('../api/services/assistant').detectStatCount;
+  // `networks` matches inside "cross-district networks" and `flagged` inside "serious flagged".
+  // If the broad pattern is reached first the narrow one is never reachable at all.
+  assert.strictEqual(d('how many cross-district networks').field, 'crossDistrictNetworks');
+  assert.strictEqual(d('how many networks').field, 'activeNetworks');
+  assert.strictEqual(d('how many seriously flagged cases').field, 'seriousFlaggedCases');
+  assert.strictEqual(d('how many flagged cases').field, 'flaggedCases');
+});
