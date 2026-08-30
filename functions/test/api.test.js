@@ -1699,3 +1699,24 @@ test('no mermaid classDef uses a reserved keyword', () => {
   assert.deepStrictEqual(offenders, [],
     `these diagrams will not render: ${offenders.join('; ')}`);
 });
+
+test('no mermaid diagram names a font the renderer may not have', () => {
+  const fs = require('fs');
+  const path = require('path');
+  // Mermaid MEASURES a label with the font named in the init directive and DRAWS it with
+  // whatever the renderer actually resolved. Naming a font the renderer lacks makes every
+  // subgraph title come out a character or two short -- "SERVERLESS FUNCTION" rendered as
+  // "SERVERLESS FUNCTIC", on GitHub and locally. Let mermaid pick its own face.
+  const root = path.join(__dirname, '..', '..');
+  const files = ['README.md', ...fs.readdirSync(path.join(root, 'docs'))
+    .filter((f) => f.endsWith('.md')).map((f) => path.join('docs', f))];
+  const offenders = [];
+  for (const f of files) {
+    const src = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const block of src.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
+      if (/fontFamily/.test(block[1])) offenders.push(f);
+    }
+  }
+  assert.deepStrictEqual([...new Set(offenders)], [],
+    `these files set a mermaid fontFamily, which clips subgraph titles: ${offenders.join(', ')}`);
+});
