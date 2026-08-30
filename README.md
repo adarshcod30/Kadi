@@ -240,16 +240,16 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 *Five tiers, and the one constraint that decided the shape of all of them.*
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3','tertiaryColor':'#161b22'}}}%%
 flowchart TB
     O(["👮  Officer — state · district · station"])
 
-    subgraph L1["1 · BROWSER"]
+    subgraph L1["🖥️  1 · BROWSER"]
         direction TB
         SPA["<b>React 18 + TypeScript SPA</b><br/>19 screens · EN / ಕನ್ನಡ · voice<br/>Cytoscape · MapLibre · Recharts"]
     end
 
-    subgraph L2["2 · SERVERLESS FUNCTION — Node 20 · 512 MB · 30 s cap"]
+    subgraph L2["⚡  2 · SERVERLESS FUNCTION — Node 20 · 512 MB · 30 s cap"]
         direction TB
         RBAC["<b>RBAC + scope</b><br/>enforced on every read and write"]
         REST["<b>105 REST endpoints</b><br/>enveloped · audited"]
@@ -257,22 +257,22 @@ flowchart TB
         RBAC --> REST --> ASST
     end
 
-    subgraph L3["3 · ZOHO AI"]
+    subgraph L3["🧠  3 · ZOHO AI"]
         direction TB
-        ZIA["<b>Zia</b> — OCR · barcode<br/>translate · TTS · STT · NLP"]
-        QML["<b>QuickML</b> — GLM-4.7 · Qwen 3.6 vision<br/>8 tabular models"]
+        ZIA["<b>Zia</b><br/>OCR · barcode · translate<br/>TTS · STT · NLP"]
+        QML["<b>QuickML</b><br/>GLM-4.7 · Qwen 3.6 vision<br/>8 tabular models"]
         ZIA ~~~ QML
     end
 
-    subgraph L4["4 · DATA"]
+    subgraph L4["🗄️  4 · DATA"]
         direction TB
         RM["<b>Read-model bundle</b><br/>graph · risk · health · hotspots"]
-        DS["<b>Data Store</b> — 19 tables · ZCQL"]
-        FS["<b>File Store</b> — retained evidence pages"]
+        DS["<b>Data Store</b><br/>19 tables · ZCQL"]
+        FS["<b>File Store</b><br/>retained evidence pages"]
         RM ~~~ DS ~~~ FS
     end
 
-    subgraph L5["5 · NIGHTLY — Catalyst Job · 15-min budget · 02:00 IST"]
+    subgraph L5["🌙  5 · NIGHTLY — Catalyst Job · 15-min budget · 02:00 IST"]
         direction TB
         JOB["<b>Python pipeline</b> — 21 modules<br/>24.6 s · peak 738 MB"]
     end
@@ -287,19 +287,17 @@ flowchart TB
     JOB ==>|writes overnight| RM
     JOB ==> DS
 
-    classDef client fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef api    fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
-    classDef ai     fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
-    classDef data   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
-    classDef job    fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
-    classDef actor  fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
+    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
 
-    class SPA client
-    class RBAC,REST,ASST api
-    class ZIA,QML ai
-    class RM,DS,FS data
-    class JOB job
+    class SPA,RBAC,REST,ASST,ZIA,QML,RM,DS,FS,JOB box
     class O actor
+
+    style L1 fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
+    style L2 fill:#0a2725,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
+    style L3 fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
+    style L4 fill:#14181d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9
+    style L5 fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
 ```
 
 ### The constraint that shaped everything
@@ -324,42 +322,48 @@ sentences. It cannot invent an FIR number because it is never in a position to l
 numeric guard rejects any phrasing that introduces a digit run absent from the facts.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     Q(["“Which cases are slipping?”"])
     I["<b>Intent + entity resolution</b><br/><i>deterministic — no model involved</i>"]
     R{"Which source<br/>answers this?"}
 
-    A["<b>The case register</b><br/>live query · always cited"]
-    B["<b>Analysis and forecasts</b><br/>from the Forecast models"]
-    C["<b>The knowledge base</b><br/>RAG over 12 documents"]
-    D["<b>A document in your hand</b><br/>one image, this request only"]
+    subgraph SRC["📚  FOUR SOURCES — each one badged on the answer"]
+        direction LR
+        A["<b>The case register</b><br/>live query · always cited"]
+        B["<b>Analysis and forecasts</b><br/>from the Forecast models"]
+        C["<b>The knowledge base</b><br/>RAG over 12 documents"]
+        D["<b>A document in your hand</b><br/>one image, this request only"]
+    end
 
-    F["<b>Facts</b><br/>counts · FIR numbers · citations"]
-    P["<b>GLM-4.7 phrases them</b><br/>two sentences, nothing more"]
-    G{"Does the phrasing contain<br/>a digit run absent<br/>from the facts?"}
-    OUT["<b>Answer</b> — badged with its source<br/>· Computed from the records<br/>· Wording by the model"]
-    FALL["<b>Serve the deterministic answer</b><br/>the model's phrasing is discarded"]
+    subgraph GUARD["🛡️  THE MODEL NEVER RETRIEVES — IT ONLY PHRASES"]
+        direction TB
+        F["<b>Facts</b> — counts · FIR numbers · citations"]
+        P["<b>GLM-4.7 phrases them</b><br/>two sentences, nothing more"]
+        G{"Does the phrasing contain a digit run<br/>absent from the facts?"}
+        F --> P --> G
+    end
+
+    OUT["<b>Answer</b> — badged with its source<br/>· Computed from the records · Wording by the model"]
+    FALL["<b>Serve the deterministic answer</b><br/>the model’s phrasing is discarded"]
 
     Q --> I --> R
     R --> A & B & C & D
-    A & B & C & D --> F --> P --> G
+    A & B & C & D --> F
     G -->|no| OUT
     G -->|yes| FALL
 
-    classDef ask   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
-    classDef src   fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef fact  fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
-    classDef model fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
-    classDef guard fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
-    classDef actor fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
+    classDef good  fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
+    classDef warn  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
+    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    class I,R,A,B,C,D,F,P,G box
+    class OUT good
+    class FALL warn
+    class Q actor
 
-    class R,G ask
-    class A,B,C,D src
-    class I,F fact
-    class P model
-    class FALL guard
-    class Q,OUT actor
+    style SRC   fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
+    style GUARD fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
 ```
 
 ---
@@ -369,6 +373,7 @@ flowchart TD
 What actually happens when an officer opens a case:
 
 ```mermaid
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 sequenceDiagram
     autonumber
     participant O as Officer
@@ -429,39 +434,47 @@ Writes are stricter than reads: **an evidence edge lets you read that a case con
 never write to it.**
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     Q(["Officer opens a case"])
-    S{"Is the case inside<br/>their own scope?"}
-    L{"Does it share evidence<br/>with a case that is?"}
-    T{"Are they<br/>station tier?"}
 
-    FULL["<b>Full detail</b><br/>visibility: in_scope"]
-    LINK["<b>Full detail, labelled</b><br/>visibility: linked<br/><i>“Registered in Belagavi, outside your<br/>scope. Visible because it shares<br/>evidence with a case in it.”</i>"]
-    DENY["<b>Refused</b><br/>200 with visible:false<br/><i>carries the id and nothing else, so a<br/>refusal cannot enumerate the register</i>"]
-    WRITE["<b>Writes need in_scope</b><br/>an evidence edge lets you READ that a<br/>case connects to yours, never write to it"]
+    subgraph DEC["🔐  THE DECISION — taken on the server, every time"]
+        direction TB
+        S{"Is the case inside<br/>their own scope?"}
+        L{"Does it share evidence<br/>with a case that is?"}
+        T{"Are they<br/>station tier?"}
+        S -->|no| L
+        L -->|yes| T
+    end
+
+    subgraph RES["📄  WHAT COMES BACK"]
+        direction TB
+        FULL["<b>Full detail</b><br/>visibility: in_scope"]
+        LINK["<b>Full detail, labelled</b> — visibility: linked<br/><i>“Registered in Belagavi, outside your scope.<br/>Visible because it shares evidence with a case in it.”</i>"]
+        DENY["<b>Refused</b> — 200 with visible:false<br/><i>carries the id and nothing else, so a refusal<br/>cannot enumerate the register</i>"]
+    end
+
+    W["<b>Writes need in_scope</b><br/>an evidence edge lets you READ that a case<br/>connects to yours, never write to it"]
 
     Q --> S
     S -->|yes| FULL
-    S -->|no| L
     L -->|no| DENY
-    L -->|yes| T
     T -->|"yes — the silo is the point"| DENY
     T -->|no| LINK
-    FULL -.-> WRITE
-    LINK -.->|refused| WRITE
+    FULL -.-> W
+    LINK -.->|refused| W
 
-    classDef ask   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
-    classDef good  fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
-    classDef linked fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef bad   fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
-    classDef actor fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
-
-    class S,L,T ask
+    classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
+    classDef good  fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
+    classDef warn  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
+    classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    class S,L,T,LINK box
     class FULL good
-    class LINK linked
-    class DENY,WRITE bad
+    class DENY,W warn
     class Q actor
+
+    style DEC fill:#14181d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9
+    style RES fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
 ```
 
 ---
@@ -573,35 +586,51 @@ The pipeline is 21 Python modules under [`appsail/pipeline/`](appsail/pipeline/)
 matter:
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
-    A["<b>FIR intake</b><br/>29 KSP tables"]
-    B["<b>Entity resolution</b><br/>54,337 → 52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
-    C["<b>MO similarity</b><br/><i>TF-IDF + NearestNeighbors</i>"]
-    D["<b>Graph build</b><br/>6 typed edge kinds · 85,429 links"]
-    E["<b>Louvain communities</b><br/>127 active networks · 335 cross-district"]
-    F["<b>Risk · Health · Anomaly</b><br/>glass-box factor scoring"]
-    G["<b>Spatial</b><br/>DBSCAN hotspots"]
-    H["<b>Socio-economic</b><br/>per-capita + correlation with p-values"]
-    I["<b>Training sets</b><br/>offender · pendency · spike"]
-    J["<b>Forecast</b><br/>trend + seasonality"]
-    K["<b>Read-model bundle</b><br/>served to the SPA"]
+    A["<b>FIR intake</b> — 29 KSP tables"]
+    subgraph RES["🧩  RESOLVE"]
+        direction TB
+        B["<b>Entity resolution</b><br/>54,337 → 52,928 identities · 578 repeat<br/><i>RapidFuzz + union-find, rarity-weighted</i>"]
+        C["<b>MO similarity</b><br/><i>TF-IDF + NearestNeighbors</i>"]
+        B --> C
+    end
+    subgraph GR["🔗  CONNECT"]
+        direction TB
+        E1["<b>Graph build</b><br/>6 typed edge kinds · 85,429 links"]
+        E2["<b>Louvain communities</b><br/>127 active networks · 335 cross-district"]
+        E1 --> E2
+    end
+    subgraph SC["📊  SCORE"]
+        direction TB
+        F["<b>Risk · Health · Anomaly</b><br/>glass-box factor scoring"]
+        G["<b>Spatial</b> — DBSCAN hotspots"]
+        H["<b>Socio-economic</b><br/>per-capita + correlation with p-values"]
+        F --> G --> H
+    end
+    subgraph ML["🤖  PREDICT"]
+        direction TB
+        I["<b>Training sets</b><br/>offender · pendency · spike"]
+        J["<b>Forecast</b> — trend + seasonality"]
+        I --> J
+    end
+    K["<b>Read-model bundle</b> — served to the SPA"]
 
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K
+    A --> B
+    C --> E1
+    E2 --> F
+    H --> I
+    J --> K
 
-    classDef ingest  fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
-    classDef resolve fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef network fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
-    classDef score   fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
-    classDef model   fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
-    classDef out     fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
+    classDef box fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
+    classDef key fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    class B,C,E1,E2,F,G,H,I,J box
+    class A,K key
 
-    class A ingest
-    class B,C resolve
-    class D,E network
-    class F,G,H score
-    class I,J model
-    class K out
+    style RES fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
+    style GR  fill:#0a2725,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
+    style SC  fill:#2b1b09,stroke:#E8871E,stroke-width:2px,color:#f0a868
+    style ML  fill:#1e1233,stroke:#a371f7,stroke-width:2px,color:#d2a8ff
 ```
 
 ### Entity resolution
@@ -612,26 +641,27 @@ are blocked, scored with RapidFuzz, and merged with union-find. **54,337 accused
 identities**, of which **578** appear in two or more FIRs.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart LR
-    R1["<b>54,337</b><br/>accused records<br/><i>“Ravi Kumar”, “R. Kumar”,<br/>“Ravikumar D”</i>"]
-    R2["<b>Blocking</b><br/>candidates only, not<br/>every pair against every pair"]
-    R3["<b>Rarity-weighted scoring</b><br/>a shared rare surname is worth<br/>far more than a common one"]
-    R4["<b>Union-find merge</b>"]
+    subgraph ER["🧩  ENTITY RESOLUTION — the same person, spelled five ways"]
+        direction LR
+        R1["<b>54,337</b><br/>accused records<br/><i>“Ravi Kumar” · “R. Kumar”<br/>“Ravikumar D”</i>"]
+        R2["<b>Blocking</b><br/>candidates only, not every<br/>pair against every pair"]
+        R3["<b>Rarity-weighted scoring</b><br/>a shared rare surname is worth<br/>far more than a common one"]
+        R4["<b>Union-find merge</b>"]
+        R1 --> R2 --> R3 --> R4
+    end
     R5["<b>52,928</b><br/>resolved identities"]
-    R6["<b>578</b><br/>appear in 2+ FIRs<br/><i>the watchlist</i>"]
+    R6["<b>578</b> appear in 2+ FIRs<br/><i>the watchlist</i>"]
+    R4 --> R5 --> R6
 
-    R1 --> R2 --> R3 --> R4 --> R5 --> R6
-
-    classDef raw   fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
-    classDef step  fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef out   fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
-    classDef key   fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
-
-    class R1 raw
-    class R2,R3,R4 step
-    class R5 out
+    classDef box  fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
+    classDef good fill:#0d2b22,stroke:#2FA8A0,stroke-width:2px,color:#56d4cc
+    classDef key  fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
+    class R1,R2,R3,R4 box
+    class R5 good
     class R6 key
+    style ER fill:#0b1f3a,stroke:#1f6feb,stroke-width:2px,color:#79c0ff
 ```
 
 ### The six typed link kinds
