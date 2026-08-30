@@ -1635,3 +1635,18 @@ test('the kept-page routes fail closed on a refused case', () => {
       `${route} must check scope on the case it resolved`);
   }
 });
+
+test('the sidebar does not hide role-gated items while /me is loading', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'client', 'src', 'components', 'Shell.tsx'), 'utf8');
+  // `me && n.roles.includes(...)` made Audit and Administration absent for the first second of
+  // every page load and then appear. On a screen a police officer is meant to trust, a tab
+  // that flickers reads as a fault. The rail falls back to the locally known role instead --
+  // safe, because the routes enforce rank themselves and this list is decoration.
+  assert.ok(!/NAV\.filter\(\(n\) => !n\.roles \|\| \(me &&/.test(src),
+    'the rail must not gate on me being loaded');
+  assert.match(src, /const navRole = \(me && me\.user\.role\) \|\| role;/,
+    'it falls back to the session role while /me is in flight');
+});

@@ -51,7 +51,19 @@ export function Shell({ children }: { children: ReactNode }) {
     if (search.trim()) nav(`/cases?search=${encodeURIComponent(search.trim())}`);
   };
 
-  const visibleNav = NAV.filter((n) => !n.roles || (me && n.roles.includes(me.user.role)));
+  // Falls back to the LOCALLY KNOWN role while /me is in flight, rather than hiding every
+  // role-gated item until it lands.
+  //
+  // With `me &&` in front of the check, Audit and Administration were absent for the first
+  // second of every page load and then appeared -- so an SP watching the rail saw the audit
+  // trail vanish and come back. On a screen a police officer is meant to trust, a tab that
+  // flickers reads as a fault, and "where did Audit go" is not a question worth causing.
+  //
+  // Safe because this list is decoration: the routes enforce rank themselves, and getRole()
+  // reads the same session the API calls are already being made with. If /me disagrees when it
+  // arrives, the rail corrects itself.
+  const navRole = (me && me.user.role) || role;
+  const visibleNav = NAV.filter((n) => !n.roles || n.roles.includes(navRole));
 
   // Scope lives in the URL (see lib/api.ts), which means a link that drops the query string
   // silently widens what the reader is looking at. Drilling into Belagavi and clicking any
