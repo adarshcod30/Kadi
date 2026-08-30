@@ -240,56 +240,50 @@ Urban districts run at **163.6** per 100k against **30.1** in rural ones — a 5
 *Five tiers, and the one constraint that decided the shape of all of them.*
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3','tertiaryColor':'#161b22'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TB
     O(["👮  Officer — state · district · station"])
 
-    subgraph L1["🖥️  1 · BROWSER"]
-        direction TB
+    subgraph L1["1 · BROWSER"]
         SPA["<b>React 18 + TypeScript SPA</b><br/>19 screens · EN / ಕನ್ನಡ · voice<br/>Cytoscape · MapLibre · Recharts"]
     end
 
-    subgraph L2["⚡  2 · SERVERLESS FUNCTION — Node 20 · 512 MB · 30 s cap"]
+    subgraph L2["2 · SERVERLESS FUNCTION"]
         direction TB
         RBAC["<b>RBAC + scope</b><br/>enforced on every read and write"]
-        REST["<b>105 REST endpoints</b><br/>enveloped · audited"]
+        REST["<b>105 REST endpoints</b><br/>Node 20 · 512 MB · 30 s cap"]
         ASST["<b>Assistant</b><br/>facts computed first,<br/>the model only phrases"]
         RBAC --> REST --> ASST
     end
 
-    subgraph L3["🧠  3 · ZOHO AI"]
-        direction TB
+    subgraph L3["3 · ZOHO AI"]
+        direction LR
         ZIA["<b>Zia</b><br/>OCR · barcode · translate<br/>TTS · STT · NLP"]
         QML["<b>QuickML</b><br/>GLM-4.7 · Qwen 3.6 vision<br/>8 tabular models"]
-        ZIA ~~~ QML
     end
 
-    subgraph L4["🗄️  4 · DATA"]
-        direction TB
-        RM["<b>Read-model bundle</b><br/>graph · risk · health · hotspots"]
+    subgraph L4["4 · DATA"]
+        direction LR
+        RM["<b>Read-model bundle</b><br/>graph · risk · health"]
         DS["<b>Data Store</b><br/>19 tables · ZCQL"]
-        FS["<b>File Store</b><br/>retained evidence pages"]
-        RM ~~~ DS ~~~ FS
+        FS["<b>File Store</b><br/>retained pages"]
     end
 
-    subgraph L5["🌙  5 · NIGHTLY — Catalyst Job · 15-min budget · 02:00 IST"]
-        direction TB
-        JOB["<b>Python pipeline</b> — 21 modules<br/>24.6 s · peak 738 MB"]
+    subgraph L5["5 · NIGHTLY JOB"]
+        JOB["<b>Python pipeline</b> — 21 modules<br/>24.6 s · peak 738 MB · 02:00 IST"]
     end
 
     O --> SPA
     SPA -->|HTTPS| RBAC
-    REST --> ZIA
+    ASST --> ZIA
     ASST --> QML
     REST --> RM
     REST --> DS
     REST --> FS
     JOB ==>|writes overnight| RM
-    JOB ==> DS
 
     classDef box   fill:#161b22,stroke:#30363d,stroke-width:1px,color:#e6edf3
     classDef actor fill:#1f6feb,stroke:#79c0ff,stroke-width:2px,color:#ffffff
-
     class SPA,RBAC,REST,ASST,ZIA,QML,RM,DS,FS,JOB box
     class O actor
 
@@ -322,7 +316,7 @@ sentences. It cannot invent an FIR number because it is never in a position to l
 numeric guard rejects any phrasing that introduces a digit run absent from the facts.
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     Q(["“Which cases are slipping?”"])
     I["<b>Intent + entity resolution</b><br/><i>deterministic — no model involved</i>"]
@@ -373,7 +367,7 @@ flowchart TD
 What actually happens when an officer opens a case:
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 sequenceDiagram
     autonumber
     participant O as Officer
@@ -434,7 +428,7 @@ Writes are stricter than reads: **an evidence edge lets you read that a case con
 never write to it.**
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     Q(["Officer opens a case"])
 
@@ -586,7 +580,7 @@ The pipeline is 21 Python modules under [`appsail/pipeline/`](appsail/pipeline/)
 matter:
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart TD
     A["<b>FIR intake</b> — 29 KSP tables"]
     subgraph RES["🧩  RESOLVE"]
@@ -641,7 +635,7 @@ are blocked, scored with RapidFuzz, and merged with union-find. **54,337 accused
 identities**, of which **578** appear in two or more FIRs.
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
+%%{init: {'theme':'dark','themeVariables':{'fontSize':'15px','lineColor':'#6e7681','primaryTextColor':'#e6edf3'}}}%%
 flowchart LR
     subgraph ER["🧩  ENTITY RESOLUTION — the same person, spelled five ways"]
         direction LR
