@@ -585,14 +585,14 @@ flowchart TD
 
     classDef ingest  fill:#E8EAEF,stroke:#64748B,stroke-width:2px,color:#0F2F44
     classDef resolve fill:#E3F0FB,stroke:#1A6FC4,stroke-width:2px,color:#0F2F44
-    classDef graph   fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
+    classDef network fill:#D8EFED,stroke:#2FA8A0,stroke-width:2px,color:#0F2F44
     classDef score   fill:#FBE9D6,stroke:#E8871E,stroke-width:2px,color:#0F2F44
     classDef model   fill:#EDE4F5,stroke:#7C5BA8,stroke-width:2px,color:#0F2F44
     classDef out     fill:#0F2F44,stroke:#0F2F44,color:#FFFFFF
 
     class A ingest
     class B,C resolve
-    class D,E graph
+    class D,E network
     class F,G,H score
     class I,J model
     class K out

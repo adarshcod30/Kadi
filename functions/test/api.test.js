@@ -1674,3 +1674,28 @@ test('the sidebar is resizable and the page is not centred away from it', () => 
   assert.ok(src.indexOf("key: 'forecast'") < src.indexOf("key: 'evidence'"),
     'Forecast comes before Evidence in the rail');
 });
+
+test('no mermaid classDef uses a reserved keyword', () => {
+  const fs = require('fs');
+  const path = require('path');
+  // `graph` is how mermaid used to open a flowchart, so `classDef graph` is a parse error and
+  // GitHub renders the whole diagram as "Unable to render rich display". It cost one deploy.
+  const RESERVED = new Set(['graph', 'flowchart', 'subgraph', 'end', 'class', 'classdef',
+    'click', 'style', 'linkstyle', 'direction', 'default', 'call', 'href', 'link']);
+  const root = path.join(__dirname, '..', '..');
+  const files = ['README.md', ...fs.readdirSync(path.join(root, 'docs'))
+    .filter((f) => f.endsWith('.md')).map((f) => path.join('docs', f))];
+  const offenders = [];
+  for (const f of files) {
+    const src = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const m of src.matchAll(/classDef\s+(\w+)/g)) {
+      if (RESERVED.has(m[1].toLowerCase())) offenders.push(`${f}: classDef ${m[1]}`);
+    }
+    // A semicolon ends a statement in the sequence grammar; it cost another deploy.
+    for (const block of src.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
+      if (/^\s*Note[^\n]*;/m.test(block[1])) offenders.push(`${f}: semicolon in a Note`);
+    }
+  }
+  assert.deepStrictEqual(offenders, [],
+    `these diagrams will not render: ${offenders.join('; ')}`);
+});
