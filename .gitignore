@@ -61,3 +61,6 @@ coverage/
 
 # Local scratch space
 scratch/
+
+# Local agent/tool workspace — never part of the project.
+.claude/

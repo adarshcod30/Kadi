@@ -1720,3 +1720,25 @@ test('no mermaid diagram names a font the renderer may not have', () => {
   assert.deepStrictEqual([...new Set(offenders)], [],
     `these files set a mermaid fontFamily, which clips subgraph titles: ${offenders.join(', ')}`);
 });
+
+test('a question about open cases is not answered with the whole corpus', () => {
+  const assistant = require('../api/services/assistant');
+  // "How many cases are open?" carries "case" and "how many", so it fell into the catch-all
+  // count branch, which filtered on nothing and answered 59,985 -- the entire register -- when
+  // 16,868 are open. Worse than a hallucination: the number is real, it is cited, and it
+  // survives the numeric guard, because it is the right answer to a question nobody asked.
+  const d = assistant.detectStatus;
+  assert.ok(typeof d === 'function', 'the status detector must be exported');
+  for (const q of ['How many cases are open?', 'open cases in Bengaluru', 'pending cases',
+    'cases still under investigation', 'how many are unsolved']) {
+    assert.strictEqual((d(q) || {}).id, '1', `"${q}" is an open-cases question`);
+  }
+  assert.strictEqual((d('how many chargesheeted cases') || {}).id, '2');
+  assert.strictEqual((d('closed cases last month') || {}).id, '3');
+  assert.strictEqual((d('undetected cases in Kodagu') || {}).id, '4');
+  // Kannada carries its own words; the English patterns never match them.
+  assert.strictEqual((d('ಎಷ್ಟು ಪ್ರಕರಣಗಳು ತೆರೆದಿವೆ?') || {}).id, '1');
+  // A question with no status qualifier still means "all".
+  assert.strictEqual(d('cyber-crime FIRs in Bengaluru this quarter'), null);
+  assert.strictEqual(d('how many cases are there in total'), null);
+});

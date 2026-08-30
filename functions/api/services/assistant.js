@@ -22,8 +22,8 @@ const PHRASE_DEADLINE_MS = Number(process.env.ASSISTANT_PHRASE_DEADLINE_MS || 50
 
 // Safe parametrized query tools (whitelisted) — the assistant may only call these.
 const TOOLS = {
-  casesByHeadDistrict(user, { head, district, dateFrom }) {
-    const res = queries.listCases(user, { head, district, dateFrom, pageSize: 200 });
+  casesByHeadDistrict(user, { head, district, dateFrom, status }) {
+    const res = queries.listCases(user, { head, district, dateFrom, status, pageSize: 200 });
     return res;
   },
   offenderByName(user, { name }) {
@@ -57,6 +57,37 @@ const TOOLS = {
     return queries.hotspots(user, { emerging: 'true' });
   },
 };
+
+// The status a question is asking about, or null for "any".
+//
+// WITHOUT THIS, "how many cases are open?" ANSWERED WITH THE WHOLE CORPUS. The branch below is
+// a catch-all: any sentence carrying "case" and "how many" fell into it, and it counted with no
+// status filter at all -- so the reader was told 59,985 cases are open when 16,868 are. That is
+// worse than a hallucination. The number is real, it is cited, it survives the numeric guard,
+// and it is the answer to a question nobody asked.
+//
+// Ids are CaseStatusMaster's, and 'open' means statusId 1 exactly as queries.js counts it for
+// the dashboard -- the assistant and the KPI card must not be able to disagree about a word
+// this load-bearing.
+const STATUS_WORDS = [
+  [/\b(open|pending|ongoing|active|under investigation|unsolved)\b/i, '1', 'open', 'ತೆರೆದ'],
+  [/\b(charge ?sheet(ed)?|chargesheet)\b/i, '2', 'charge-sheeted', 'ದೋಷಾರೋಪ ಪಟ್ಟಿ ಸಲ್ಲಿಸಿದ'],
+  [/\b(closed|disposed|finished)\b/i, '3', 'closed', 'ಮುಚ್ಚಿದ'],
+  [/\b(undetected|untraced|no clue)\b/i, '4', 'undetected', 'ಪತ್ತೆಯಾಗದ'],
+];
+// Kannada carries its own words; the English patterns never match them.
+const STATUS_WORDS_KN = [
+  [/ತೆರೆದ|ಬಾಕಿ|ತನಿಖೆಯಲ್ಲಿ/, '1', 'open', 'ತೆರೆದ'],
+  [/ದೋಷಾರೋಪ/, '2', 'charge-sheeted', 'ದೋಷಾರೋಪ ಪಟ್ಟಿ ಸಲ್ಲಿಸಿದ'],
+  [/ಮುಚ್ಚಿದ/, '3', 'closed', 'ಮುಚ್ಚಿದ'],
+  [/ಪತ್ತೆಯಾಗದ/, '4', 'undetected', 'ಪತ್ತೆಯಾಗದ'],
+];
+function detectStatus(text) {
+  for (const [re, id, en, kn] of [...STATUS_WORDS, ...STATUS_WORDS_KN]) {
+    if (re.test(text)) return { id, en, kn };
+  }
+  return null;
+}
 
 function detectHead(text, db) {
   const t = text.toLowerCase();
@@ -320,7 +351,8 @@ function query(user, text, lang, context = {}) {
     const head = detectHead(text, db);
     const district = detectDistrict(text, db);
     const dateFrom = detectDateFrom(text);
-    const res = TOOLS.casesByHeadDistrict(user, { head, district, dateFrom });
+    const status = detectStatus(text);
+    const res = TOOLS.casesByHeadDistrict(user, { head, district, dateFrom, status: status && status.id });
     res.items.slice(0, 6).forEach((c) => citations.push({ type: 'case', id: c.caseMasterId, label: c.crimeNo }));
     // Fall-backs must match the answer's language or the Kannada sentence ends up with
     // English words spliced into it ("the state ನಲ್ಲಿ 40836 matching ಪ್ರಕರಣಗಳು").
@@ -328,10 +360,13 @@ function query(user, text, lang, context = {}) {
     const distName = district
       ? (db.lookups.districts.get(district) || {}).DistrictName
       : (isKn ? 'ರಾಜ್ಯಾದ್ಯಂತ' : 'the state');
+    // The status is NAMED in the sentence when one was asked for. "Found 16,868 matching
+    // cases" in answer to "how many are open" is a true number attached to an ambiguous claim,
+    // and the reader has no way to tell which of the two it is.
     answer = isKn
-      ? `${distName} ${n(res.total)} ${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
-      : `Found ${n(res.total)} ${headName || 'matching'} case${res.total === 1 ? '' : 's'} in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
-    action = { type: 'open_cases', filters: { head, district, dateFrom } };
+      ? `${distName} ${n(res.total)} ${status ? status.kn + ' ' : ''}${headName ? headName + ' ' : ''}ಪ್ರಕರಣಗಳು ಕಂಡುಬಂದಿವೆ.`
+      : `Found ${n(res.total)} ${status ? status.en + ' ' : ''}${headName || ''}case${res.total === 1 ? '' : 's'} in ${distName}${dateFrom ? ' for the selected period' : ''}. Sample FIRs are cited; open any to explore its linkage graph.`;
+    action = { type: 'open_cases', filters: { head, district, dateFrom, status: status && status.id } };
   } else {
     answer = isKn
       ? 'ನಾನು ಪ್ರಕರಣಗಳು, ಆರೋಪಿಗಳ ಇತಿಹಾಸ, ಜಾರುತ್ತಿರುವ ಪ್ರಕರಣಗಳು, ಅಪರಾಧ ತಾಣಗಳು, ತಲಾ ಜನಸಂಖ್ಯೆಯ ಅಪರಾಧ ದರ ಮತ್ತು ಮುನ್ಸೂಚನೆಯ ಬಗ್ಗೆ ಉತ್ತರಿಸಬಲ್ಲೆ.'
@@ -521,4 +556,4 @@ async function queryEnhanced(user, text, lang, req, context = {}) {
   };
 }
 
-module.exports = { queryEnhanced, query, TOOLS };
+module.exports = { detectStatus, queryEnhanced, query, TOOLS };
