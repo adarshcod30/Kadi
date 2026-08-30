@@ -319,7 +319,7 @@ sequenceDiagram
     O->>S: open FIR 100310297202500003
     S->>F: GET /cases/:id  (session token)
     F->>R: resolve identity + scope
-    Note over R: a signed-in account is pinned to<br/>the district and unit in its token;<br/>x-kadi-role is ignored entirely
+    Note over R: a signed-in account is pinned to<br/>the district and unit in its token —<br/>x-kadi-role is ignored entirely
     F->>A: record view_case
     F->>Q: getCase(user, id)
     alt in scope
