@@ -6,16 +6,16 @@ Three parts:
 
 - **Part A** — the **source FIR schema**, exactly as given in the KSP ER diagram. This is a
   contract, not a suggestion.
-- **Part B** — the tables **you added** (app, audit, and the derived analytics tables).
+- **Part B** — the tables **added on top** (app, audit, and the derived analytics tables).
 - **Part C** — Catalyst specifics: type mapping, import order, and the traps.
 
 > **Rule one: keep the source column names verbatim.** The whole point is that a real KSP
-> export drops in unchanged. The moment you rename `CaseMasterID` to something tidier, you
+> export drops in unchanged. The moment `CaseMasterID` is renamed to something tidier, that
 > have built a demo instead of a system. Catalyst auto-adds `ROWID`, `CREATEDTIME`,
 > `MODIFIEDTIME` and `CREATORID` to every table — never redefine those.
 
 **Live right now:** 11 tables in Data Store, 59,985 FIRs, queryable with ZCQL. The generator
-emits 29 tables in total; you imported the subset the API actually reads.
+emits 29 tables in total; the subset the API actually reads is what was imported.
 
 ---
 
@@ -153,7 +153,7 @@ drift out of sync.
 
 ---
 
-## PART B — Tables you added
+## PART B — Tables added on top
 
 ### App and audit
 
@@ -178,9 +178,9 @@ drift out of sync.
 > **The fairness invariant.** `OffenderRisk.protectedAttributesUsed` must always be `0`, and
 > entity resolution, linkage and risk features must never contain `ReligionID`, `CasteID` or
 > `OccupationID`. There is a unit test that fails the build if any of them appears in a
-> feature set. That test is the reason you can make the claim out loud — protect it.
+> feature set. That test is the reason the claim can be made out loud, so it stays.
 
-`evidenceJSON` on `LinkEdge` is what powers every "why linked" panel. If you ever find
+`evidenceJSON` on `LinkEdge` is what powers every "why linked" panel. If there is ever
 yourself tempted to drop it to save space, intern the strings instead (see
 [02](02_TRD.md) §9) — do not lose the evidence.
 
@@ -200,7 +200,7 @@ yourself tempted to drop it to save space, intern the strings instead (see
 | DECIMAL (lat/long) | `double` |
 | BIT | `boolean` |
 
-### Three traps that will cost you an evening each
+### Three traps, an evening each
 
 1. **17-digit IDs break `JSON.parse`.** Catalyst project and row IDs exceed
    `Number.MAX_SAFE_INTEGER`. They corrupt *silently* — `...013048` becomes `...013050` and
@@ -234,7 +234,7 @@ LinkEdge(srcId, dstId, edgeType)
 ### Import order
 
 Generate one CSV per table → upload to a **Stratus** bucket → bulk-write into Data Store.
-Respect FK order or the import fails halfway and leaves you with a partial table:
+Respect FK order or the import fails halfway and leaves a partial table:
 
 1. Lookup and master tables (State, District, Unit, Rank, Act, Section, CrimeHead…)
 2. `CaseMaster`
@@ -246,7 +246,7 @@ Derived tables are **populated by the pipeline**, never imported. Details in
 ### Where the graph actually lives
 
 The original plan was to mirror the derived graph into **NoSQL** for fast ego-graph reads.
-You did not do that, and the reason is worth remembering: the read-model ships **inside the
+That is not what happened here, and the reason is worth remembering: the read-model ships **inside the
 function bundle** as interned JSON, which is faster still and has no extra service
 dependency. A 121 MB naive bundle broke the deployed function outright; interning brought it
 to 12.1 MB with identical evidence text.

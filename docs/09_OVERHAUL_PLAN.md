@@ -2,8 +2,8 @@
 
 ### From "a good visualization platform" to what the track actually asks for
 
-**Written:** 2026-08-20, for the Refined Prototype phase (deadline 30 Aug).
-**Source:** the Challenge 02 brief + Adarsh's own gap analysis.
+For the Refined Prototype phase, worked out against the Challenge 02 brief and my own gap
+analysis.
 
 ---
 
@@ -324,5 +324,5 @@ It receives computed figures and returns prose. Every number, every FIR referenc
 percentage on screen comes from the deterministic pipeline and is traceable to a row.
 
 That is what separates this from a chatbot bolted onto a dashboard — and it is the answer to
-the only question that really threatens an AI-heavy police tool: *"how do you know it isn't
+the only question that really threatens an AI-heavy police tool: *"how is it known this isn't
 making this up?"*

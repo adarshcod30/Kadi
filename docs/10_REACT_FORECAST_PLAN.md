@@ -1,7 +1,7 @@
 # 10 — React, Forecast, live case entry, and a real ML model
 
-A plan for review. Nothing here is built yet except the knowledge-base documents, which are
-generated and waiting on one wiring step.
+The plan I worked out for this phase. At the time of writing nothing here was built except the
+knowledge-base documents, which were waiting on one wiring step.
 
 ---
 
@@ -59,11 +59,11 @@ predictable from case features. Detection rate across 34,683 closed cases:
 
 The one strong feature is leakage: the health flag is *computed from* case age and pendency,
 which already encode the outcome trajectory. Training on it would produce a model that looks
-excellent and tells you nothing.
+excellent and says nothing.
 
 **The corpus was generated with detection roughly independent of case features.** A supervised
 detection-risk model would predict ~68.7% for everything. Proposing one would be exactly the
-"for name sake" feature you objected to earlier.
+"for name sake" feature I had already objected to.
 
 **What this does not rule out.** Three things genuinely have structure and are what PRD items 4
 and 6 actually ask for — time-series forecasting, anomaly detection, and pattern discovery.
@@ -126,11 +126,11 @@ is something an officer can act on today, ordered by what fails first.
 
 - **Priority worklist** — one merged, ranked queue drawn from health flags, pulsing stations,
   active high-risk offenders and inbound cross-district links. Today these live on four
-  separate screens; nothing tells you which to do first.
+  separate screens; nothing says which to do first.
 - **Ageing wall** — cases nearest their peer-median failure point, with days remaining.
 - **Active offenders needing attention** — high risk **and** recently active **and** unarrested,
   which is the intersection none of the current sorts produce.
-- **Inbound links** — cases registered elsewhere that connect into your scope, arriving as a
+- **Inbound links** — cases registered elsewhere that connect into the reader's scope, arriving as a
   feed rather than a buried tab.
 - **Pending approvals** — for supervisors, the §4 queue.
 
@@ -257,7 +257,7 @@ Each phase is independently shippable and leaves the system working.
 | **6** | QuickML forecasting model, served with fallback to the statistical baseline | phase 4 for growing data |
 
 Phases 2 and 3 deliver visible value with no new infrastructure, so I would do those first
-unless you want the write path sooner.
+unless the write path is wanted sooner.
 
 ---
 
@@ -283,11 +283,11 @@ Forecast and React tabs and a working knowledge base.
 
 ---
 
-## 7. What I need from you
+## 7. The two decisions this plan turned on
 
-1. **Phase order** — agree with 1→2→3 first, or do you want the write path (4/5) sooner?
-2. **The ML finding in §0.2** — confirm you are happy dropping the detection-risk classifier in
-   favour of forecasting plus anomaly detection. This is the one judgement worth your explicit
+1. **Phase order** — 1→2→3 first, with the write path (4/5) after rather than before.
+2. **The ML finding in §0.2** — dropping the detection-risk classifier in favour of forecasting
+   plus anomaly detection. This is the one judgement that deserved an explicit
    agreement, because it contradicts the obvious reading of "a case-record ML model".
 3. **Who submits** — should SI and SHO both submit, with SP approving? And should the DGP be
    able to approve for any district, or only Admin?

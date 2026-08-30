@@ -3,9 +3,9 @@
 ### Architecture, services and the constraints that produced them
 **Deploy target:** Zoho Catalyst · **Stack:** React SPA + Node Function + Python AppSail / Job
 
-> This is the architecture you actually shipped, not the one you sketched on day one. Where
-> the two differ, the reason is recorded — usually a platform limit you hit at 2am. Read
-> §10 before you change anything structural.
+> This is the architecture that actually shipped, not the one sketched on day one. Where the
+> two differ the reason is recorded, and it is usually a platform limit found late at night.
+> §10 is worth re-reading before anything structural changes.
 
 ---
 
@@ -43,13 +43,13 @@
 
 **The golden rule, and the only one that matters:** the SPA and the API **only read**
 precomputed results. Everything expensive is produced asynchronously by the Job and written
-down before any user asks for it. §10 explains why you have no choice.
+down before any user asks for it. §10 explains why there was no choice.
 
-## 2. Catalyst services — what you wired, and what you did not
+## 2. Catalyst services — what is wired, and what is not
 
 Eight services are live. Be precise about this in the pitch; a judge will check.
 
-| Capability in KADI | Catalyst service | How you use it |
+| Capability in KADI | Catalyst service | How it is used |
 |---|---|---|
 | SPA hosting | **Web Client Hosting** | Serves `/app`. Same origin as the API, so no CORS dance. |
 | REST API + nightly Job | **Serverless Functions** | Advanced I/O accepts an Express app. Raised to 512 MB for the read-model. |
@@ -60,7 +60,7 @@ Eight services are live. Be precise about this in the pitch; a judge will check.
 | OAuth to QuickML | **Connections** | `deployment.READ` scope. QuickML refuses anonymous calls. |
 | Sign-in + role model | **Authentication** | Provisioned. See §8 for the honest caveat. |
 
-**Not wired — and you should say so before anyone asks.** Full diagnosis in
+**Not wired — and better said before anyone asks.** Full diagnosis in
 [08_CATALYST_LIVE.md](08_CATALYST_LIVE.md):
 
 | Service | Status |
@@ -158,7 +158,7 @@ docs/
 | GET | `/audit` | Audit log — ACP / Admin only |
 | GET | `/ai/status` | Whether QuickML and Zia are genuinely wired |
 
-`/ai/status` exists so you never have to *claim* an AI service is on. Point at it instead.
+`/ai/status` exists so an AI service never has to be *claimed* to be on. It can be pointed at instead.
 
 ## 6. Data model
 
@@ -218,7 +218,7 @@ Every stage writes an explanation payload alongside its results. That is what ma
 
 ## 9. Performance work worth knowing
 
-Three optimisations you should be able to explain, because they are the interesting part:
+Three optimisations worth being able to explain, because they are the interesting part:
 
 - **sklearn `working_memory`.** Peak RSS was 1,770 MB — over the 512 MB Job ceiling. Setting
   `config_context(working_memory=32)` cut it to **738 MB with byte-identical output**. The
@@ -227,7 +227,7 @@ Three optimisations you should be able to explain, because they are the interest
   broke the deployed function outright. Interning the repeated edge-reason strings brings it
   to **12.1 MB** with identical evidence text. A JS `Proxy` rehydrates it lazily on read.
 - **JSON integer precision.** Catalyst's 17-digit IDs exceed `Number.MAX_SAFE_INTEGER` and
-  corrupt silently through `JSON.parse`. Store them as **strings**. This one cost you a
+  corrupt silently through `JSON.parse`. They are stored as **strings**. This one cost a
   deploy: `...013048` became `...013050` and nothing errored.
 
 ## 10. The 30-second cap — the constraint behind everything
@@ -244,7 +244,7 @@ fits, so:
 - The web tier reads only what the Job has already written.
 
 That single limit is why every screen loads instantly instead of waiting on a model. When
-you present the architecture, lead with the constraint — it makes the design look inevitable
+the architecture is presented, the constraint leads — it makes the design look inevitable
 rather than arbitrary.
 
 Two smaller traps in the same family: a Job function **must** be named `index.js`

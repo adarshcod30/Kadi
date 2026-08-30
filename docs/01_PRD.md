@@ -1,28 +1,27 @@
-# 01 — What you are building, and why
+# 01 — What I built, and why
 
 ### KADI — AI-Driven Crime Analytics & Visualization Platform
 **Program:** Datathon 2026 · Karnataka State Police × Hack2Skill · **Challenge 02**
 **Deploy target:** Zoho Catalyst (mandatory — see [07](07_CATALYST_SETUP.md))
-**Status:** shipped and live. Every requirement below is marked with what you actually built.
+**Status:** shipped and live. Every requirement below is marked against what actually shipped.
 
-> These docs are written to you, as build instructions. Read 01 for *what* and *why*,
-> [02](02_TRD.md) for *how it is wired*, [03](03_DATABASE_SCHEMA.md) for the data contract,
-> and [05](05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md) for the order you built it in.
-> If you are rebuilding from scratch, follow 05.
+> This file is the *what* and the *why*. [02](02_TRD.md) covers how it is wired,
+> [03](03_DATABASE_SCHEMA.md) the data contract, and
+> [05](05_APP_FLOW_AND_IMPLEMENTATION_PLAN.md) the order it came together in.
 
 ---
 
 ## 1. The one-sentence pitch
 
-You are turning 59,985 siloed Karnataka FIRs into **one connected, explainable intelligence
+KADI turns 59,985 siloed Karnataka FIRs into **one connected, explainable intelligence
 picture** — one that exposes serial offenders, cross-district networks and slipping
 investigations, without ever profiling a community.
 
 Hold on to that sentence. Every feature below either serves it or gets cut.
 
-## 2. The problem you are solving
+## 2. The problem being solved
 
-Four things are broken, and you should be able to say all four from memory:
+Four things are broken, and all four need to be sayable in one breath:
 
 - **Data silos.** FIRs are registered per station and stay there. A gang working across
   three districts shows up as many unrelated petty crimes. Nobody can see the connection
@@ -35,7 +34,7 @@ Four things are broken, and you should be able to say all four from memory:
   against caste and religious minorities. The KSP schema *contains* those fields. A
   credible solution must refuse to use them — and be able to prove the refusal.
 
-That last point is not a disclaimer you bolt on at the end. It is a design constraint that
+That last point is not a disclaimer bolted on at the end. It is a design constraint that
 shapes the feature set, so treat it as one.
 
 ## 3. Goals
@@ -51,9 +50,9 @@ shapes the feature set, so treat it as one.
 
 ### Non-goals — say no to these
 
-Writing these down is what keeps the scope survivable. You are not building:
+Writing these down is what kept the scope survivable. Not in scope:
 
-- Real KSP data integration. You use a schema-faithful **synthetic** corpus; the pipeline
+- Real KSP data integration. It runs on a schema-faithful **synthetic** corpus; the pipeline
   ingests real data unchanged. See [06](06_SYNTHETIC_DATA_SPEC.md).
 - Facial recognition, biometrics, or CDR / phone-tap ingestion.
 - **Any** predictive use of caste, religion or occupation.
@@ -82,7 +81,7 @@ real read boundary enforced **server-side on every query** in
 
 The station tier is the one the whole product argues against: an SHO sees their own register
 and nothing else, which is precisely the silo the brief describes. Giving that view its own
-login makes the argument demonstrable rather than asserted — you can stand in it, see how
+login makes the argument demonstrable rather than asserted — it can be stood in, showing how
 little is visible, and then step up a tier.
 
 | Capability | SI / SHO | DySP | SP | Analyst | DGP | Admin |
@@ -117,8 +116,8 @@ deployed build.
 - Edges are **typed and labelled**: shared offender, co-accused, similar MO, same location,
   same time window, same act & section.
 - Every edge is click-through to a **"why linked"** panel naming the exact matching
-  attributes and the source FIR numbers. This is the feature that separates you from a
-  dashboard — make sure it is the first thing you demo.
+  attributes and the source FIR numbers. This is the feature that separates KADI from a
+  dashboard, so it is the first thing to demo.
 - Communities (Louvain) are grouped and expandable. **127 active networks, 335 of them
   spanning more than one district** — the cross-silo finding, stated as a count.
 - Filters: crime head, date range, district, edge type, minimum link strength.
@@ -129,7 +128,7 @@ deployed build.
   **54,337 accused records resolve into 578 repeat-offender identities**, recovered at
   85.9% against planted ground truth.
 - A behaviour-based risk score (0–100) with a visible factor breakdown — prior count,
-  gravity mix, recency, network centrality. **No protected attributes.** If you cannot show
+  gravity mix, recency, network centrality. **No protected attributes.** If the factors cannot be shown
   the breakdown, do not show the score.
 - "Also appears in" links straight back into the graph.
 - Entity-resolution confidence is displayed. Low-confidence merges are flagged, not hidden.
@@ -216,7 +215,7 @@ deployed build.
 
 - One ranked queue merging four signal sources that already existed on four different screens
   with four different orderings: cases failing their health rules, high-risk offenders who are
-  still active, stations sharply above their own baseline, and cases outside your scope that
+  still active, stations sharply above their own baseline, and cases outside the reader’s scope that
   link into it.
 - **Severity first, then urgency within severity.** A case's urgency is how far past the peer
   median *for its own type* it has run — not raw age, because an old case of a slow type is
@@ -311,14 +310,14 @@ deployed build.
 
 ## 6. What "good" looks like
 
-You should be able to demonstrate all six of these live:
+All six of these are demonstrable live:
 
 - The graph reconstructs the planted gangs and serial chains — **100% ground-truth
   recovery**, recomputed on every pipeline run, never hand-entered.
 - Investigation health flags the planted slipping cases with correct reasons.
 - A cross-silo link spans ≥2 districts and ≥3 stations, on stage.
 - The assistant answers an English *and* a Kannada question with citations.
-- You can answer "how do you avoid discrimination?" in one confident sentence, and then
+- The question "how is discrimination avoided?" is answerable in one sentence, and then
   show the test that enforces it.
 - **File a case as an SI, approve it as the SP, and watch it appear in the register marked as
   awaiting analysis** — then try to approve it as SP Mysuru and be refused.
@@ -334,16 +333,16 @@ You should be able to demonstrate all six of these live:
 - [x] Official PPT template filled — `docs/deck/`, 20 slides
 - [x] All links tested and public
 
-## 8. Assumptions you are working under
+## 8. Assumptions this is built on
 
 - Synthetic data is acceptable and expected; real FIR data is confidential.
 - Catalyst free credits cover the build.
 - Deployment is **exclusively** on Catalyst. Substituting a third-party host may invalidate
   the submission — do not be tempted, however convenient the alternative looks.
 
-## 9. Risks, and what you did about each
+## 9. Risks, and what was done about each
 
-| Risk | What you did |
+| Risk | What was done |
 |---|---|
 | 30 s request cap on Functions **and** AppSail | All heavy compute moved to a Job (15-min budget). The web tier only reads precomputed results. This one constraint shaped the whole architecture. |
 | Scope creep | F1/F2/F3/F6/F8/F9 shipped first; F4/F5/F7 layered after. |

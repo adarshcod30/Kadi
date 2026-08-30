@@ -62,7 +62,7 @@ Two different permissions, deliberately not the same one.
 | **Read an uploaded image** | DGP, Administrator, SCRB Analyst | The register is *scoped*; an upload is whatever the uploader chose to photograph, and no scope applies to it. That belongs with the ranks already holding state-wide read. |
 | **Read a filed note** | anyone who can see the case | The note belongs to the case. The station that registered it needs the memo transcription — and gets it without ever being able to upload an image. |
 
-Verified against the deployment:
+Checked against the deployment:
 
 ```
 POST /evidence/ocr    DGP 200 · Admin 200 · Analyst 200 · SP 403 · DSP 403 · SHO 403 · SI 403

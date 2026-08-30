@@ -20,7 +20,7 @@ are read back from the real account, not placeholders.
 > **console** does services and credentials — enabling Data Store / Zia / QuickML, OAuth
 > scopes, domain whitelisting. Most services cannot be switched on from the CLI.
 >
-> The one big exception you discovered: **Data Store tables can be created programmatically**
+> The one big exception: **Data Store tables can be created programmatically**
 > through the REST API. The console is not the only route, whatever the docs imply.
 
 ---
@@ -29,7 +29,7 @@ are read back from the real account, not placeholders.
 
 ```bash
 npm i -g zcatalyst-cli
-catalyst login          # `catalyst whoami` should print your account
+catalyst login          # `catalyst whoami` should print the account
 ```
 
 If the CLI logs out later: `catalyst login --force` (add `--no-localhost` on a headless box).
@@ -96,7 +96,7 @@ Derived tables (`LinkEdge`, `OffenderRisk`, `CaseHealthMetric`…) are **never i
 pipeline computes them.
 
 > **DDL gotcha:** `Create_Column` returns `PATTERN_NOT_MATCHED` if a column `description`
-> contains a non-ASCII character. An em-dash is enough. The error does not tell you which
+> contains a non-ASCII character. An em-dash is enough. The error does not say which
 > character or which field. Keep DDL text plain ASCII.
 
 ## Step 4 — Deploy
@@ -113,13 +113,13 @@ catalyst deploy --only appsail
 Live at `https://kadilabs-60078029367.development.catalystserverless.in/app/`.
 
 Because the SPA is served from the same origin as the API, there is no CORS configuration to
-do. If you ever split them, whitelist the front-end domain under Authentication — that is the
+do. If they are ever split, whitelist the front-end domain under Authentication — that is the
 single most common Catalyst integration failure.
 
 ## Step 5 — Schedule the pipeline
 
 Console → Cron → new Cron targeting the recompute Job, nightly at 02:00 IST. Confirm the
-first run reports SUCCESS before you trust it.
+first run reports SUCCESS before trusting it.
 
 ---
 
@@ -208,4 +208,4 @@ curl -s https://kadilabs-60078029367.development.catalystserverless.in/server/ap
 ```
 
 `/ai/status` reports honestly whether QuickML and Zia are actually wired. Use it instead of
-claiming anything from memory.
+claiming anything unverified.

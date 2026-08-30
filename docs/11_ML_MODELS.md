@@ -212,7 +212,7 @@ ship and these do not.
 | Location re-victimisation, 14 days | 0.621 | 0.632 26-week rate | Persistence — "somewhere that had a crime recently will have another" — is most of the signal. |
 | Cross-district escalation (per case) | 0.586 | 0.691 share of districts so far | Loses to a one-line ratio by a wide margin. **See the note below.** |
 | Repeat victimisation (person) | 0.692 | 0.758 prior count | Loses to counting, and near-degenerate: 91% of observed victims are victimised again inside six months, so there is almost nothing to separate. |
-| Charge-sheet within 90 days, at registration | 0.520 | 0.527 sub-head history | No signal beyond what the crime type already tells you. |
+| Charge-sheet within 90 days, at registration | 0.520 | 0.527 sub-head history | No signal beyond what the crime type already says. |
 
 ### Rejected despite beating the rule
 

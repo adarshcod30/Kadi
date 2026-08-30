@@ -2,16 +2,14 @@
 
 ### Every part of this project, from scratch, with nothing hidden
 
-**Written:** 2026-08-20 · **Verified against:** the code at commit `195cd2b` and the live
-deployment, not from memory.
+This is my reference for the whole project — the file I come back to before deciding what to
+refine. It records what exists, what works, what does not, and where each number came from.
+Where a claim elsewhere in the repo is **wrong**, this file says so and gives the measured
+value instead.
 
-This is the reference to read before deciding what to refine. It documents what exists, what
-works, what does not, and where the numbers came from. Where a claim elsewhere in the repo
-is **wrong**, this file says so and gives the measured value instead.
-
-> **Standing rule for this document:** every figure here was produced by running something —
-> a query, a `wc -l`, a `curl`, a `du`. Nothing is quoted from another document. Where I could
-> not verify something, it says so explicitly.
+> **My rule for this file:** every figure in it came out of running something — a query, a
+> `wc -l`, a `curl`, a `du`. Nothing is copied across from another document. Where I could not
+> confirm a number, I say so instead of guessing.
 
 **Contents**
 
@@ -533,7 +531,7 @@ This is the screen that carries the product, so its encoding matters.
 | **Circle** | a person |
 | Square colour | crime head (Property blue, Cyber teal, Body red, Women pink, …) |
 | **Circle colour** | **risk band** — High red, Medium amber, Low green |
-| Node size | degree — the hub is biggest, before you read a label |
+| Node size | degree — the hub is biggest, before a label is read |
 | Orange 4px ring | the focus / selected node |
 | Edge colour | evidence type (see below) |
 | Edge thickness | `0.8 + strength × 2.2` |
@@ -605,7 +603,7 @@ FROM DistrictInsight WHERE RankShift > 5 ORDER BY RankShift DESC LIMIT 5
 
 → Kodagu 335 FIRs, 51.6/100k, **#31 → #6** · Dharwad #23 → #7 · Ramanagara #19 → #11.
 
-If you get to run one query in front of a judge, run this one.
+If there is time for one query in front of a judge, this is the one.
 
 ### 🔴 The root cause behind three limitations
 
@@ -734,7 +732,7 @@ entire 4,150-line client is verified only by eye.
 
 ## 10 · Everything that is wrong or unfinished
 
-Nothing withheld. Grouped by how much it costs you.
+Nothing withheld. Grouped by how much each one costs.
 
 ### A · Blocked on a console action
 
@@ -839,6 +837,6 @@ Three specifically worth volunteering before anyone asks:
 3. **"The assistant is not an LLM."** It is a deterministic intent engine — which cannot
    hallucinate an FIR number. In police work that trade is worth making.
 
-Saying these first is what separates an analyst's work from a student project. And you can
+Saying these first is what separates an analyst's work from a student project. And it is possible to
 afford to say them, because the things that *do* work — 100% ground-truth recovery, 7.8% MAPE
 on a hold-out backtest, a fairness guarantee enforced by a failing test — are all measured.

@@ -1,10 +1,10 @@
 # 08 — What is live right now
 
-The honest state of the **KadiLabs** Catalyst project, verified by API call rather than
-recalled from memory. Last verified **2026-08-22**.
+The honest state of the **KadiLabs** Catalyst project, read back from the API rather than
+recalled.
 
-Read this before any demo or interview. Everything in the "not real yet" section is
-something a judge could discover on their own — you want to have said it first.
+Worth re-reading before any demo or interview. Everything in the "not real yet" section is
+something a judge could find on their own, so it is better said first.
 
 | | |
 |---|---|
@@ -20,7 +20,7 @@ something a judge could discover on their own — you want to have said it first
 
 Everything below was created **programmatically through the Catalyst REST API** — no console
 clicking. That supersedes the "Data Store tables can only be created from the console"
-limitation you will find in older notes and in some Zoho documentation.
+limitation still repeated in older notes and in some Zoho documentation.
 
 ---
 
@@ -67,7 +67,7 @@ FROM DistrictInsight WHERE RankShift > 5 ORDER BY RankShift DESC LIMIT 5
 
 It returns the districts raw counts hide — Kodagu **31st by count, 6th per 100,000
 residents**; Dharwad 23rd → 7th. That is the argument for per-capita analysis answered *in
-the database*, not asserted on a slide. If you only get to run one query in front of a judge,
+the database*, not asserted on a slide. If there is only time for one query in front of a judge,
 run this one.
 
 ---
@@ -216,7 +216,7 @@ Store and Cache failures — so calls go over the raw-HTTPS header-credential pa
 
 Two lessons, both already paid for once:
 
-- **Ask the service, do not trust a flag you set yourself.** `ZIA_ENABLED=false` was our own
+- **Ask the service, do not trust a flag set by hand.** `ZIA_ENABLED=false` was our own
   config, and it proved nothing about the project. `/diag/zia` now asks Zia directly.
 - **Read the SDK, do not guess the URL.** Five guessed paths returned
   `404 INVALID_URL_PATTERN`. The real ones are in
@@ -278,4 +278,4 @@ curl -s https://kadilabs-60078029367.development.catalystserverless.in/server/ap
 curl -s https://kadilabs-60078029367.development.catalystserverless.in/server/api/ai/status
 ```
 
-`/ai/status` exists precisely so you never have to claim an AI service is wired. Point at it.
+`/ai/status` exists precisely so an AI service never has to be claimed to be wired. Point at it.

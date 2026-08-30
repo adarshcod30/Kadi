@@ -49,6 +49,7 @@ Turning 59,985 siloed FIRs into one connected, explainable intelligence picture.
 **Understand it**
 [The Problem](#the-problem) ·
 [What KADI Does](#what-kadi-does) ·
+[Requirement Coverage](#requirement-coverage) ·
 [A Five-Minute Tour](#a-five-minute-tour) ·
 [Screens](#screens) ·
 [The Headline Finding](#the-headline-finding)
@@ -87,6 +88,20 @@ Turning 59,985 siloed FIRs into one connected, explainable intelligence picture.
 
 The Karnataka State Police maintains extensive crime records. The records are not the problem —
 **the walls between them are.**
+
+### The four hurdles, as the challenge statement words them
+
+Each is quoted as written, with what the deployed build does about it and the figure that closes
+it. Every number below was read from the live Catalyst API, not estimated.
+
+| # | The hurdle, as stated | What KADI does | Evidence |
+|---|---|---|---|
+| **1** | *"Records managed in independent silos, heavily reliant on Excel-based reporting rather than integrated, automated systems."* | One graph over 19 relational Data Store tables, rebuilt nightly. Every link names the attribute it matched on. | **85,429** typed links · **6** edge kinds · **0** spreadsheets |
+| **2** | *"Absence of AI-driven approaches, leaving deeper behavioral patterns, social interactions and interconnected criminal networks undiscovered."* | Eight ML models ship, and each had to beat the rule a supervisor would already use. Twelve candidates did not, and were cut. | **8** models · **0.870** best AUC · **12** candidates cut |
+| **3** | *"SCRB currently receives limited, fragmented information, hindering comprehensive state-wide analysis."* | SCRB reads state-wide on the same graph a station sees its own slice of — not a separate extract, and not a second pipeline. | **31** districts · **298** stations · **1** register, six ranks |
+| **4** | *"Policing remains largely reactive; without systematic exploration of emerging trends, investigators lack tools for proactive strategies."* | Forecast, hotspots and pendency risk run ahead of the event rather than reporting after it. | **5** districts pulsing red · **346** hotspots · **3-month** horizon |
+
+### What that looks like on an ordinary Tuesday
 
 | Today | Consequence |
 |---|---|
@@ -152,6 +167,39 @@ the graph.
 
 </td></tr>
 </table>
+
+---
+
+## Requirement Coverage
+
+The statement names six capabilities; expanded, they are twelve distinct asks. Each one below
+names the screen that serves it, a figure from the deployed build, and the module that computes
+it — so a claim can be checked against code rather than taken on trust.
+
+| Requirement, as stated | Where it ships | Evidence | Computed in |
+|---|---|---|---|
+| **1a** District-level drill-down | Spatiotemporal Map — choropleth over satellite | 31 districts · 298 stations | [`national.py`](appsail/pipeline/national.py) · [`MapPage.tsx`](client/src/pages/MapPage.tsx) |
+| **1b** Spatiotemporal clusters | Map — DBSCAN over location, layered hour × weekday | 346 hotspots · 8 time-layered | [`spatial.py`](appsail/pipeline/spatial.py) |
+| **1c** Emerging trend alerts | Command Dashboard — red-zone pulsing against a district's own history | 5 pulsing · top district +145% | [`zones.py`](appsail/pipeline/zones.py) |
+| **2a** Relationship mapping | Case-Linkage Graph — node canvas, 5 layouts, 6 link filters | 85,429 links · 6 typed kinds | [`graph_build.py`](appsail/pipeline/graph_build.py) · [`GraphExplorer.tsx`](client/src/pages/GraphExplorer.tsx) |
+| **2b** Repeat offender tracking + MO | Offender Watchlist — one identity across jurisdictions | 578 repeat · 54,337 → 52,928 identities | [`entity_resolution.py`](appsail/pipeline/entity_resolution.py) · [`mo_similarity.py`](appsail/pipeline/mo_similarity.py) |
+| **2c** Association detection | Clusters — Louvain communities over the link graph | 100 clusters · largest 172 cases | [`community.py`](appsail/pipeline/community.py) |
+| **3a** Socio-economic correlation | Socio-economic Insights — per-capita rates with p-values | +0.880 urbanisation, p < 0.0001 | [`socio.py`](appsail/pipeline/socio.py) · [`demographics.py`](appsail/pipeline/demographics.py) |
+| **3b** Predictive risk scoring | React + Forecast — risk bands and horizons | 0.870 AUC · 3 months ahead | [`risk_score.py`](appsail/pipeline/risk_score.py) · [`pendency_set.py`](appsail/pipeline/pendency_set.py) · [`forecast.py`](appsail/pipeline/forecast.py) |
+| **3c** Anomaly detection | Investigation Health — deviation call-outs on cases and stations | 1,803 cases · 6 stations flagged | [`anomaly.py`](appsail/pipeline/anomaly.py) |
+| **4** Pattern & trend discovery | Near-repeat, occasion effects and concentration curves | 93% repeat rate within 400 m / 14 days | [`spatial.py`](appsail/pipeline/spatial.py) · [`occasions.py`](appsail/pipeline/occasions.py) |
+| **5** Network & behavioural analysis | Graph + agenda — `mo_similarity` is a first-class edge kind, ranked below a shared offender | shared MO ranked as a hypothesis, not a name | [`agenda.js`](functions/api/services/agenda.js) |
+| **6** AI/ML-driven intelligence | Eight models on QuickML and scikit-learn | 12 candidates cut · fairness invariant in the build | [`training_set.py`](appsail/pipeline/training_set.py) · [`evaluate.py`](appsail/pipeline/evaluate.py) |
+
+**And one thing the statement does not ask for.** Caste, religion and occupation are present in
+the corpus and are excluded from every model by a test that fails the build. A platform asked to
+read *"social interactions"* has to be told, in code, which social facts it may never learn from.
+See [Fairness is an invariant, not a policy](#fairness-is-an-invariant-not-a-policy).
+
+**A finding worth surfacing here.** The concentration curve says the busiest 10% of the 298
+stations carry only 11.5% of the load — a Gini of 0.047. Resource cannot be moved between
+stations on volume alone. Concentration lives in the 346 clusters (Gini 0.377), which is the
+layer to deploy against.
 
 ---
 
@@ -987,7 +1035,7 @@ npm --prefix client run build && catalyst deploy
 There is no external CI runner; verification is local and reproducible:
 
 ```bash
-cd functions && npm test        # 74 tests — API, RBAC, scope, evidence, i18n, invariants
+cd functions && npm test        # 83 tests — API, RBAC, scope, evidence, i18n, invariants
 cd client && npx tsc --noEmit   # typecheck
 ```
 
@@ -1022,7 +1070,7 @@ Kadi/
 │   │   │                       translationfix · submissions · forecasting · mlforecast …
 │   │   └── data/               deployable bundle (built by build_bundle.py)
 │   ├── refreshanalytics/       Catalyst Job — nightly analytics revalidation
-│   └── test/api.test.js        74 tests
+│   └── test/api.test.js        83 tests
 │
 ├── appsail/                    Python analytics — Catalyst AppSail
 │   ├── app.py                  stdlib-only HTTP service
@@ -1215,7 +1263,7 @@ The synthetic corpus, pipeline and application code are the work of Team KadiLab
 
 | Artefact | Location |
 |---|---|
-| **Deck** | [`docs/deck/KADI_KSP_Datathon_2026_Submission.pptx`](docs/deck/) — 20 slides, official template |
+| **Deck** | [`KADI_KSP_Datathon_2026.pdf`](docs/deck/KADI_KSP_Datathon_2026.pdf) · [`.pptx`](docs/deck/KADI_KSP_Datathon_2026.pptx) — 22 slides on the official template, 4.5 MB against the 5 MB cap |
 | **Prototype brief** | [`docs/deck/PROTOTYPE_BRIEF.txt`](docs/deck/PROTOTYPE_BRIEF.txt) — 972 / 1024 characters |
 | **Demo video** | [Google Drive](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing) |
 | **Live deployment** | [Catalyst](https://kadilabs-60078029367.development.catalystserverless.in/app/) |

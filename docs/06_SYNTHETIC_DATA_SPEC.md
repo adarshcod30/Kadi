@@ -1,11 +1,12 @@
 # 06 — The synthetic corpus
 
-Real FIR data is confidential and cannot leave KSP. So you build and demo on a
+Real FIR data is confidential and cannot leave KSP. So the build and the demo run on a
 **schema-faithful synthetic corpus** that (a) matches the KSP ER diagram exactly and
-(b) **plants known ground-truth patterns** so you can *prove* the platform finds them.
+(b) **plants known ground-truth patterns**, so the platform finding them is measurable rather
+than asserted.
 
 Say "synthetic" everywhere it appears — README, About page, deck, footer. Disclosure costs
-you nothing and buys you the judge's trust. The pipeline ingests real data unchanged.
+nothing and buys the judge's trust. The pipeline ingests real data unchanged.
 
 **What the generator currently produces:** 59,985 FIRs across 43 months, 31 districts, 298
 police stations, 74,799 victim records and 54,337 accused records carrying 300 planted repeat
@@ -22,8 +23,8 @@ byte-for-byte.
 4. Determinism, so the demo is reproducible and the eval score is meaningful.
 5. One CSV per table, ready for Data Store import.
 
-Point 3 is the one that turns a demo into evidence. Without it you can only assert that
-linkage works; with it you can measure it.
+Point 3 is the one that turns a demo into evidence. Without it linkage can only be asserted;
+with it, it can be measured.
 
 ## 2. Volumes
 
@@ -191,12 +192,12 @@ python data/generator/generate.py
 
 ## 12. Be honest about where it shows
 
-You will be asked how realistic it is. Have the answer ready, and volunteer the weaknesses —
+The question of how realistic it is always comes up. The answer is ready, and the weaknesses are volunteered —
 it reads as rigour, not apology:
 
 - MO narratives are template-drawn, so they are cleaner and more uniform than real free text.
 - The urbanisation correlation is **partly circular**: the generator weights urban crime
-  upward, so finding that urbanisation correlates with crime rate is partly confirming your
+  upward, so finding that urbanisation correlates with crime rate is partly confirming the
   own assumption. The method is sound and runs unchanged on real data — but on this corpus it
   is confirmation, not discovery.
 - Names come from a finite pool, making resolution slightly easier than reality.

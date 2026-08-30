@@ -122,7 +122,7 @@ workspace rail.
 
 Correcting the machine's Kannada is not a feature of the product; it is a tool for maintaining
 one. A place in the rail beside Cases and Offenders would advertise it as something an officer
-does as part of the job. It is also where somebody is standing at the moment they need it: you
+does as part of the job. It is also where somebody is standing at the moment they need it: the officer
 notice a bad translation right after switching the language.
 
 - English above Kannada, stacked rather than in columns — the two scripts have very different

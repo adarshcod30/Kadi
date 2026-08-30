@@ -23,7 +23,7 @@ act on one needs to know which they are reading.
 |---|---|---|
 | **Computed from the records** (teal) | live query over 59,987 cases | "Which cases are slipping?" |
 | **From the knowledge base** (purple) | RAG over 12 indexed documents | "What does a pulsing red zone mean?" |
-| **Read from the document you supplied** (gold) | one image, in this request only | a photographed seizure memo |
+| **Read from the document supplied** (gold) | one image, in this request only | a photographed seizure memo |
 | **Wording by the model** (grey) | GLM-4.7 re-phrased the sentence | appears alongside the others |
 
 The empty state uses the same four groups and the same colours, so the card someone clicked and
@@ -87,7 +87,7 @@ A branch may set `noPhrase`, and the model is then skipped entirely. One case us
 it is the important one:
 
 > Case 100310297202500003 is **not visible in your scope**. That is not the same as it not
-> existing — it may be registered in a district you do not read.
+> existing — it may be registered in a district this account does not read.
 
 The model reliably flattens that to *"the record does not show any case numbered…"*, which tells
 an officer that a case they cannot see is a case that is not there. The distinction is the entire

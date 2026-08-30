@@ -1,8 +1,8 @@
-# 05 — App flow, and the order you built it in
+# 05 — App flow, and the order it came together in
 
 **Part A** — how the app is wired: sitemap, navigation, journeys, sequences.
-**Part B** — the build order, with a definition of done for each phase. If you are rebuilding
-from scratch, follow Part B top to bottom.
+**Part B** — the build order, with a definition of done for each phase, in the sequence it was
+actually done.
 
 ---
 
@@ -95,7 +95,7 @@ Cron 02:00 IST → Job → entity resolution → graph build → communities →
 
 The sign-in screen is a **role chooser, not a password gate**. Catalyst Authentication is
 provisioned, but the API still trusts a role header rather than a verified JWT. The login
-page states this in plain language and so should you.
+page states this in plain language, and so does every demo of it.
 
 The role *scoping* is completely real: the API filters every query by the caller's unit,
 district or state and refuses out-of-scope reads. Only the identity check is outstanding.
@@ -122,7 +122,7 @@ interface and keep moving rather than blocking.
 **Done when:** the app shell renders locally and `/health` returns ok.
 
 > Do not hand-write `catalyst.json`. Scaffold a throwaway project and copy its real schema —
-> you will otherwise burn an afternoon on a file whose format is undocumented. And leave
+> an undocumented file format otherwise burns an afternoon. And leave
 > `project_id` out of it entirely; the binding belongs in `.catalystrc`, as strings.
 
 ### Phase 1 — Data and a vertical slice
@@ -215,7 +215,7 @@ In priority order, and each is genuinely small:
 
 ### B3. Where the hours actually went
 
-Worth knowing before you estimate anything similar again: the pipeline logic was the
+Worth remembering before estimating anything similar again: the pipeline logic was the
 predictable part. The time went on platform archaeology — a silent integer-precision bug, an
 undocumented `catalyst.json` schema, an AppSail container that ignores `requirements.txt`, a
 Job that fails silently unless its entry file is called `index.js`, and an API Gateway that

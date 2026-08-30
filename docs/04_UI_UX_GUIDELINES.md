@@ -6,7 +6,7 @@
 calm, light, authoritative, and obvious to a non-technical officer — but with modern,
 data-dense polish. "gov.in portal meets a clean analytics product."
 
-If a screen ever makes you feel clever, you have probably made it worse. Optimise for an SI
+If a screen ever feels clever, it has probably got worse. Optimise for an SI
 understanding it in five seconds.
 
 ---
@@ -47,7 +47,7 @@ understanding it in five seconds.
 --status-undetected:#C9820A  --status-false:#8A94A3
 ```
 
-Saffron and red are **only** for genuine alerts and flags. The moment you use red for
+Saffron and red are **only** for genuine alerts and flags. The moment red is used for
 decoration, it stops meaning anything. Base UI is navy and blue on white.
 
 **Typography**
@@ -55,7 +55,7 @@ decoration, it stops meaning anything. Base UI is navy and blue on white.
 - **Inter** for UI, **Noto Sans Kannada** for Kannada, system-font fallback.
 - Display 28/600 · H1 22/600 · H2 18/600 · Body 14/400 · Small 12.5/400 · mono for IDs and
   CrimeNo.
-- Line-height 1.5 on body. `tabular-nums` on every metric, or your KPI cards will jitter as
+- Line-height 1.5 on body. `tabular-nums` on every metric, or the KPI cards jitter as
   numbers change.
 
 **Spacing and shape**
@@ -130,7 +130,7 @@ rank-shift finding. Alerts feed on the right rail.
 
 ### Case-Linkage Graph — hero screen
 Filters left, canvas centre, "why linked" panel right. Entry from a case, an offender, a
-cluster or search. A case switcher lets you move between cases without going back.
+cluster or search. A case switcher moves between cases without going back.
 
 Open on a case whose network is genuinely populated. An empty hero screen is worse than no
 hero screen.
@@ -173,7 +173,7 @@ Respect `prefers-reduced-motion`. Skeletons over spinners.
 
 ## 7. Internationalisation
 
-Every string lives in an i18n dictionary (en, kn). **Every** string — the failure mode you
+Every string lives in an i18n dictionary (en, kn). **Every** string — the failure mode to
 already hit was a half-translated page where headings were Kannada and body text was
 English, which looks worse than no translation at all. Numbers and dates localised
 (DD-MM-YYYY, IST). The assistant answers in the language it was asked in.
@@ -196,5 +196,5 @@ one. Co-brand respectfully: "Karnataka State Police" leads, KADI is secondary. T
 - Keep the "synthetic dataset" tag visible in the footer. Judges respect the disclosure and
   will ask if it is missing.
 - Check the graph and the Kannada answer on a projector: large type, high contrast.
-- **Show what you built, do not just mention it.** If a feature exists, it should be
-  reachable in one click from the screen you are on.
+- **Show the feature, do not just mention it.** If a feature exists, it should be reachable
+  in one click from wherever the reader already is.

@@ -1803,7 +1803,11 @@ test('the README test badge matches the suite', () => {
   // rechecks is exactly the kind of stale claim the README rewrite existed to remove.
   assert.strictEqual(badge, declared,
     `README badge says ${badge}, the suite declares ${declared}`);
-  for (const re of [/\*\*(\d+) Node tests\*\*/, /\| Test suite \| \*\*(\d+) passing\*\* \|/]) {
+  // Every place the README states the Node count, including inside code fences -- the two
+  // fenced ones drifted to 74 while the suite ran 83, because the first version of this test
+  // only looked at prose.
+  for (const re of [/\*\*(\d+) Node tests\*\*/, /\| Test suite \| \*\*(\d+) passing\*\* \|/,
+                    /npm test\s+# (\d+) tests/, /test\/api\.test\.js\s+(\d+) tests/]) {
     const n = Number((readme.match(re) || [])[1]);
     assert.strictEqual(n, declared, `a README test count says ${n}, the suite declares ${declared}`);
   }
