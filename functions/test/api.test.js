@@ -1604,3 +1604,34 @@ test('writes take scope from a lookup that actually enforces it', () => {
   assert.ok(app.slice(read, read + 1600).includes('rbac.caseInScope(req.user, c)'),
     'readings stay at the case\'s own scope');
 });
+
+test('the kept-page routes fail closed on a refused case', () => {
+  const rbac = require('../api/services/rbac');
+  // These two routes were written BEFORE getCase enforced scope, so they resolve a case and
+  // then check rbac.caseInScope themselves. getCase now answers an out-of-scope read with a
+  // stub carrying the id and nothing else -- no districtId, no unitId -- and that stub is what
+  // these routes now hand to caseInScope. It has to be refused rather than waved through: the
+  // page behind a reading is a photograph of somebody's document.
+  const stub = { caseMasterId: 'X', visible: false, visibility: 'out_of_scope' };
+  for (const role of ['SP', 'DSP', 'SHO', 'SI']) {
+    const u = { ...rbac.DEMO_USERS[role], roleMeta: rbac.ROLES[role] };
+    assert.strictEqual(rbac.caseInScope(u, stub), false, `${role} must not pass a refusal stub`);
+  }
+  // A state account that has drilled into a district reads as that district, and the stub
+  // carries no district to match -- so it is refused there too.
+  const drilled = { ...rbac.DEMO_USERS.Analyst, roleMeta: rbac.ROLES.Analyst,
+    drilledFromState: true, districtId: '1' };
+  assert.strictEqual(rbac.caseInScope(drilled, stub), false,
+    'a drilled state account must not pass a refusal stub either');
+
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'api', 'app.js'), 'utf8');
+  for (const route of ["r.get('/evidence/note/:id/page'", "r.post('/evidence/note/:id/reread'"]) {
+    const at = app.indexOf(route);
+    assert.ok(at > 0, `${route} must exist`);
+    const body = app.slice(at, at + 1400);
+    assert.match(body, /rbac\.caseInScope\(req\.user, c\)/,
+      `${route} must check scope on the case it resolved`);
+  }
+});
