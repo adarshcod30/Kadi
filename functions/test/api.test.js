@@ -1650,3 +1650,27 @@ test('the sidebar does not hide role-gated items while /me is loading', () => {
   assert.match(src, /const navRole = \(me && me\.user\.role\) \|\| role;/,
     'it falls back to the session role while /me is in flight');
 });
+
+test('the sidebar is resizable and the page is not centred away from it', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'client', 'src', 'components', 'Shell.tsx'), 'utf8');
+
+  // The width travels as a CSS VARIABLE. An inline `width` beats every class including the
+  // `w-16` that keeps the rail an icon strip on a phone, so setting it directly would drag the
+  // mobile layout along with the desktop one.
+  assert.match(src, /\['--rail' as any\]: `\$\{rail\}px`/, 'width must ride on a custom property');
+  assert.match(src, /md:w-\[var\(--rail\)\]/, 'and be consumed only inside the md breakpoint');
+  assert.ok(!/style=\{collapsed \? undefined : \{ width: rail \}\}/.test(src),
+    'never set an inline width — it would override the mobile rail');
+
+  // mx-auto inside a max-width put ~90px of nothing between the rail and the page on a wide
+  // screen, which reads as the layout having come apart rather than as breathing room.
+  const page = src.slice(src.indexOf('page-enter'), src.indexOf('page-enter') + 120);
+  assert.ok(!/mx-auto/.test(page), 'the page must not be centred away from the sidebar');
+
+  // Forecast sits with the analytical screens; Evidence with the restricted ones above Audit.
+  assert.ok(src.indexOf("key: 'forecast'") < src.indexOf("key: 'evidence'"),
+    'Forecast comes before Evidence in the rail');
+});

@@ -24,8 +24,12 @@ const NAV = [
   { to: '/map', icon: Map, key: 'map' },
   { to: '/intelligence', icon: Brain, key: 'insights' },
   { to: '/react', icon: Zap, key: 'react' },
-  { to: '/evidence', icon: ScanText, key: 'evidence', roles: ['DGP', 'Admin', 'Analyst'] },
+  // Forecast sits with the analytical screens above it; Evidence sits just above Audit and
+  // Administration, with the other restricted ones. It is the only screen here that reads
+  // something an officer is physically holding, and it is state-tier only -- grouping it with
+  // the rest of the restricted set is truer than sitting it in the middle of daily work.
   { to: '/forecast', icon: TrendingUp, key: 'forecast' },
+  { to: '/evidence', icon: ScanText, key: 'evidence', roles: ['DGP', 'Admin', 'Analyst'] },
   { to: '/audit', icon: ShieldCheck, key: 'audit', roles: ['SP', 'DSP', 'Analyst', 'DGP', 'Admin'] },
   { to: '/admin', icon: Settings, key: 'admin', roles: ['Admin', 'DGP'] },
   // About sits at the very bottom of the rail: orientation material, not a daily destination,
@@ -33,8 +37,57 @@ const NAV = [
   { to: '/about', icon: Info, key: 'about' },
 ];
 
+// The rail's width, in pixels, when it is not collapsed.
+//
+// A fixed 240px suits a 13-inch laptop and wastes a third of a station terminal's screen -- and
+// the labels here are Kannada half the time, which runs longer than the English. So the width is
+// the viewer's to set: drag the divider, and it is remembered.
+const RAIL_MIN = 176;
+const RAIL_MAX = 380;
+const RAIL_DEFAULT = 240;
+const RAIL_KEY = 'kadi.railWidth';
+
+const readRail = () => {
+  try {
+    const n = Number(localStorage.getItem(RAIL_KEY));
+    return Number.isFinite(n) && n >= RAIL_MIN && n <= RAIL_MAX ? n : RAIL_DEFAULT;
+  } catch { return RAIL_DEFAULT; }
+};
+
 export function Shell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [rail, setRail] = useState(readRail);
+  const [dragging, setDragging] = useState(false);
+
+  // Pointer events rather than mouse events, so a stylus or a touch screen on a station
+  // terminal drags the same way. Listeners live on window: the pointer leaves the 4px handle
+  // almost immediately, and a handler bound to the handle would stop tracking the moment it did.
+  useEffect(() => {
+    if (!dragging) return undefined;
+    const onMove = (e: PointerEvent) => {
+      const w = Math.min(RAIL_MAX, Math.max(RAIL_MIN, e.clientX));
+      setRail(w);
+    };
+    const onUp = () => {
+      setDragging(false);
+      // Written on release rather than on every move -- a drag is ~200 pointer events and
+      // localStorage is synchronous.
+      setRail((w) => { try { localStorage.setItem(RAIL_KEY, String(w)); } catch { /* quota */ } return w; });
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    // The whole document takes the resize cursor and stops selecting text, or the drag paints
+    // the sidebar blue as it passes over the labels.
+    const prev = document.body.style.cursor;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = prev;
+      document.body.style.userSelect = '';
+    };
+  }, [dragging]);
   const alertsPop = usePopover();
   const { lang, setLang } = useLang();
   const t = useT();
@@ -179,7 +232,50 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 min-h-0">
         {/* Sidebar — icon-only below md, labelled (collapsible) from md up */}
-        <aside className={`bg-surface border-r border-line flex flex-col shrink-0 transition-all w-16 ${collapsed ? 'md:w-16' : 'md:w-60'}`}>
+        <aside
+          // The width travels as a CSS VARIABLE, not as an inline `width`. An inline width beats
+          // every class, including the `w-16` that keeps the rail an icon strip on a phone -- so
+          // setting it directly would drag the mobile layout along with the desktop one. The
+          // variable is only consumed inside the md: breakpoint, so small screens never see it.
+          style={{ ['--rail' as any]: `${rail}px` }}
+          className={`relative bg-surface border-r border-line flex flex-col shrink-0 w-16 ${
+            collapsed ? 'md:w-16' : 'md:w-[var(--rail)]'} ${
+            dragging ? '' : 'transition-[width] duration-150'}`}>
+          {/* The drag handle: a 5px strip over the right border, widened to a comfortable
+              target without drawing a 5px line. Hidden while collapsed, where there is nothing
+              to resize. Keyboard users get the arrow keys, because a control that only responds
+              to a pointer is not a control for everybody. */}
+          {!collapsed && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize the sidebar"
+              aria-valuenow={rail}
+              aria-valuemin={RAIL_MIN}
+              aria-valuemax={RAIL_MAX}
+              tabIndex={0}
+              onPointerDown={(e) => { e.preventDefault(); setDragging(true); }}
+              onDoubleClick={() => {
+                setRail(RAIL_DEFAULT);
+                try { localStorage.setItem(RAIL_KEY, String(RAIL_DEFAULT)); } catch { /* quota */ }
+              }}
+              onKeyDown={(e) => {
+                const step = e.shiftKey ? 32 : 8;
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                e.preventDefault();
+                setRail((w) => {
+                  const next = Math.min(RAIL_MAX, Math.max(RAIL_MIN, w + (e.key === 'ArrowRight' ? step : -step)));
+                  try { localStorage.setItem(RAIL_KEY, String(next)); } catch { /* quota */ }
+                  return next;
+                });
+              }}
+              title="Drag to resize · double-click to reset"
+              className={`hidden md:block absolute top-0 right-0 h-full w-[5px] translate-x-[2px] z-20
+                cursor-col-resize group focus:outline-none`}>
+              <span className={`absolute inset-y-0 left-[2px] w-[1px] transition-colors ${
+                dragging ? 'bg-kadi-blue' : 'bg-transparent group-hover:bg-kadi-blue/50 group-focus:bg-kadi-blue'}`} />
+            </div>
+          )}
           {/* The collapse control belongs at the top of the rail, next to what it collapses --
               not buried at the foot beneath the account row, which is where people looked for
               sign-out and found a chevron instead. */}
@@ -245,7 +341,12 @@ export function Shell({ children }: { children: ReactNode }) {
               wrapper stalled at opacity 0 on the map route and left the whole page invisible,
               and no decorative fade is worth that. */}
           <div key={location.pathname.split('/')[1] || 'home'}
-            className="page-enter p-5 max-w-[1500px] mx-auto">
+            // LEFT-ALIGNED, NOT CENTRED. `mx-auto` inside a 1500px cap put a gutter between the
+            // sidebar and the page on any wide screen -- roughly 90px of nothing on a station
+            // monitor, which reads as the layout having come apart rather than as breathing
+            // room. The cap still stops running text from stretching to 2,000px; it just no
+            // longer pushes the page away from the rail it belongs against.
+            className="page-enter p-5 max-w-[1800px]">
             {children}
           </div>
         </main>
