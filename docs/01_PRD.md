@@ -329,8 +329,8 @@ All six of these are demonstrable live:
 - [x] Live solution deployed **on Catalyst**
 - [x] Public GitHub repo with README and setup steps
 - [x] Demo video (problem → prototype → workflows)
-- [x] Prototype brief, ≤1024 characters — `docs/deck/PROTOTYPE_BRIEF.txt`
-- [x] Official PPT template filled — `docs/deck/`, 20 slides
+- [x] Prototype brief, ≤1024 characters
+- [x] Official PPT template filled — `docs/deck/`, 23 slides
 - [x] All links tested and public
 
 ## 8. Assumptions this is built on

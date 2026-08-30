@@ -1,9 +1,0 @@
-KADI turns 59,985 siloed Karnataka FIRs into one connected, explainable intelligence picture.
-
-Today FIRs sit in station-level registers and analysis is Excel-driven, so a serial offender working across districts is invisible. KADI builds a living graph: entity resolution folds 54,337 accused records into 52,928 identities, 578 of them repeat, and 85,429 typed edges join cases by shared offender, co-accused, modus operandi, place, time or act & section. Every edge is clickable evidence, naming the attribute that matched and the FIRs it matched on.
-
-Above that sit per-capita analytics (Kodagu is 31st by raw count, 6th per 100,000), DBSCAN hotspots, a 3-month forecast backtested to 7.8% MAPE, investigation-health flags on 26,168 cases, and a bilingual EN/Kannada assistant that cites real FIR numbers.
-
-Caste, religion and occupation never enter any model; a unit test fails the build if they do.
-
-Runs end-to-end on eight Zoho Catalyst services. Live now, sign in by role, no password.

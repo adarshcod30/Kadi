@@ -1263,8 +1263,7 @@ The synthetic corpus, pipeline and application code are the work of Team KadiLab
 
 | Artefact | Location |
 |---|---|
-| **Deck** | [`KADI_KSP_Datathon_2026.pdf`](docs/deck/KADI_KSP_Datathon_2026.pdf) · [`.pptx`](docs/deck/KADI_KSP_Datathon_2026.pptx) — 22 slides on the official template, 4.5 MB against the 5 MB cap |
-| **Prototype brief** | [`docs/deck/PROTOTYPE_BRIEF.txt`](docs/deck/PROTOTYPE_BRIEF.txt) — 972 / 1024 characters |
+| **Deck** | [`KADI_KSP_Datathon_2026.pdf`](docs/deck/KADI_KSP_Datathon_2026.pdf) · [`.pptx`](docs/deck/KADI_KSP_Datathon_2026.pptx) — 23 slides on the official template, 4.2 MB against the 5 MB cap |
 | **Demo video** | [Google Drive](https://drive.google.com/drive/folders/1WY3KHg1WOEnSNTBXGmTtH2ZoJM1y4cLJ?usp=sharing) |
 | **Live deployment** | [Catalyst](https://kadilabs-60078029367.development.catalystserverless.in/app/) |
 
