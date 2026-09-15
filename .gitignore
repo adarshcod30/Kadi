@@ -60,17 +60,9 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-
 # Deck QA artefacts — regenerate with `node build.js && python3 preview.py`
 
 # Local scratch space
 scratch/
 
 # Local agent/tool workspace — never part of the project.
-.claude/
-
-# local agent and editor files, never committed
-.claude.json
-CLAUDE.local.md
-CLAUDE.md
-AGENTS.md
