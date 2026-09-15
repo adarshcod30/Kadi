@@ -66,3 +66,6 @@ coverage/
 scratch/
 
 # Local agent/tool workspace — never part of the project.
+
+# secrets, build output and local noise
+.next/
